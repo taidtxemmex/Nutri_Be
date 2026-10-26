@@ -11,6 +11,10 @@ import { ProfilesModule } from './modules/profiles/profiles.module';
 import { NutritionEngineModule } from './core/nutrition-engine/nutrition-engine.module';
 import { MasterDataModule } from './modules/master-data.module';
 import { IngredientsModule } from './modules/ingredients/ingredients.module';
+import { DishesModule } from './modules/dishes/dishes.module';
+import { MealsModule } from './modules/meals/meals.module';
+import { CoefficientsModule } from './modules/coefficients/coefficients.module';
+import { EvidencesModule } from './modules/evidences/evidences.module';
 
 @Module({
   imports: [
@@ -28,6 +32,10 @@ import { IngredientsModule } from './modules/ingredients/ingredients.module';
     ProfilesModule,
     MasterDataModule,
     IngredientsModule,
+    DishesModule,
+    MealsModule,
+    CoefficientsModule,
+    EvidencesModule,
   ],
 })
 export class AppModule implements NestModule {

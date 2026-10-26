@@ -27,11 +27,13 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
     }
 
     const request = context.switchToHttp().getRequest();
+    const httpResponse = context.switchToHttp().getResponse();
     const traceId = request.headers['x-trace-id'] || 'trace-local';
 
     return next.handle().pipe(
       map((response) => {
         const timestamp = new Date().toISOString();
+        const statusCode = httpResponse?.statusCode || 200;
 
         // 1. Stream file (Excel, PDF)
         if (response && response.isStream) {
@@ -45,7 +47,7 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
           const totalPages = Math.ceil(response.total / limit) || 1;
 
           return {
-            status: 200,
+            status: statusCode,
             message: 'success',
             data: response.items,
             content: response.items,
@@ -64,7 +66,7 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
 
         // 3. Single Entity or Mutation
         return {
-          status: 200,
+          status: statusCode,
           message: 'success',
           data: response ?? null,
           meta: {

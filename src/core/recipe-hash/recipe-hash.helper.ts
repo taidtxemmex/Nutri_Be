@@ -1,4 +1,4 @@
-import * as crypto from 'crypto';
+import { computeRecipeHash, RecipeComponentInput } from '../nutrition-engine/recipe-hash.util';
 
 export interface RecipeItemInput {
   ingredientId: number;
@@ -6,18 +6,11 @@ export interface RecipeItemInput {
 }
 
 export class RecipeHashHelper {
+  /**
+   * Generates a deterministic SHA-256 hash using the canonical recipe engine.
+   * Preserves backward compatibility while delegating to the unified recipe-hash utility.
+   */
   static generateHash(items: RecipeItemInput[]): string {
-    if (!items || items.length === 0) {
-      return '';
-    }
-
-    // Sort items by ingredientId ascending to ensure consistent hash
-    const sorted = [...items].sort((a, b) => a.ingredientId - b.ingredientId);
-
-    const canonicalString = sorted
-      .map((item) => `${item.ingredientId}:${Number(item.weightGrams).toFixed(2)}`)
-      .join('|');
-
-    return crypto.createHash('sha256').update(canonicalString).digest('hex');
+    return computeRecipeHash(items as RecipeComponentInput[]);
   }
 }
