@@ -1,11 +1,8 @@
-import {
-  ValidationPipe,
-  ValidationError,
-  BadRequestException,
-} from '@nestjs/common';
+import { ValidationPipe, ValidationError, BadRequestException, Optional } from '@nestjs/common';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 export class CustomValidationPipe extends ValidationPipe {
-  constructor() {
+  constructor(@Optional() private readonly i18nService?: I18nService) {
     super({
       whitelist: true,
       transform: true,
@@ -14,7 +11,9 @@ export class CustomValidationPipe extends ValidationPipe {
         const details = this.flattenErrors(errors);
         return new BadRequestException({
           code: 'VALIDATION_FAILED',
-          message: 'Dữ liệu gửi lên không hợp lệ',
+          message: this.i18nService
+            ? this.i18nService.translate('error.validation.failed')
+            : 'Dữ liệu gửi lên không hợp lệ',
           details,
         });
       },
@@ -31,7 +30,12 @@ export class CustomValidationPipe extends ValidationPipe {
       const fieldPath = parentField ? `${parentField}.${error.property}` : error.property;
 
       if (error.constraints) {
-        for (const [code, message] of Object.entries(error.constraints)) {
+        for (const [code, rawMessage] of Object.entries(error.constraints)) {
+          const message =
+            this.i18nService && this.i18nService.hasKey(rawMessage)
+              ? this.i18nService.translate(rawMessage)
+              : rawMessage;
+
           result.push({
             field: fieldPath,
             code: code.toUpperCase(),

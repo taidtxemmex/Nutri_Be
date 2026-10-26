@@ -24,7 +24,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:unit": "jest --config jest.config.js --testPathPattern=\".*\\.spec\\.ts$\"",
     "test:modules": "dotenv -e .env.test -- jest --config ./tests/jest-e2e.json --testPathPattern=\"tests/modules/.*\\.spec\\.ts$\"",
-    "test:e2e": "dotenv -e .env.test -- jest --config ./tests/jest-e2e.json --testPathPattern=\"tests/e2e/.*\\.e2e-spec\\.ts$\" --forceExit",
+    "test:e2e": "dotenv -e .env.test -- jest --config ./tests/jest-e2e.json --testPathPattern=\".*\\.e2e-spec\\.ts$\" --runInBand --forceExit",
     "test:db:setup": "dotenv -e .env.test -- npx prisma db push --skip-generate",
     "test:db:reset": "dotenv -e .env.test -- npx prisma migrate reset --force"
   },

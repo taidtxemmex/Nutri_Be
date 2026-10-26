@@ -1,5 +1,5 @@
 import { IsOptional, IsInt, Min, Max, IsString, IsIn } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type, Transform, Expose } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class BasePaginationQueryDto {
@@ -16,9 +16,11 @@ export class BasePaginationQueryDto {
 
   @ApiPropertyOptional({ default: 20, maximum: 100, description: 'Limit items per page (max 100)' })
   @IsOptional()
+  @Expose()
   @Type(() => Number)
-  @Transform(({ value }) => {
-    const num = Number(value);
+  @Transform(({ value, obj }) => {
+    const raw = value !== undefined ? value : obj?.size;
+    const num = Number(raw);
     if (isNaN(num) || num < 1) return 20;
     return Math.min(100, num);
   })
@@ -27,13 +29,11 @@ export class BasePaginationQueryDto {
   @Max(100)
   limit?: number = 20;
 
-  // Setter alias for backward compatibility with NutriFE / Spring Boot
-  set size(val: number) {
-    if (val) {
-      const num = Number(val);
-      this.limit = isNaN(num) || num < 1 ? 20 : Math.min(100, num);
-    }
-  }
+  // Property alias for backward compatibility with NutriFE / Spring Boot
+  @ApiPropertyOptional({ description: 'Alias for limit' })
+  @IsOptional()
+  @Type(() => Number)
+  size?: number;
 
   @ApiPropertyOptional({ description: 'Search keyword' })
   @IsOptional()

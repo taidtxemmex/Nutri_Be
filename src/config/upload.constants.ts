@@ -30,9 +30,7 @@ export const ALLOWED_IMAGE_MIME_TYPES = [
   'image/gif',
 ] as const;
 
-export const ALLOWED_DOCUMENT_MIME_TYPES = [
-  'application/pdf',
-] as const;
+export const ALLOWED_DOCUMENT_MIME_TYPES = ['application/pdf'] as const;
 
 export const ALLOWED_UPLOAD_MIME_TYPES = [
   ...ALLOWED_IMAGE_MIME_TYPES,

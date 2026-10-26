@@ -5,13 +5,17 @@ import {
   HttpException,
   HttpStatus,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import { I18nService } from '../../core/i18n/i18n.service';
 
 @Catch()
 export class GlobalExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(GlobalExceptionFilter.name);
+
+  constructor(@Optional() private readonly i18nService?: I18nService) {}
 
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp();
@@ -19,6 +23,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const request = ctx.getRequest<Request>();
     const traceId = (request.headers['x-trace-id'] as string) || 'trace-unknown';
     const timestamp = new Date().toISOString();
+    const locale = request.locale || 'vi';
 
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let errorCode = 'INTERNAL_SERVER_ERROR';
@@ -77,6 +82,14 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         `[500 ERROR] Trace: ${traceId} | Path: ${request.method} ${request.url} | Error: ${err?.message}`,
         err?.stack,
       );
+    }
+
+    if (this.i18nService) {
+      if (this.i18nService.hasKey(message)) {
+        message = this.i18nService.translate(message, locale);
+      } else if (this.i18nService.hasKey(errorCode)) {
+        message = this.i18nService.translate(errorCode, locale);
+      }
     }
 
     response.status(status).json({

@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  NestInterceptor,
-  ExecutionContext,
-  CallHandler,
-} from '@nestjs/common';
+import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -15,9 +10,10 @@ export interface StandardResponse<T> {
 }
 
 @Injectable()
-export class TransformResponseInterceptor<T>
-  implements NestInterceptor<T, StandardResponse<T> | T>
-{
+export class TransformResponseInterceptor<T> implements NestInterceptor<
+  T,
+  StandardResponse<T> | T
+> {
   private reflector = new Reflector();
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
@@ -49,6 +45,8 @@ export class TransformResponseInterceptor<T>
           const totalPages = Math.ceil(response.total / limit) || 1;
 
           return {
+            status: 200,
+            message: 'success',
             data: response.items,
             meta: {
               page,
@@ -65,6 +63,8 @@ export class TransformResponseInterceptor<T>
 
         // 3. Single Entity or Mutation
         return {
+          status: 200,
+          message: 'success',
           data: response ?? null,
           meta: {
             timestamp,
