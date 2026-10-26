@@ -33,7 +33,9 @@ describe('UsersService', () => {
           },
         ]),
         findUnique: jest.fn(),
+        create: jest.fn().mockResolvedValue({ id: 'uuid-created' }),
         update: jest.fn().mockResolvedValue({ id: 'uuid-1' }),
+        updateMany: jest.fn().mockResolvedValue({ count: 2 }),
       },
       ho_so_ca_nhan: {
         upsert: jest.fn().mockResolvedValue({ id: 1 }),
@@ -41,7 +43,7 @@ describe('UsersService', () => {
       nguoi_de_xuat: {
         upsert: jest.fn().mockResolvedValue({ id: 1 }),
       },
-      $transaction: jest.fn((callback) => callback(mockPrisma)),
+      $transaction: jest.fn((ops) => (Array.isArray(ops) ? Promise.all(ops) : ops(mockPrisma))),
     };
 
     usersService = new UsersService(mockPrisma, idorDefenseService);
@@ -245,6 +247,95 @@ describe('UsersService', () => {
       await expect(
         usersService.softDeleteUser('victim-id', regularUser),
       ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should batch soft delete multiple users using updateMany (Rule 20)', async () => {
+      mockPrisma.nguoi_dung.findMany.mockResolvedValue([
+        { id: 'user-1', vai_tro: UserRole.USER },
+        { id: 'user-2', vai_tro: UserRole.USERPRO },
+      ]);
+      mockPrisma.nguoi_dung.updateMany.mockResolvedValue({ count: 2 });
+
+      const result = await usersService.softDeleteBatch(['user-1', 'user-2'], adminUser);
+
+      expect(result.success).toBe(true);
+      expect(result.affectedCount).toBe(2);
+      expect(mockPrisma.nguoi_dung.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['user-1', 'user-2'] }, deleted_at: null },
+        data: expect.objectContaining({
+          active: false,
+          deleted_at: expect.any(Date),
+        }),
+      });
+    });
+
+    it('should prevent user from self-deleting in batch soft delete', async () => {
+      await expect(
+        usersService.softDeleteBatch(['user-1', adminUser.id], adminUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should prevent non-SUPERADMIN from soft deleting SUPERADMIN in batch', async () => {
+      mockPrisma.nguoi_dung.findMany.mockResolvedValue([
+        { id: 'super-admin-id', vai_tro: UserRole.SUPERADMIN },
+      ]);
+
+      await expect(
+        usersService.softDeleteBatch(['super-admin-id'], adminUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should batch update user status using updateMany (Rule 20)', async () => {
+      mockPrisma.nguoi_dung.findMany.mockResolvedValue([
+        { id: 'user-1', vai_tro: UserRole.USER },
+        { id: 'user-2', vai_tro: UserRole.USERPRO },
+      ]);
+      mockPrisma.nguoi_dung.updateMany.mockResolvedValue({ count: 2 });
+
+      const result = await usersService.updateStatusBatch(['user-1', 'user-2'], false, adminUser);
+
+      expect(result.success).toBe(true);
+      expect(result.affectedCount).toBe(2);
+      expect(mockPrisma.nguoi_dung.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ['user-1', 'user-2'] }, deleted_at: null },
+        data: { active: false },
+      });
+    });
+
+    it('should batch create users in a single transaction (Rule 20)', async () => {
+      mockPrisma.nguoi_dung.findMany.mockResolvedValue([]);
+
+      const newUsers = [
+        {
+          username: 'new_user_1',
+          fullName: 'New User One',
+          email: 'user1@nutritest.com',
+          role: UserRole.USER,
+        },
+        {
+          username: 'new_user_2',
+          fullName: 'New User Two',
+          email: 'user2@nutritest.com',
+          role: UserRole.BAC_SI,
+        },
+      ];
+
+      const result = await usersService.createBatch(newUsers, adminUser);
+
+      expect(result.success).toBe(true);
+      expect(result.createdCount).toBe(2);
+      expect(mockPrisma.$transaction).toHaveBeenCalled();
+    });
+
+    it('should throw BadRequestException when batch create contains duplicate usernames in payload', async () => {
+      const duplicateUsers = [
+        { username: 'same_name', fullName: 'User A', email: 'a@nutritest.com' },
+        { username: 'same_name', fullName: 'User B', email: 'b@nutritest.com' },
+      ];
+
+      await expect(
+        usersService.createBatch(duplicateUsers, adminUser),
+      ).rejects.toThrow();
     });
   });
 });

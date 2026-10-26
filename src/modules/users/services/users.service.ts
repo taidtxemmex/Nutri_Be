@@ -1,9 +1,20 @@
-import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+  ConflictException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
+import * as crypto from 'crypto';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { IdorDefenseService } from '../../../security/idor/idor-defense.service';
 import { RefreshTokenRotationService } from '../../../security/token/refresh-token-rotation.service';
 import { UserRole } from '../../../config/enums/role.enum';
+import { AuthProvider } from '../../../config/enums/domain.enum';
 import {
   CACHE_TAG_PROFILES,
   CACHE_TAG_USERS,
@@ -16,7 +27,7 @@ import {
   DEFAULT_PAGE,
   MAX_LIMIT,
 } from '../../../config/constants/pagination.constants';
-import { QueryUsersDto, UpdateUserInfoReqDto } from '../dto';
+import { QueryUsersDto, UpdateUserInfoReqDto, CreateUserItemDto } from '../dto';
 import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 import { UserInfoViewResponse } from '../interfaces/user-info-view.interface';
 
@@ -600,6 +611,243 @@ export class UsersService {
     return {
       success: true,
       message: 'Xóa mềm người dùng và thu hồi toàn bộ phiên đăng nhập thành công.',
+    };
+  }
+
+  /**
+   * Xóa mềm hàng loạt người dùng theo batch (Rule 20 - Chunked Atomic Commit & Batching)
+   */
+  async softDeleteBatch(
+    userIds: string[],
+    currentUser: AuthenticatedUser,
+  ): Promise<{ success: boolean; message: string; affectedCount: number }> {
+    this.idorDefenseService.assertAdmin(currentUser.role);
+
+    if (!userIds || userIds.length === 0) {
+      throw new BadRequestException('Danh sách userIds không được để trống.');
+    }
+
+    // 1. Chặn người dùng tự xóa chính mình trong batch
+    if (userIds.includes(currentUser.id)) {
+      throw new ForbiddenException(
+        'Bạn không thể tự xóa tài khoản của chính mình trong danh sách batch.',
+      );
+    }
+
+    // 2. Chặn xóa tài khoản SUPERADMIN nếu người thực hiện không phải SUPERADMIN
+    const targetUsers = await this.prisma.nguoi_dung.findMany({
+      where: { id: { in: userIds }, deleted_at: null },
+      select: { id: true, vai_tro: true },
+    });
+
+    if (targetUsers.length === 0) {
+      return {
+        success: true,
+        message: 'Không tìm thấy người dùng hợp lệ nào cần xóa mềm.',
+        affectedCount: 0,
+      };
+    }
+
+    const hasSuperAdmin = targetUsers.some((u) => u.vai_tro === UserRole.SUPERADMIN);
+    if (hasSuperAdmin && currentUser.role !== UserRole.SUPERADMIN) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên cấp cao (SUPERADMIN) mới có quyền xóa tài khoản SUPERADMIN.',
+      );
+    }
+
+    const validIds = targetUsers.map((u) => u.id);
+
+    // 3. Batch Soft-Delete trực tiếp bằng updateMany (Single Query - Rule 20)
+    const result = await this.prisma.nguoi_dung.updateMany({
+      where: { id: { in: validIds }, deleted_at: null },
+      data: {
+        active: false,
+        deleted_at: new Date(),
+      },
+    });
+
+    // 4. Thu hồi hàng loạt Refresh Tokens và Sessions theo batch
+    if (this.refreshTokenRotationService) {
+      await this.refreshTokenRotationService.revokeMultipleUsersTokens(validIds);
+    }
+
+    // 5. Invalidate Cache gom cụm 500ms
+    if (this.cacheService) {
+      const cacheTags = [
+        CACHE_TAG_USERS,
+        CACHE_TAG_PROFILES,
+        ...validIds.map((id) => buildUserCacheTag(id)),
+      ];
+      await this.cacheService.debouncedInvalidateTags(cacheTags);
+    }
+
+    this.logger.log(
+      `Quản trị viên ${currentUser.username} (${currentUser.id}) đã xóa mềm hàng loạt ${result.count} người dùng.`,
+    );
+
+    return {
+      success: true,
+      message: `Đã xóa mềm thành công ${result.count} người dùng và thu hồi toàn bộ phiên đăng nhập.`,
+      affectedCount: result.count,
+    };
+  }
+
+  /**
+   * Cập nhật trạng thái hoạt động (active/inactive) hàng loạt người dùng theo batch
+   */
+  async updateStatusBatch(
+    userIds: string[],
+    isActive: boolean,
+    currentUser: AuthenticatedUser,
+  ): Promise<{ success: boolean; message: string; affectedCount: number }> {
+    this.idorDefenseService.assertAdmin(currentUser.role);
+
+    if (!userIds || userIds.length === 0) {
+      throw new BadRequestException('Danh sách userIds không được để trống.');
+    }
+
+    if (userIds.includes(currentUser.id) && !isActive) {
+      throw new ForbiddenException('Bạn không thể tự khóa tài khoản của chính mình.');
+    }
+
+    const targetUsers = await this.prisma.nguoi_dung.findMany({
+      where: { id: { in: userIds }, deleted_at: null },
+      select: { id: true, vai_tro: true },
+    });
+
+    if (targetUsers.length === 0) {
+      return {
+        success: true,
+        message: 'Không tìm thấy người dùng hợp lệ nào cần cập nhật trạng thái.',
+        affectedCount: 0,
+      };
+    }
+
+    const hasSuperAdmin = targetUsers.some((u) => u.vai_tro === UserRole.SUPERADMIN);
+    if (hasSuperAdmin && currentUser.role !== UserRole.SUPERADMIN) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên cấp cao (SUPERADMIN) mới có quyền thay đổi trạng thái tài khoản SUPERADMIN.',
+      );
+    }
+
+    const validIds = targetUsers.map((u) => u.id);
+
+    // Batch update trực tiếp bằng updateMany (Single Query)
+    const result = await this.prisma.nguoi_dung.updateMany({
+      where: { id: { in: validIds }, deleted_at: null },
+      data: { active: isActive },
+    });
+
+    if (!isActive && this.refreshTokenRotationService) {
+      await this.refreshTokenRotationService.revokeMultipleUsersTokens(validIds);
+    }
+
+    if (this.cacheService) {
+      const cacheTags = [
+        CACHE_TAG_USERS,
+        CACHE_TAG_PROFILES,
+        ...validIds.map((id) => buildUserCacheTag(id)),
+      ];
+      await this.cacheService.debouncedInvalidateTags(cacheTags);
+    }
+
+    return {
+      success: true,
+      message: `Đã cập nhật trạng thái cho ${result.count} người dùng thành công.`,
+      affectedCount: result.count,
+    };
+  }
+
+  /**
+   * Tạo hàng loạt người dùng theo batch transaction (Rule 20 - Chunked Atomic Commit & Batching)
+   */
+  async createBatch(
+    dtoList: CreateUserItemDto[],
+    currentUser: AuthenticatedUser,
+  ): Promise<{ success: boolean; message: string; createdCount: number }> {
+    this.idorDefenseService.assertAdmin(currentUser.role);
+
+    if (!dtoList || dtoList.length === 0) {
+      throw new BadRequestException('Danh sách người dùng cần tạo không được để trống.');
+    }
+
+    // 1. Kiểm tra trùng lặp username / email trong chính payload gửi lên
+    const usernames = dtoList.map((u) => u.username.toLowerCase());
+    const emails = dtoList.map((u) => u.email.toLowerCase());
+
+    if (new Set(usernames).size !== usernames.length) {
+      throw new BadRequestException('Danh sách payload có chứa tên đăng nhập bị trùng lặp.');
+    }
+    if (new Set(emails).size !== emails.length) {
+      throw new BadRequestException('Danh sách payload có chứa email bị trùng lặp.');
+    }
+
+    // 2. Kiểm tra trùng lặp với CSDL bằng 1 single query (Chống N+1 Query - Rule 11)
+    const existingUsers = await this.prisma.nguoi_dung.findMany({
+      where: {
+        OR: [{ ten_dang_nhap: { in: usernames } }, { ho_so_ca_nhan: { email: { in: emails } } }],
+      },
+      select: {
+        ten_dang_nhap: true,
+        ho_so_ca_nhan: { select: { email: true } },
+      },
+    });
+
+    if (existingUsers.length > 0) {
+      const existingUsernames = existingUsers.map((u) => u.ten_dang_nhap);
+      throw new ConflictException(
+        `Các tài khoản sau đã tồn tại trong hệ thống: ${existingUsernames.join(', ')}`,
+      );
+    }
+
+    // 3. Chuẩn bị mật khẩu băm
+    const salt = await bcrypt.genSalt(10);
+    const defaultPasswordHash = await bcrypt.hash('P@ssw0rd123!', salt);
+
+    // 4. Batch Transaction: Gom toàn bộ thao tác tạo user vào 1 transaction duy nhất (Rule 20)
+    const createOps = dtoList.map((u) => {
+      const userId = crypto.randomUUID();
+      const role = u.role || UserRole.USER;
+      const hashedPassword = u.password ? bcrypt.hashSync(u.password, salt) : defaultPasswordHash;
+
+      return this.prisma.nguoi_dung.create({
+        data: {
+          id: userId,
+          ten_dang_nhap: u.username,
+          mat_khau: hashedPassword,
+          vai_tro: role,
+          kenh: AuthProvider.LOCAL,
+          active: true,
+          profile_completed: false,
+          keycloak_user_id: userId,
+          deleted_at: null,
+          ho_so_ca_nhan: {
+            create: {
+              ho_ten: u.fullName,
+              email: u.email,
+              phone: u.phone || null,
+              deleted_at: null,
+            },
+          },
+        },
+      });
+    });
+
+    await this.prisma.$transaction(createOps);
+
+    // 5. Invalidate Cache gom cụm 500ms
+    if (this.cacheService) {
+      await this.cacheService.debouncedInvalidateTags([CACHE_TAG_USERS, CACHE_TAG_PROFILES]);
+    }
+
+    this.logger.log(
+      `Quản trị viên ${currentUser.username} (${currentUser.id}) đã tạo hàng loạt ${dtoList.length} người dùng theo batch.`,
+    );
+
+    return {
+      success: true,
+      message: `Đã tạo thành công ${dtoList.length} người dùng theo batch.`,
+      createdCount: dtoList.length,
     };
   }
 }

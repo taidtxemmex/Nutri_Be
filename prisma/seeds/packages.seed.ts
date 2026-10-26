@@ -41,8 +41,9 @@ export async function seedPackages(prisma: PrismaClient): Promise<void> {
     },
   ];
 
-  for (const pkg of packages) {
-    await prisma.goi.upsert({
+  // Batch Transaction: Gom tất cả thao tác upsert vào 1 transaction duy nhất (Rule 20)
+  const upsertOps = packages.map((pkg) =>
+    prisma.goi.upsert({
       where: { ma_goi: pkg.ma_goi },
       create: {
         ...pkg,
@@ -56,7 +57,17 @@ export async function seedPackages(prisma: PrismaClient): Promise<void> {
         trang_thai: pkg.trang_thai,
         deleted_at: null,
       },
-    });
-    console.log(`   + Gói cước: ${pkg.ma_goi} - ${pkg.ten_goi}`);
-  }
+    }),
+  );
+
+  await prisma.$transaction(upsertOps);
+
+  console.log(`   ✅ Đã khởi tạo/cập nhật thành công ${packages.length} gói dịch vụ.`);
 }
+
+if (require.main === module) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { runStandaloneSeed } = require('./standalone-runner');
+  runStandaloneSeed('packages', (p: PrismaClient) => seedPackages(p));
+}
+

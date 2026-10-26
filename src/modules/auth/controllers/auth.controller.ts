@@ -1,14 +1,5 @@
-import {
-  Controller,
-  Post,
-  Body,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-  Ip,
-  Headers,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import {
   RegisterDto,
@@ -20,9 +11,15 @@ import {
   ResetPasswordDto,
   AuthResponseDto,
 } from '../dto';
-import { Public } from '../../../common/decorators/public.decorator';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
+import {
+  Public,
+  Auth,
+  CurrentUser,
+  ClientIp,
+  UserAgent,
+  ApiStandardResponse,
+  ApiErrorResponse,
+} from '../../../common/decorators';
 import { AuthenticatedUser } from '../interfaces/jwt-payload.interface';
 
 @ApiTags('Auth')
@@ -34,9 +31,12 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Đăng ký tài khoản người dùng mới' })
-  @ApiResponse({ status: 201, description: 'Đăng ký thành công, chờ xác thực email' })
-  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
-  @ApiResponse({ status: 409, description: 'Tên đăng nhập hoặc email đã tồn tại' })
+  @ApiStandardResponse({
+    status: 201,
+    description: 'Đăng ký thành công, chờ xác thực email',
+  })
+  @ApiErrorResponse(400, 'Dữ liệu đầu vào không hợp lệ')
+  @ApiErrorResponse(409, 'Tên đăng nhập hoặc email đã tồn tại')
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
   }
@@ -45,8 +45,11 @@ export class AuthController {
   @Post('verify-email')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Xác thực tài khoản qua email token' })
-  @ApiResponse({ status: 200, description: 'Xác thực tài khoản thành công' })
-  @ApiResponse({ status: 400, description: 'Mã xác thực không hợp lệ hoặc đã hết hạn' })
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Xác thực tài khoản thành công',
+  })
+  @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc đã hết hạn')
   async verifyEmail(@Body() dto: VerifyEmailDto) {
     return this.authService.verifyEmail(dto.token);
   }
@@ -55,13 +58,13 @@ export class AuthController {
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập hệ thống bằng tên đăng nhập và mật khẩu' })
-  @ApiResponse({
+  @ApiStandardResponse({
     status: 200,
     description: 'Đăng nhập thành công, trả về JWT Access Token & Refresh Token',
     type: AuthResponseDto,
   })
-  @ApiResponse({ status: 401, description: 'Sai tên đăng nhập hoặc mật khẩu' })
-  async login(@Body() dto: LoginDto, @Ip() ip: string, @Headers('user-agent') userAgent: string) {
+  @ApiErrorResponse(401, 'Sai tên đăng nhập hoặc mật khẩu')
+  async login(@Body() dto: LoginDto, @ClientIp() ip: string, @UserAgent() userAgent: string) {
     return this.authService.login(dto, ip, userAgent);
   }
 
@@ -69,25 +72,28 @@ export class AuthController {
   @Post(['refresh', 'refresh-token'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Làm mới Access Token thông qua Refresh Token Rotation' })
-  @ApiResponse({ status: 200, description: 'Cấp token mới thành công', type: AuthResponseDto })
-  @ApiResponse({
-    status: 401,
-    description: 'Refresh token không hợp lệ hoặc bị tái sử dụng (Replay Attack)',
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Cấp token mới thành công',
+    type: AuthResponseDto,
   })
+  @ApiErrorResponse(401, 'Refresh token không hợp lệ hoặc bị tái sử dụng (Replay Attack)')
   async refreshToken(
     @Body() dto: RefreshTokenDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
+    @ClientIp() ip: string,
+    @UserAgent() userAgent: string,
   ) {
     return this.authService.refreshToken(dto, ip, userAgent);
   }
 
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth('JWT-auth')
+  @Auth()
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất khỏi hệ thống và hủy phiên làm việc' })
-  @ApiResponse({ status: 200, description: 'Đăng xuất thành công' })
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Đăng xuất thành công, thu hồi token',
+  })
   @ApiBody({
     schema: {
       type: 'object',
@@ -110,12 +116,16 @@ export class AuthController {
   @Post(['google', 'oauth2/exchange'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng nhập hoặc xác thực tài khoản qua Google OAuth2 ID Token' })
-  @ApiResponse({ status: 200, description: 'Đăng nhập Google thành công', type: AuthResponseDto })
-  @ApiResponse({ status: 400, description: 'Token Google không hợp lệ' })
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Đăng nhập Google thành công',
+    type: AuthResponseDto,
+  })
+  @ApiErrorResponse(400, 'Token Google không hợp lệ')
   async googleLogin(
     @Body() dto: GoogleAuthDto,
-    @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
+    @ClientIp() ip: string,
+    @UserAgent() userAgent: string,
   ) {
     return this.authService.googleLogin(dto, ip, userAgent);
   }
@@ -124,7 +134,10 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Yêu cầu đặt lại mật khẩu qua email' })
-  @ApiResponse({ status: 200, description: 'Yêu cầu được tiếp nhận' })
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Yêu cầu đặt lại mật khẩu đã được tiếp nhận',
+  })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto);
   }
@@ -133,11 +146,11 @@ export class AuthController {
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đặt lại mật khẩu mới bằng mã OTP/Token' })
-  @ApiResponse({ status: 200, description: 'Đặt lại mật khẩu thành công' })
-  @ApiResponse({
-    status: 400,
-    description: 'Mã xác thực không hợp lệ hoặc mật khẩu không đúng chuẩn',
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Đặt lại mật khẩu thành công',
   })
+  @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc mật khẩu không đúng chuẩn')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto);
   }

@@ -169,6 +169,54 @@ export class TestAppHelper {
     return { user, token, rawPassword };
   }
 
+  /**
+   * Khởi tạo hàng loạt người dùng mẫu trong CSDL bằng Batch Transaction (Rule 20)
+   */
+  async createTestUsers(
+    usersList: Array<{
+      username: string;
+      password?: string;
+      role?: 'USER' | 'USERPRO' | 'ADMIN' | 'SUPERADMIN';
+      fullName?: string;
+      email?: string;
+      active?: boolean;
+    }>,
+  ): Promise<any[]> {
+    const salt = await bcrypt.genSalt(10);
+    const defaultHash = await bcrypt.hash('P@ssw0rd123!', salt);
+
+    const ops = usersList.map((params) => {
+      const userId = crypto.randomUUID();
+      const role = params.role || 'USER';
+      const email = params.email || `${params.username.toLowerCase()}@nutritest.com`;
+      const fullName = params.fullName || `User ${params.username}`;
+
+      return this.prisma.nguoi_dung.create({
+        data: {
+          id: userId,
+          ten_dang_nhap: params.username,
+          mat_khau: params.password ? bcrypt.hashSync(params.password, salt) : defaultHash,
+          vai_tro: role as any,
+          kenh: 'LOCAL',
+          active: params.active !== undefined ? params.active : true,
+          profile_completed: false,
+          keycloak_user_id: userId,
+          ho_so_ca_nhan: {
+            create: {
+              ho_ten: fullName,
+              email: email,
+              phone: '0987654321',
+              dia_chi: 'Hà Nội',
+              gioi_tinh: 'NAM',
+            },
+          },
+        },
+      });
+    });
+
+    return this.prisma.$transaction(ops);
+  }
+
   async close(): Promise<void> {
     if (this.app) {
       await this.app.close();

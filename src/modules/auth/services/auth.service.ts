@@ -422,19 +422,12 @@ export class AuthService {
         this.logger.warn(`Lỗi cập nhật logout_time theo session: ${err?.message}`);
       }
     } else {
-      // Cập nhật phiên đăng nhập gần nhất chưa logout của user
+      // Cập nhật tất cả các phiên đăng nhập đang hoạt động của user (Batch Update - Rule 20)
       try {
-        const lastSession = await this.prisma.lich_su_dang_nhap.findFirst({
+        await this.prisma.lich_su_dang_nhap.updateMany({
           where: { nguoi_dung_id: currentUser.id, logout_time: null },
-          orderBy: { login_time: 'desc' },
-          select: { id: true },
+          data: { logout_time: new Date() },
         });
-        if (lastSession) {
-          await this.prisma.lich_su_dang_nhap.update({
-            where: { id: lastSession.id },
-            data: { logout_time: new Date() },
-          });
-        }
       } catch (err: any) {
         this.logger.warn(`Lỗi cập nhật logout_time: ${err?.message}`);
       }

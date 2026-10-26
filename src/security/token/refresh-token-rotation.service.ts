@@ -230,34 +230,58 @@ export class RefreshTokenRotationService {
   }
 
   /**
-   * Revoke all tokens belonging to a specific user
+   * Revoke all tokens belonging to a specific user (Delegates to atomic batch)
    */
   async revokeAllUserTokens(userId: string): Promise<void> {
-    const userTag = `${REFRESH_TOKEN_CACHE_TAG}:${userId}`;
+    await this.revokeMultipleUsersTokens([userId]);
+  }
+
+  /**
+   * Revoke all tokens belonging to multiple users in a single atomic batch transaction (Rule 20)
+   */
+  async revokeMultipleUsersTokens(userIds: string[]): Promise<void> {
+    if (!userIds || userIds.length === 0) return;
+
+    const userTags = userIds.map((id) => `${REFRESH_TOKEN_CACHE_TAG}:${id}`);
     if (this.prisma) {
       try {
         const userRecords = await this.prisma.systemCache.findMany({
-          where: { tag: userTag },
+          where: userIds.length === 1 ? { tag: userTags[0] } : { tag: { in: userTags } },
         });
-        for (const item of userRecords) {
-          try {
-            const data: StoredRefreshToken = JSON.parse(item.value);
-            data.isRevoked = true;
-            await this.prisma.systemCache.update({
-              where: { key: item.key },
-              data: { value: JSON.stringify(data) },
-            });
-          } catch {
-            // Ignore parse errors
+
+        if (userRecords.length > 0) {
+          const updates = [];
+          for (const item of userRecords) {
+            try {
+              const data: StoredRefreshToken = JSON.parse(item.value);
+              data.isRevoked = true;
+              updates.push(
+                this.prisma.systemCache.update({
+                  where: { key: item.key },
+                  data: { value: JSON.stringify(data) },
+                }),
+              );
+            } catch {
+              // Ignore parse errors
+            }
+          }
+
+          if (updates.length > 0) {
+            if (typeof this.prisma.$transaction === 'function') {
+              await this.prisma.$transaction(updates);
+            } else {
+              await Promise.all(updates);
+            }
           }
         }
       } catch (err: any) {
-        this.logger.error(`Error revoking user tokens from DB: ${err?.message}`);
+        this.logger.error(`Error revoking batch user tokens from DB: ${err?.message}`);
       }
     }
 
+    const userIdSet = new Set(userIds);
     for (const [, val] of this.memoryStore.entries()) {
-      if (val.userId === userId) {
+      if (userIdSet.has(val.userId)) {
         val.isRevoked = true;
       }
     }

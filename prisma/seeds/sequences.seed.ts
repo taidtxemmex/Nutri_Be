@@ -15,3 +15,10 @@ export async function seedSequences(prisma: PrismaClient): Promise<void> {
 
   console.log(`   + Bộ đếm mã bệnh nhân PATIENT_CODE: ${patientCount}`);
 }
+
+if (require.main === module) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { runStandaloneSeed } = require('./standalone-runner');
+  runStandaloneSeed('sequences', (p: PrismaClient) => seedSequences(p));
+}
+

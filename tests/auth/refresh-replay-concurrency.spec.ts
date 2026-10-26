@@ -31,7 +31,13 @@ describe('Refresh Token Rotation Concurrency & Replay Attack Defense', () => {
         findMany: jest.fn(async ({ where }) => {
           const items = [];
           for (const [k, v] of fakeDatabaseCache.entries()) {
-            if (v.userId && where.tag.includes(v.userId)) {
+            const matches =
+              typeof where?.tag === 'string'
+                ? where.tag.includes(v.userId)
+                : Array.isArray(where?.tag?.in)
+                  ? where.tag.in.some((t: string) => t.includes(v.userId))
+                  : false;
+            if (v.userId && matches) {
               items.push({ key: k, value: JSON.stringify(v) });
             }
           }
@@ -41,6 +47,10 @@ describe('Refresh Token Rotation Concurrency & Replay Attack Defense', () => {
           fakeDatabaseCache.delete(where.key);
         }),
       },
+      $transaction: jest.fn(async (ops) => {
+        if (Array.isArray(ops)) return Promise.all(ops);
+        return ops(mockPrisma);
+      }),
     };
 
     service = new RefreshTokenRotationService(mockPrisma);

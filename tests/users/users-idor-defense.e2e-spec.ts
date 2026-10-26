@@ -143,4 +143,120 @@ describe('Users IDOR Defense & PII Protection - E2E Tests', () => {
       expect(updatedProfile?.dia_chi).toBe('TP. Hồ Chí Minh');
     });
   });
+
+  describe('Batch Operations: DELETE /api/v1/users/batch & PUT /api/v1/users/batch-status (Rule 20)', () => {
+    it('Admin thực hiện xóa mềm hàng loạt người dùng: Chạy updateMany đơn lệnh và cập nhật DB Layer 3', async () => {
+      const { token: adminToken } = await helper.createTestUser({
+        username: 'batch_admin_deleter',
+        role: 'ADMIN',
+      });
+
+      const { user: userA } = await helper.createTestUser({ username: 'batch_target_a' });
+      const { user: userB } = await helper.createTestUser({ username: 'batch_target_b' });
+
+      const res = await request(httpServer)
+        .delete('/api/v1/users/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: [userA.id, userB.id] })
+        .expect(200);
+
+      expect(res.body.data.affectedCount).toBe(2);
+
+      // LAYER 3 DB ASSERTION: Khẳng định trực tiếp trong MySQL cả 2 users đều bị xóa mềm
+      // (Do findMany mặc định lọc deleted_at: null, cần chỉ định deleted_at: { not: null } để đọc thùng rác)
+      const dbUsers = await prisma.nguoi_dung.findMany({
+        where: { id: { in: [userA.id, userB.id] }, deleted_at: { not: null } },
+      });
+
+      expect(dbUsers).toHaveLength(2);
+      for (const u of dbUsers) {
+        expect(u.active).toBe(false);
+        expect(u.deleted_at).not.toBeNull();
+      }
+    });
+
+    it('Admin cập nhật trạng thái hàng loạt bằng batch: Chạy updateMany đơn lệnh và kiểm tra DB Layer 3', async () => {
+      const { token: adminToken } = await helper.createTestUser({
+        username: 'batch_admin_status',
+        role: 'ADMIN',
+      });
+
+      const { user: user1 } = await helper.createTestUser({ username: 'status_target_1', active: true });
+      const { user: user2 } = await helper.createTestUser({ username: 'status_target_2', active: true });
+
+      const res = await request(httpServer)
+        .put('/api/v1/users/batch-status')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send({ userIds: [user1.id, user2.id], isActive: false })
+        .expect(200);
+
+      expect(res.body.data.affectedCount).toBe(2);
+
+      // LAYER 3 DB ASSERTION: Cả 2 users đều chuyển thành active = false trong CSDL
+      const dbUsers = await prisma.nguoi_dung.findMany({
+        where: { id: { in: [user1.id, user2.id] } },
+      });
+
+      expect(dbUsers).toHaveLength(2);
+      for (const u of dbUsers) {
+        expect(u.active).toBe(false);
+      }
+    });
+
+    it('Admin tạo hàng loạt người dùng bằng Batch Transaction (Rule 20): Tạo atomic và kiểm tra DB Layer 3', async () => {
+      const { token: adminToken } = await helper.createTestUser({
+        username: 'batch_admin_creator',
+        role: 'ADMIN',
+      });
+
+      const payload = {
+        users: [
+          {
+            username: 'bulk_created_user_1',
+            fullName: 'Bác sĩ Đoàn Văn Một',
+            email: 'bsmot@nutritest.com',
+            role: 'BAC_SI',
+            phone: '0981111111',
+          },
+          {
+            username: 'bulk_created_user_2',
+            fullName: 'Chuyên gia Lê Thị Hai',
+            email: 'chuyengiahai@nutritest.com',
+            role: 'EXPERT',
+            phone: '0982222222',
+          },
+        ],
+      };
+
+      const res = await request(httpServer)
+        .post('/api/v1/users/batch')
+        .set('Authorization', `Bearer ${adminToken}`)
+        .send(payload)
+        .expect(201);
+
+      expect(res.body.data.createdCount).toBe(2);
+
+      // LAYER 3 DB ASSERTION: Khẳng định cả 2 users và hồ sơ cá nhân đã nằm trong CSDL MySQL
+      const dbUsers = await prisma.nguoi_dung.findMany({
+        where: { ten_dang_nhap: { in: ['bulk_created_user_1', 'bulk_created_user_2'] } },
+        include: { ho_so_ca_nhan: true },
+      });
+
+      expect(dbUsers).toHaveLength(2);
+      const user1 = dbUsers.find((u) => u.ten_dang_nhap === 'bulk_created_user_1');
+      const user2 = dbUsers.find((u) => u.ten_dang_nhap === 'bulk_created_user_2');
+
+      expect(user1).toBeDefined();
+      expect(user1?.vai_tro).toBe('BAC_SI');
+      expect(user1?.active).toBe(true);
+      expect(user1?.deleted_at).toBeNull();
+      expect(user1?.ho_so_ca_nhan?.ho_ten).toBe('Bác sĩ Đoàn Văn Một');
+
+      expect(user2).toBeDefined();
+      expect(user2?.vai_tro).toBe('EXPERT');
+      expect(user2?.active).toBe(true);
+      expect(user2?.deleted_at).toBeNull();
+      expect(user2?.ho_so_ca_nhan?.ho_ten).toBe('Chuyên gia Lê Thị Hai');
+    });
+  });
 });

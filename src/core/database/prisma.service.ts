@@ -35,6 +35,56 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     const extended = this.$extends({
       query: {
         $allModels: {
+          async create({
+            model,
+            args,
+            query,
+          }: {
+            model: string;
+            args: any;
+            query: (args: any) => Promise<any>;
+          }) {
+            if (SOFT_DELETE_MODELS.includes(model) && args?.data) {
+              if (args.data.deleted_at === undefined) {
+                args.data.deleted_at = null;
+              }
+            }
+            return query(args);
+          },
+          async createMany({
+            model,
+            args,
+            query,
+          }: {
+            model: string;
+            args: any;
+            query: (args: any) => Promise<any>;
+          }) {
+            if (SOFT_DELETE_MODELS.includes(model) && Array.isArray(args?.data)) {
+              for (const item of args.data) {
+                if (item && item.deleted_at === undefined) {
+                  item.deleted_at = null;
+                }
+              }
+            }
+            return query(args);
+          },
+          async upsert({
+            model,
+            args,
+            query,
+          }: {
+            model: string;
+            args: any;
+            query: (args: any) => Promise<any>;
+          }) {
+            if (SOFT_DELETE_MODELS.includes(model)) {
+              if (args?.create && args.create.deleted_at === undefined) {
+                args.create.deleted_at = null;
+              }
+            }
+            return query(args);
+          },
           async delete({
             model,
             args,
@@ -65,13 +115,34 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             query: (args: any) => Promise<any>;
           }) {
             if (SOFT_DELETE_MODELS.includes(model)) {
+              const where = { ...args?.where };
+              if (where.deleted_at === undefined) {
+                where.deleted_at = null;
+              }
               return (self as any)[model].updateMany({
-                where: args?.where,
+                where,
                 data: {
                   deleted_at: new Date(),
                   ...(model === 'nguoi_dung' ? { active: false } : {}),
                 },
               });
+            }
+            return query(args);
+          },
+          async updateMany({
+            model,
+            args,
+            query,
+          }: {
+            model: string;
+            args: any;
+            query: (args: any) => Promise<any>;
+          }) {
+            if (SOFT_DELETE_MODELS.includes(model)) {
+              args.where = { ...args?.where };
+              if (args.where.deleted_at === undefined) {
+                args.where.deleted_at = null;
+              }
             }
             return query(args);
           },

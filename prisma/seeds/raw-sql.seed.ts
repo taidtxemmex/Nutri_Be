@@ -56,3 +56,10 @@ export async function seedRawSqlData(prisma: PrismaClient, databaseUrl: string):
     console.log(`   ℹ️  CSDL đã có sẵn ${existingDanhMuc} danh mục thực phẩm, bỏ qua nạp SQL thô.`);
   }
 }
+
+if (require.main === module) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { runStandaloneSeed } = require('./standalone-runner');
+  runStandaloneSeed('raw-sql', (p: PrismaClient, dbUrl: string) => seedRawSqlData(p, dbUrl));
+}
+

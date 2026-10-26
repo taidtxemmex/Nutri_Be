@@ -64,24 +64,44 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
     },
   ];
 
-  for (const u of initialUsers) {
-    const existing = await prisma.nguoi_dung.findFirst({
-      where: { ten_dang_nhap: u.username },
-    });
-
-    if (!existing) {
-      await prisma.nguoi_dung.create({
-        data: {
-          id: u.id,
-          ten_dang_nhap: u.username,
-          mat_khau: u.password,
-          vai_tro: u.role,
-          kenh: AuthProvider.LOCAL,
-          active: true,
-          profile_completed: true,
-          deleted_at: null,
-          ho_so_ca_nhan: {
+  // Batch Upsert Transaction: Tự động Create nếu chưa có, Update nếu đã có trong 1 transaction (Rule 20)
+  const upsertOps = initialUsers.map((u) =>
+    prisma.nguoi_dung.upsert({
+      where: { id: u.id },
+      create: {
+        id: u.id,
+        ten_dang_nhap: u.username,
+        mat_khau: u.password,
+        vai_tro: u.role,
+        kenh: AuthProvider.LOCAL,
+        active: true,
+        profile_completed: true,
+        deleted_at: null,
+        ho_so_ca_nhan: {
+          create: {
+            ho_ten: u.fullName,
+            email: u.email,
+            phone: u.phone,
+            gioi_tinh: u.gender,
+            deleted_at: null,
+          },
+        },
+      },
+      update: {
+        mat_khau: u.password,
+        vai_tro: u.role,
+        active: true,
+        deleted_at: null,
+        ho_so_ca_nhan: {
+          upsert: {
             create: {
+              ho_ten: u.fullName,
+              email: u.email,
+              phone: u.phone,
+              gioi_tinh: u.gender,
+              deleted_at: null,
+            },
+            update: {
               ho_ten: u.fullName,
               email: u.email,
               phone: u.phone,
@@ -90,19 +110,18 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
             },
           },
         },
-      });
-      console.log(`   + Đã tạo tài khoản: ${u.username} (${u.role})`);
-    } else {
-      await prisma.nguoi_dung.update({
-        where: { id: existing.id },
-        data: {
-          mat_khau: u.password,
-          vai_tro: u.role,
-          active: true,
-          deleted_at: null,
-        },
-      });
-      console.log(`   * Đã cập nhật tài khoản: ${u.username} (${u.role})`);
-    }
-  }
+      },
+    }),
+  );
+
+  await prisma.$transaction(upsertOps);
+
+  console.log(`   ✅ Đã khởi tạo/cập nhật thành công ${initialUsers.length} tài khoản người dùng theo chuẩn Enum.`);
 }
+
+if (require.main === module) {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { runStandaloneSeed } = require('./standalone-runner');
+  runStandaloneSeed('users', (p: PrismaClient) => seedUsers(p));
+}
+

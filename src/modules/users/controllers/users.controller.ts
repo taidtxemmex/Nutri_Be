@@ -1,5 +1,4 @@
 import {
-  Controller,
   Get,
   Post,
   Put,
@@ -7,12 +6,11 @@ import {
   Body,
   Param,
   Query,
-  UseGuards,
   HttpCode,
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { UsersService } from '../services/users.service';
 import {
   QueryUsersDto,
@@ -20,34 +18,61 @@ import {
   UpdateUserInfoReqDto,
   UpdateUserRoleDto,
   UpdateUserStatusDto,
+  BatchUserIdsDto,
+  BatchUpdateUserStatusDto,
+  BatchCreateUsersDto,
+  UserListItemDto,
+  UserDetailResponseDto,
+  BatchOperationResponseDto,
 } from '../dto';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../../common/guards/roles.guard';
-import { Roles } from '../../../common/decorators/roles.decorator';
-import { CurrentUser } from '../../../common/decorators/current-user.decorator';
+import {
+  Roles,
+  CurrentUser,
+  CurrentUserId,
+  ApiController,
+  ApiStandardResponse,
+  ApiPaginatedResponse,
+} from '../../../common/decorators';
 import { UserRole } from '../../../config/enums/role.enum';
 import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 
-@ApiTags('Users')
-@ApiBearerAuth('JWT-auth')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Controller('users')
+@ApiController('Users', 'users', { auth: true })
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get('me')
   @ApiOperation({ summary: 'Lấy thông tin tài khoản và hồ sơ của người dùng hiện tại' })
-  @ApiResponse({ status: 200, description: 'Lấy thông tin thành công' })
-  async getMe(@CurrentUser() user: AuthenticatedUser) {
-    return this.usersService.getMe(user.id);
+  @ApiStandardResponse({
+    type: UserDetailResponseDto,
+    description: 'Lấy thông tin tài khoản và hồ sơ thành công',
+  })
+  async getMe(@CurrentUserId() userId: string) {
+    return this.usersService.getMe(userId);
   }
 
   @Put('me')
   @ApiOperation({ summary: 'Cập nhật thông tin hồ sơ của người dùng hiện tại' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thành công' })
+  @ApiStandardResponse({ description: 'Cập nhật hồ sơ cá nhân thành công' })
   async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserInfoReqDto) {
     dto.userId = user.id;
     return this.usersService.updateUserInfo(dto, user);
+  }
+
+  @Post('batch')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({
+    summary: 'Tạo hàng loạt người dùng theo batch transaction (Admin only - Rule 20)',
+  })
+  @ApiStandardResponse({
+    status: 201,
+    type: BatchOperationResponseDto,
+    description: 'Tạo hàng loạt người dùng thành công',
+  })
+  async createBatch(
+    @Body() dto: BatchCreateUsersDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.usersService.createBatch(dto.users, currentUser);
   }
 
   @Post(['getInfo', '/api/users/getInfo'])
@@ -55,13 +80,8 @@ export class UsersController {
   @ApiOperation({
     summary: 'Lấy thông tin chi tiết người dùng và chuyên môn (Vá lỗ hổng IDOR PII)',
   })
-  @ApiResponse({
-    status: 200,
+  @ApiStandardResponse({
     description: 'Trả về cấu trúc viewUser và viewJob cho InfomationUser.jsx',
-  })
-  @ApiResponse({
-    status: 403,
-    description: 'Bị chặn IDOR khi cố tình truy cập thông tin của người dùng khác',
   })
   async getUserInfo(
     @Body() dto: UserInfoRequestDto,
@@ -73,7 +93,7 @@ export class UsersController {
   @Put(['update-info', '/api/users/update-info'])
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cập nhật thông tin cá nhân và nghề nghiệp (Tương thích FE cũ)' })
-  @ApiResponse({ status: 200, description: 'Cập nhật thông tin thành công' })
+  @ApiStandardResponse({ description: 'Cập nhật thông tin thành công' })
   async updateUserInfo(
     @Body() dto: UpdateUserInfoReqDto,
     @CurrentUser() currentUser: AuthenticatedUser,
@@ -84,7 +104,10 @@ export class UsersController {
   @Get('')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Danh sách người dùng phân trang (Dành cho Quản trị viên)' })
-  @ApiResponse({ status: 200, description: 'Danh sách người dùng chuẩn phân trang' })
+  @ApiPaginatedResponse({
+    type: UserListItemDto,
+    description: 'Danh sách người dùng chuẩn phân trang',
+  })
   async findAll(@Query() query: QueryUsersDto) {
     return this.usersService.findAll(query);
   }
@@ -93,7 +116,7 @@ export class UsersController {
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Phân quyền vai trò người dùng (Admin only)' })
   @ApiParam({ name: 'id', required: false, description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'Cập nhật vai trò thành công' })
+  @ApiStandardResponse({ description: 'Cập nhật vai trò thành công' })
   async updateRole(
     @Param('id') paramId: string,
     @Body() dto: UpdateUserRoleDto,
@@ -106,11 +129,27 @@ export class UsersController {
     return this.usersService.updateRole(targetUserId, dto.newRole, currentUser);
   }
 
+  @Put('batch-status')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({
+    summary: 'Cập nhật trạng thái hoạt động hàng loạt người dùng theo batch (Admin only)',
+  })
+  @ApiStandardResponse({
+    type: BatchOperationResponseDto,
+    description: 'Cập nhật trạng thái batch thành công',
+  })
+  async updateStatusBatch(
+    @Body() dto: BatchUpdateUserStatusDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.usersService.updateStatusBatch(dto.userIds, dto.isActive, currentUser);
+  }
+
   @Put([':id/status', 'update-user-active-satus'])
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Cập nhật trạng thái hoạt động (khóa/mở khóa) người dùng' })
   @ApiParam({ name: 'id', required: false, description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'Cập nhật trạng thái thành công' })
+  @ApiStandardResponse({ description: 'Cập nhật trạng thái thành công' })
   async updateStatus(
     @Param('id') paramId: string,
     @Body() dto: UpdateUserStatusDto,
@@ -131,25 +170,42 @@ export class UsersController {
   @ApiOperation({
     summary: 'Kiểm tra trạng thái hoàn thiện hồ sơ của người dùng (Tương thích FE cũ)',
   })
-  @ApiResponse({ status: 200, description: 'Trả về profileComplete boolean' })
-  async checkProfile(@CurrentUser() user: AuthenticatedUser) {
-    return this.usersService.checkProfile(user.id);
+  @ApiStandardResponse({ description: 'Trả về profileComplete boolean' })
+  async checkProfile(@CurrentUserId() userId: string) {
+    return this.usersService.checkProfile(userId);
   }
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Lấy chi tiết người dùng theo ID (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'Chi tiết người dùng' })
+  @ApiStandardResponse({
+    type: UserDetailResponseDto,
+    description: 'Chi tiết tài khoản người dùng',
+  })
   async findById(@Param('id') id: string) {
     return this.usersService.findById(id);
+  }
+
+  @Delete('batch')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Xóa mềm hàng loạt người dùng theo batch (Admin only)' })
+  @ApiStandardResponse({
+    type: BatchOperationResponseDto,
+    description: 'Xóa mềm batch thành công',
+  })
+  async softDeleteBatch(
+    @Body() dto: BatchUserIdsDto,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.usersService.softDeleteBatch(dto.userIds, currentUser);
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Xóa mềm người dùng và thu hồi mọi phiên đăng nhập (Admin only)' })
   @ApiParam({ name: 'id', description: 'User ID' })
-  @ApiResponse({ status: 200, description: 'Xóa mềm thành công' })
+  @ApiStandardResponse({ description: 'Xóa mềm người dùng thành công' })
   async softDelete(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
     return this.usersService.softDeleteUser(id, currentUser);
   }
