@@ -77,11 +77,13 @@ export class IdorDefenseService {
    * Strip sensitive PII fields if user is neither admin nor the owner
    */
   sanitizePii<T extends Record<string, any>>(data: T, isPrivileged: boolean): Partial<T> {
+    // Mật khẩu hash tuyệt đối KHÔNG bao giờ được trả về cho bất kỳ ai (kể cả Admin)
+    const { mat_khau: _mat_khau, ...rest } = data;
     if (isPrivileged) {
-      return data;
+      return rest as Partial<T>;
     }
 
-    const { mat_khau: _mat_khau, keycloak_user_id: _keycloak_user_id, ...sanitized } = data;
+    const { keycloak_user_id: _keycloak_user_id, ...sanitized } = rest;
 
     return sanitized as Partial<T>;
   }

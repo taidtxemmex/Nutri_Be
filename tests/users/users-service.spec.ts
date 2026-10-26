@@ -193,4 +193,58 @@ describe('UsersService', () => {
       );
     });
   });
+
+  describe('checkProfile & softDeleteUser', () => {
+    const adminUser = {
+      id: 'admin-id',
+      sub: 'admin-id',
+      username: 'admin',
+      role: UserRole.ADMIN,
+    };
+
+    const regularUser = {
+      id: 'regular-id',
+      sub: 'regular-id',
+      username: 'regular',
+      role: UserRole.USER,
+    };
+
+    it('should return profileComplete status correctly', async () => {
+      mockPrisma.nguoi_dung.findUnique.mockResolvedValue({
+        id: 'user-id',
+        profile_completed: true,
+        deleted_at: null,
+      });
+
+      const result = await usersService.checkProfile('user-id');
+      expect(result.profileComplete).toBe(true);
+    });
+
+    it('should allow admin to soft delete user, marking active false and setting deleted_at', async () => {
+      mockPrisma.nguoi_dung.findUnique.mockResolvedValue({
+        id: 'victim-id',
+        active: true,
+        deleted_at: null,
+      });
+
+      const result = await usersService.softDeleteUser('victim-id', adminUser);
+
+      expect(result.success).toBe(true);
+      expect(mockPrisma.nguoi_dung.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'victim-id' },
+          data: expect.objectContaining({
+            active: false,
+            deleted_at: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should throw ForbiddenException when non-admin attempts soft delete', async () => {
+      await expect(
+        usersService.softDeleteUser('victim-id', regularUser),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
 });

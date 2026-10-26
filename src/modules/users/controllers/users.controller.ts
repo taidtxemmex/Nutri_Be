@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Put,
+  Delete,
   Body,
   Param,
   Query,
@@ -126,6 +127,15 @@ export class UsersController {
     return this.usersService.updateStatus(targetUserId, isActive, currentUser);
   }
 
+  @Get(['check-profile', '/api/users/check-profile'])
+  @ApiOperation({
+    summary: 'Kiểm tra trạng thái hoàn thiện hồ sơ của người dùng (Tương thích FE cũ)',
+  })
+  @ApiResponse({ status: 200, description: 'Trả về profileComplete boolean' })
+  async checkProfile(@CurrentUser() user: AuthenticatedUser) {
+    return this.usersService.checkProfile(user.id);
+  }
+
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Lấy chi tiết người dùng theo ID (Admin only)' })
@@ -133,5 +143,14 @@ export class UsersController {
   @ApiResponse({ status: 200, description: 'Chi tiết người dùng' })
   async findById(@Param('id') id: string) {
     return this.usersService.findById(id);
+  }
+
+  @Delete(':id')
+  @Roles(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Xóa mềm người dùng và thu hồi mọi phiên đăng nhập (Admin only)' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 200, description: 'Xóa mềm thành công' })
+  async softDelete(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
+    return this.usersService.softDeleteUser(id, currentUser);
   }
 }

@@ -28,6 +28,7 @@ import {
   ResetPasswordDto,
   AuthResponseDto,
 } from '../dto';
+import { UserRole, AuthProvider } from '../../../config/enums';
 import { JwtPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
 
 @Injectable()
@@ -184,13 +185,11 @@ export class AuthService {
           id: newUserId,
           ten_dang_nhap: pending.ten_dang_nhap,
           mat_khau: pending.mat_khau_ma_hoa,
-          vai_tro: 'USER',
-          kenh: 'LOCAL',
+          vai_tro: UserRole.USER,
+          kenh: AuthProvider.LOCAL,
           active: true,
           profile_completed: false,
           keycloak_user_id: newUserId,
-          created_at: new Date(),
-          updated_at: new Date(),
         },
       });
 
@@ -202,10 +201,8 @@ export class AuthService {
           email: pending.email,
           phone: pending.phone,
           dia_chi: pending.dia_chi,
-          gioi_tinh: pending.gioi_tinh as any,
+          gioi_tinh: pending.gioi_tinh,
           ngay_sinh: pending.ngay_sinh,
-          created_at: new Date(),
-          updated_at: new Date(),
         },
       });
 
@@ -532,14 +529,12 @@ export class AuthService {
           data: {
             id: newUserId,
             ten_dang_nhap: generatedUsername,
-            vai_tro: 'USER',
-            kenh: 'KEYCLOAK_GOOGLE',
+            vai_tro: UserRole.USER,
+            kenh: AuthProvider.KEYCLOAK_GOOGLE,
             id_kenh: googleId,
             active: true,
             profile_completed: false,
             keycloak_user_id: newUserId,
-            created_at: new Date(),
-            updated_at: new Date(),
           },
           select: {
             id: true,
@@ -555,8 +550,6 @@ export class AuthService {
             nguoi_dung_id: newUserId,
             ho_ten: fullName,
             email: email,
-            created_at: new Date(),
-            updated_at: new Date(),
           },
         });
 
@@ -707,7 +700,6 @@ export class AuthService {
         where: { id: record.nguoi_dung_id },
         data: {
           mat_khau: hashedPassword,
-          updated_at: new Date(),
         },
       });
 

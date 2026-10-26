@@ -1,6 +1,7 @@
 import { IsOptional, Matches, IsEnum, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PHONE_REGEX } from '../../../config/constants/regex.constants';
+import { Gender } from '../../../config/enums';
 
 export class UpdateProfileDto {
   @ApiPropertyOptional({ example: 'Nguyễn Minh Trí', description: 'Họ và tên' })
@@ -18,10 +19,10 @@ export class UpdateProfileDto {
   @IsString()
   address?: string;
 
-  @ApiPropertyOptional({ example: 'NAM', enum: ['NAM', 'NU'], description: 'Giới tính' })
+  @ApiPropertyOptional({ example: Gender.NAM, enum: Gender, description: 'Giới tính' })
   @IsOptional()
-  @IsEnum(['NAM', 'NU'], { message: 'Giới tính phải là NAM hoặc NU' })
-  gender?: 'NAM' | 'NU';
+  @IsEnum(Gender, { message: 'Giới tính phải là NAM hoặc NU' })
+  gender?: Gender;
 
   @ApiPropertyOptional({ example: '1990-05-15', description: 'Ngày sinh (YYYY-MM-DD)' })
   @IsOptional()

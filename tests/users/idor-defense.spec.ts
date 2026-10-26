@@ -154,7 +154,8 @@ describe('IDOR Defense System', () => {
       expect(sanitized.email).toBe('john@example.com');
 
       const adminView = service.sanitizePii(rawUser, true);
-      expect((adminView as any).mat_khau).toBe('$2b$10$hashed_secret');
+      expect((adminView as any).mat_khau).toBeUndefined();
+      expect(adminView.email).toBe('john@example.com');
     });
   });
 });

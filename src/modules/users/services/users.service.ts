@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, Logger, Optional } from '@nestjs/common'
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { IdorDefenseService } from '../../../security/idor/idor-defense.service';
+import { RefreshTokenRotationService } from '../../../security/token/refresh-token-rotation.service';
 import { UserRole } from '../../../config/enums/role.enum';
 import {
   CACHE_TAG_PROFILES,
@@ -71,6 +72,7 @@ export class UsersService {
     private readonly prisma: PrismaService,
     private readonly idorDefenseService: IdorDefenseService,
     @Optional() private readonly cacheService?: CacheService,
+    @Optional() private readonly refreshTokenRotationService?: RefreshTokenRotationService,
   ) {}
 
   /**
@@ -97,7 +99,9 @@ export class UsersService {
       }
     }
 
-    const where: any = {};
+    const where: any = {
+      deleted_at: null,
+    };
 
     if (query.role) {
       where.vai_tro = query.role;
@@ -394,19 +398,16 @@ export class UsersService {
           email: dto.email,
           phone: dto.phone,
           dia_chi: dto.address,
-          gioi_tinh: dto.gender as any,
+          gioi_tinh: dto.gender,
           ngay_sinh: dobDate,
-          created_at: new Date(),
-          updated_at: new Date(),
         },
         update: {
           ...(dto.fullName !== undefined && { ho_ten: dto.fullName }),
           ...(dto.email !== undefined && { email: dto.email }),
           ...(dto.phone !== undefined && { phone: dto.phone }),
           ...(dto.address !== undefined && { dia_chi: dto.address }),
-          ...(dto.gender !== undefined && { gioi_tinh: dto.gender as any }),
+          ...(dto.gender !== undefined && { gioi_tinh: dto.gender }),
           ...(dobDate !== undefined && { ngay_sinh: dobDate }),
-          updated_at: new Date(),
         },
       });
 
@@ -437,12 +438,6 @@ export class UsersService {
           },
         });
       }
-
-      // 3. Đánh dấu cập nhật thời gian
-      await tx.nguoi_dung.update({
-        where: { id: targetId },
-        data: { updated_at: new Date() },
-      });
     });
 
     // Invalidate Cache gom cụm 500ms (Rule 25)
@@ -482,8 +477,7 @@ export class UsersService {
     await this.prisma.nguoi_dung.update({
       where: { id: targetUserId },
       data: {
-        vai_tro: newRole as any,
-        updated_at: new Date(),
+        vai_tro: newRole,
       },
     });
 
@@ -526,7 +520,6 @@ export class UsersService {
       where: { id: targetUserId },
       data: {
         active: isActive,
-        updated_at: new Date(),
       },
     });
 
@@ -543,6 +536,70 @@ export class UsersService {
       success: true,
       message: `Cập nhật trạng thái người dùng thành ${isActive ? 'kích hoạt' : 'khóa'} thành công.`,
       active: isActive,
+    };
+  }
+
+  /**
+   * Kiểm tra người dùng đã hoàn thiện hồ sơ chưa (Tương thích FE cũ: check-profile)
+   */
+  async checkProfile(userId: string): Promise<{ profileComplete: boolean }> {
+    const user = await this.prisma.nguoi_dung.findUnique({
+      where: { id: userId },
+      select: { profile_completed: true, deleted_at: true },
+    });
+
+    if (!user || user.deleted_at) {
+      throw new NotFoundException('Không tìm thấy người dùng hoặc tài khoản đã bị vô hiệu hóa.');
+    }
+
+    return {
+      profileComplete: Boolean(user.profile_completed),
+    };
+  }
+
+  /**
+   * Xóa mềm người dùng và thu hồi toàn bộ Refresh Token (Admin only)
+   */
+  async softDeleteUser(
+    targetUserId: string,
+    currentUser: AuthenticatedUser,
+  ): Promise<{ success: boolean; message: string }> {
+    this.idorDefenseService.assertAdmin(currentUser.role);
+
+    const user = await this.prisma.nguoi_dung.findUnique({
+      where: { id: targetUserId },
+      select: { id: true, active: true, deleted_at: true },
+    });
+
+    if (!user || user.deleted_at) {
+      throw new NotFoundException('Không tìm thấy người dùng hoặc tài khoản đã bị xóa trước đó.');
+    }
+
+    await this.prisma.nguoi_dung.update({
+      where: { id: targetUserId },
+      data: {
+        active: false,
+        deleted_at: new Date(),
+      },
+    });
+
+    // Thu hồi toàn bộ Refresh Token của user bị xóa mềm
+    if (this.refreshTokenRotationService) {
+      await this.refreshTokenRotationService.revokeAllUserTokens(targetUserId);
+    }
+
+    // Invalidate Cache gom cụm 500ms
+    if (this.cacheService) {
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_USERS,
+        CACHE_TAG_PROFILES,
+        buildUserCacheTag(targetUserId),
+      ]);
+    }
+
+    return {
+      success: true,
+      message: 'Xóa mềm người dùng và thu hồi toàn bộ phiên đăng nhập thành công.',
     };
   }
 }

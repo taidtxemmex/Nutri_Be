@@ -93,7 +93,7 @@ export class TestAppHelper {
     await this.prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
     for (const table of tables) {
       try {
-        await this.prisma.$executeRawUnsafe(`TRUNCATE TABLE \`${table}\`;`);
+        await this.prisma.$executeRawUnsafe(`DELETE FROM \`${table}\`;`);
       } catch {
         // Bỏ qua nếu bảng trống hoặc không tồn tại
       }
@@ -133,8 +133,6 @@ export class TestAppHelper {
         active: params.active !== undefined ? params.active : true,
         profile_completed: false,
         keycloak_user_id: userId,
-        created_at: new Date(),
-        updated_at: new Date(),
         ho_so_ca_nhan: {
           create: {
             ho_ten: fullName,
@@ -142,8 +140,6 @@ export class TestAppHelper {
             phone: '0987654321',
             dia_chi: 'Hà Nội',
             gioi_tinh: 'NAM',
-            created_at: new Date(),
-            updated_at: new Date(),
           },
         },
       },

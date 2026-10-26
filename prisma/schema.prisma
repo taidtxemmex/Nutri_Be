@@ -1,6 +1,5 @@
 datasource db {
   provider = "mysql"
-  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -73,7 +72,7 @@ model benh_nhan {
   ho_ten           String              @db.VarChar(255)
   so_dien_thoai    String?             @db.VarChar(20)
   ngay_sinh        DateTime?           @db.Date
-  gioi_tinh        benh_nhan_gioi_tinh
+  gioi_tinh        String              @db.VarChar(20)
   can_nang         Float?
   chieu_cao        Float?
   ghi_chu          String?             @db.Text
@@ -81,6 +80,7 @@ model benh_nhan {
   ma_benh_nhan_bv  String?             @db.VarChar(255)
   tao_luc          DateTime?           @db.DateTime(6)
   chi_nam_sinh     Boolean?            @db.Bit(1)
+  deleted_at       DateTime?           @map("deleted_at") @db.DateTime(0)
   nguoi_dung       nguoi_dung          @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "benh_nhan_ibfk_1")
   de_xuat_thuc_don de_xuat_thuc_don[]
   khau_phan_24h    khau_phan_24h[]
@@ -90,6 +90,7 @@ model benh_nhan {
   @@index([nguoi_dung_id, ho_ten], map: "idx_patient_user_name")
   @@index([so_dien_thoai], map: "idx_patient_phone")
   @@index([ma_benh_nhan_bv], map: "idx_patient_bv_code")
+  @@index([deleted_at], map: "idx_patient_deleted_at")
 }
 
 model bua_an {
@@ -97,7 +98,7 @@ model bua_an {
   nguoi_dung_id     String              @db.Char(36)
   ten_bua_an        String?             @db.VarChar(255)
   gio_an            String              @db.VarChar(50)
-  trang_thai        bua_an_trang_thai?  @default(RIENG_TU)
+  trang_thai        String?             @default("RIENG_TU") @db.VarChar(50)
   la_cong_khai      Boolean?            @default(false)
   nguoi_dung        nguoi_dung          @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "bua_an_ibfk_1")
   chi_tiet_bua_an   chi_tiet_bua_an[]
@@ -154,7 +155,7 @@ model dang_ky {
   ma_goi        String             @db.VarChar(50)
   ngay_bat_dau  DateTime           @db.DateTime(0)
   ngay_ket_thuc DateTime           @db.DateTime(0)
-  trang_thai    dang_ky_trang_thai
+  trang_thai    String             @db.VarChar(50)
   thanh_toan_id BigInt?
 
   @@index([nguoi_dung_id, trang_thai, ngay_ket_thuc], map: "idx_dang_ky_user_status_end")
@@ -163,13 +164,13 @@ model dang_ky {
 model dang_ky_cho_xac_thuc {
   id              BigInt                          @id @default(autoincrement())
   dia_chi         String?                         @db.VarChar(255)
-  created_at      DateTime                        @db.DateTime(6)
+  created_at      DateTime                        @default(now()) @db.DateTime(6)
   ngay_sinh       DateTime?                       @db.Date
   email           String                          @db.VarChar(255)
   mat_khau_ma_hoa String                          @db.VarChar(512)
   expires_at      DateTime                        @db.DateTime(6)
   ho_ten          String?                         @db.VarChar(255)
-  gioi_tinh       dang_ky_cho_xac_thuc_gioi_tinh?
+  gioi_tinh       String?                         @db.VarChar(20)
   phone           String?                         @db.VarChar(255)
   token_hash      String                          @unique(map: "UK_ab8mb59mlyohva6oewekv3vof") @db.VarChar(64)
   ten_dang_nhap   String                          @db.VarChar(100)
@@ -192,13 +193,13 @@ model de_xuat_nguyen_lieu {
   edible                                                    Float?
   nguyen_lieu_id                                            BigInt?
   ten_nguyen_lieu                                           String                            @db.VarChar(255)
-  loai_protein                                              de_xuat_nguyen_lieu_loai_protein?
+  loai_protein                                              String?                           @db.VarChar(50)
   ghi_chu                                                   String?                           @db.Text
   gia_tri_dinh_duong_json                                   String                            @db.Text
-  loai_de_xuat                                              de_xuat_nguyen_lieu_loai_de_xuat
+  loai_de_xuat                                              String                            @db.VarChar(50)
   ly_do_tu_choi                                             String?                           @db.Text
   ngay_duyet                                                DateTime?                         @db.DateTime(6)
-  trang_thai                                                de_xuat_nguyen_lieu_trang_thai
+  trang_thai                                                String                            @db.VarChar(50)
   danh_muc                                                  Int
   nguoi_tao_id                                              String                            @db.Char(36)
   nguoi_duyet_id                                            String?                           @db.Char(36)
@@ -218,11 +219,11 @@ model de_xuat_thuc_don {
   ngay_phe_duyet                                             DateTime?                       @db.DateTime(6)
   ngay_tao                                                   DateTime?                       @db.DateTime(6)
   ten_thuc_don                                               String                          @db.VarChar(255)
-  loai_thuc_don                                              de_xuat_thuc_don_loai_thuc_don
+  loai_thuc_don                                              String                          @db.VarChar(50)
   ly_do_tu_choi                                              String?                         @db.Text
   snapshot_json                                              String                          @db.LongText
-  trang_thai                                                 de_xuat_thuc_don_trang_thai
-  loai_doi_tuong                                             de_xuat_thuc_don_loai_doi_tuong
+  trang_thai                                                 String                          @db.VarChar(50)
+  loai_doi_tuong                                             String                          @db.VarChar(50)
   tong_nang_luong                                            String?                         @db.VarChar(255)
   nguoi_phe_duyet_id                                         String?                         @db.Char(36)
   nguoi_de_xuat_id                                           String?                         @db.Char(36)
@@ -251,7 +252,7 @@ model gioi_han_dinh_duong {
   gioi_han_json    Json?
   ten_gioi_han     String?                       @db.VarChar(255)
   ngay_cap_nhat    DateTime?                     @db.DateTime(6)
-  canh_bao         gioi_han_dinh_duong_canh_bao?
+  canh_bao         String?                       @db.VarChar(50)
   nguoi_dung_id    String?                       @db.Char(36)
   tai_su_dung      Boolean                       @db.Bit(1)
   de_xuat_thuc_don de_xuat_thuc_don[]
@@ -268,9 +269,12 @@ model goi {
   so_ngay_su_dung Int
   gia_tien        Decimal        @db.Decimal(15, 2)
   mo_ta           String?        @db.Text
-  trang_thai      goi_trang_thai
+  trang_thai      String         @db.VarChar(50)
   ngay_tao        DateTime?      @default(now()) @db.DateTime(0)
   ngay_cap_nhat   DateTime?      @default(now()) @db.DateTime(0)
+  deleted_at      DateTime?      @map("deleted_at") @db.DateTime(0)
+
+  @@index([deleted_at], map: "idx_package_deleted_at")
 }
 
 model he_so_song_chin {
@@ -293,16 +297,18 @@ model ho_so_ca_nhan {
   nguoi_dung_id String?                  @unique(map: "nguoi_dung_id") @db.Char(36)
   ho_ten        String?                  @db.VarChar(255)
   ngay_sinh     DateTime?                @db.Date
-  gioi_tinh     ho_so_ca_nhan_gioi_tinh?
+  gioi_tinh     String?                  @db.VarChar(20)
   dia_chi       String?                  @db.VarChar(255)
   email         String?                  @db.VarChar(255)
   phone         String?                  @db.VarChar(255)
   created_at    DateTime?                @default(now()) @db.DateTime(0)
-  updated_at    DateTime?                @default(now()) @db.DateTime(0)
+  updated_at    DateTime?                @updatedAt @default(now()) @db.DateTime(0)
+  deleted_at    DateTime?                @map("deleted_at") @db.DateTime(0)
   nguoi_dung    nguoi_dung?              @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ho_so_ca_nhan_ibfk_1")
 
   @@index([email], map: "idx_profile_email")
   @@index([phone], map: "idx_profile_phone")
+  @@index([deleted_at], map: "idx_profile_deleted_at")
 }
 
 model huong_dan_dinh_duong {
@@ -325,7 +331,7 @@ model khau_phan_24h {
   ghi_chu              String?                 @db.VarChar(255)
   benh_nhan_id         BigInt
   nguoi_dung_id        String?                 @db.Char(36)
-  kieu_nhap            khau_phan_24h_kieu_nhap
+  kieu_nhap            String                  @db.VarChar(50)
   benh_nhan            benh_nhan               @relation(fields: [benh_nhan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK8aqjtjyd95rlsimqr2f5cosmj")
   nguoi_dung           nguoi_dung?             @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKqt7efogms7js35qdvp3rfrct8")
   khau_phan_24h_bua_an khau_phan_24h_bua_an[]
@@ -411,7 +417,8 @@ model mon_an {
   id                                               BigInt             @id @default(autoincrement())
   nguoi_dung_id                                    String?            @db.Char(36)
   ten_mon                                          String             @db.VarChar(255)
-  trang_thai                                       mon_an_trang_thai? @default(RIENG_TU)
+  trang_thai                                       String?            @default("RIENG_TU") @db.VarChar(50)
+  deleted_at                                       DateTime?          @map("deleted_at") @db.DateTime(0)
   mon_goc_id                                       BigInt?
   ly_do_tu_choi                                    String?            @db.Text
   ngay_phe_duyet                                   DateTime?          @db.DateTime(6)
@@ -431,6 +438,7 @@ model mon_an {
   @@index([nguoi_dung_id], map: "mon_an_ibfk_1")
   @@index([nguoi_dung_id, trang_thai, ngay_tao(sort: Desc)], map: "idx_dish_user_status_created")
   @@index([trang_thai, ngay_tao(sort: Desc)], map: "idx_dish_status_created")
+  @@index([deleted_at], map: "idx_dish_deleted_at")
 }
 
 model nguoi_de_xuat {
@@ -448,13 +456,14 @@ model nguoi_dung {
   id                                                                   String                 @id @db.Char(36)
   ten_dang_nhap                                                        String                 @db.VarChar(255)
   mat_khau                                                             String?                @db.VarChar(255)
-  vai_tro                                                              nguoi_dung_vai_tro
-  kenh                                                                 nguoi_dung_kenh?
+  vai_tro                                                              String                 @default("USER") @db.VarChar(50)
+  kenh                                                                 String?                @default("LOCAL") @db.VarChar(50)
   id_kenh                                                              String?                @db.VarChar(100)
   active                                                               Boolean                @db.Bit(1)
   keycloak_user_id                                                     String?                @db.VarChar(255)
   created_at                                                           DateTime?              @default(now()) @db.DateTime(0)
-  updated_at                                                           DateTime?              @default(now()) @db.DateTime(0)
+  updated_at                                                           DateTime?              @updatedAt @default(now()) @db.DateTime(0)
+  deleted_at                                                           DateTime?              @map("deleted_at") @db.DateTime(0)
   pro_expired_at                                                       DateTime?              @db.DateTime(6)
   profile_completed                                                    Boolean                @db.Bit(1)
   benh_nhan                                                            benh_nhan[]
@@ -484,6 +493,7 @@ model nguoi_dung {
   @@unique([ten_dang_nhap], map: "uk_nguoi_dung_username")
   @@index([vai_tro, pro_expired_at], map: "idx_user_role_exp")
   @@index([created_at], map: "idx_user_created_at")
+  @@index([deleted_at], map: "idx_user_deleted_at")
 }
 
 model nguyen_lieu {
@@ -568,9 +578,10 @@ model nguyen_lieu {
   glycine                                 Float?
   proline                                 Float?
   serine                                  Float?
-  loai_protein                            nguyen_lieu_loai_protein?
+  loai_protein                            String?                     @db.VarChar(50)
   tao_boi_id                              String?                     @db.Char(36)
-  trang_thai                              nguyen_lieu_trang_thai?
+  trang_thai                              String?                     @db.VarChar(50)
+  deleted_at                              DateTime?                   @map("deleted_at") @db.DateTime(0)
   chi_tiet_mon_an                         chi_tiet_mon_an[]
   he_so_song_chin                         he_so_song_chin[]
   khau_phan_24h_nguyen_lieu               khau_phan_24h_nguyen_lieu[]
@@ -581,6 +592,7 @@ model nguyen_lieu {
   @@index([tao_boi_id], map: "tao_boi_id")
   @@index([trang_thai, danh_muc, ten_nguyen_lieu], map: "idx_ing_status_cat_name")
   @@index([tao_boi_id, trang_thai], map: "idx_ing_creator_status")
+  @@index([deleted_at], map: "idx_ingredient_deleted_at")
 }
 
 model nhom_benh {
@@ -607,12 +619,12 @@ model nhom_benh_mo_rong {
 
 model thiet_bi_dang_nhap {
   id                BigInt                          @id @default(autoincrement())
-  created_at        DateTime                        @db.DateTime(6)
+  created_at        DateTime                        @default(now()) @db.DateTime(6)
   device_hash       String                          @db.VarChar(64)
   device_name       String?                         @db.VarChar(255)
-  device_type       thiet_bi_dang_nhap_device_type?
+  device_type       String?                         @db.VarChar(50)
   is_active         Boolean                         @db.Bit(1)
-  updated_at        DateTime?                       @db.DateTime(6)
+  updated_at        DateTime?                       @updatedAt @db.DateTime(6)
   user_agent        String?                         @db.VarChar(500)
   nguoi_dung_id     String                          @db.Char(36)
   lich_su_dang_nhap lich_su_dang_nhap[]
@@ -626,8 +638,9 @@ model thuc_don {
   id                     BigInt                  @id @default(autoincrement())
   nguoi_dung_id          String                  @db.Char(36)
   ten_thuc_don           String                  @db.VarChar(255)
-  loai_thuc_don          thuc_don_loai_thuc_don
-  loai_doi_tuong         thuc_don_loai_doi_tuong
+  loai_thuc_don          String                  @db.VarChar(50)
+  loai_doi_tuong         String                  @db.VarChar(50)
+  deleted_at             DateTime?               @map("deleted_at") @db.DateTime(0)
   benh_nhan_id           BigInt?
   nhom_benh_id           Int?
   ngay_tao               DateTime?               @db.Date
@@ -646,6 +659,7 @@ model thuc_don {
   @@index([nguoi_dung_id], map: "thuc_don_ibfk_1")
   @@index([nguoi_dung_id, loai_thuc_don, ngay_tao(sort: Desc)], map: "idx_menu_user_type_created")
   @@index([benh_nhan_id, ngay_tao(sort: Desc)], map: "idx_menu_patient_created")
+  @@index([deleted_at], map: "idx_menu_deleted_at")
 }
 
 model yeu_cau_thanh_toan {
@@ -655,7 +669,7 @@ model yeu_cau_thanh_toan {
   ten_goi                                                      String                        @db.VarChar(255)
   so_ngay_su_dung                                              Int
   so_tien                                                      Decimal                       @db.Decimal(15, 2)
-  trang_thai                                                   yeu_cau_thanh_toan_trang_thai
+  trang_thai                                                   String                        @db.VarChar(50)
   ly_do_tu_choi                                                String?                       @db.TinyText
   ngay_tao                                                     DateTime?                     @default(now()) @db.DateTime(0)
   ngay_phe_duyet                                               DateTime?                     @db.DateTime(0)
@@ -674,143 +688,4 @@ model yeu_cau_thanh_toan {
   @@index([nguoi_dung_id, ngay_tao(sort: Desc)], map: "idx_payment_user_created")
 }
 
-// ==========================================
-// 3. ENUMS
-// ==========================================
 
-enum mon_an_trang_thai {
-  RIENG_TU
-  CHO_DUYET
-  DA_DUYET
-  TU_CHOI
-  HE_THONG
-}
-
-enum nguoi_dung_vai_tro {
-  USER
-  USERPRO
-  SUPERADMIN
-  ADMIN
-}
-
-enum thuc_don_loai_thuc_don {
-  NGAY
-  TUAN
-  THANG
-}
-
-enum bua_an_trang_thai {
-  RIENG_TU
-  CHO_DUYET
-  DA_DUYET
-  TU_CHOI
-}
-
-enum de_xuat_thuc_don_loai_thuc_don {
-  NGAY
-  TUAN
-  THANG
-}
-
-enum ho_so_ca_nhan_gioi_tinh {
-  NAM
-  NU
-}
-
-enum nguoi_dung_kenh {
-  LOCAL
-  FACEBOOK
-  KEYCLOAK_GOOGLE
-}
-
-enum thiet_bi_dang_nhap_device_type {
-  WEB
-  ANDROID
-  IOS
-  DESKTOP
-  TABLET
-  POSTMAN
-  UNKNOWN
-}
-
-enum thuc_don_loai_doi_tuong {
-  BENH_NHAN
-  NHOM_BENH
-}
-
-enum benh_nhan_gioi_tinh {
-  NAM
-  NU
-}
-
-enum dang_ky_trang_thai {
-  ACTIVE
-  EXPIRED
-}
-
-enum de_xuat_nguyen_lieu_loai_protein {
-  THUC_VAT
-  DONG_VAT
-}
-
-enum gioi_han_dinh_duong_canh_bao {
-  OFF
-  GTE_5
-  GTE_10
-}
-
-enum goi_trang_thai {
-  ACTIVE
-  INACTIVE
-}
-
-enum khau_phan_24h_kieu_nhap {
-  INGREDIENT_ONLY
-  BY_MEAL
-}
-
-enum yeu_cau_thanh_toan_trang_thai {
-  APPROVED
-  REJECTED
-  PENDING
-}
-
-enum de_xuat_thuc_don_trang_thai {
-  RIENG_TU
-  CHO_DUYET
-  DA_DUYET
-  TU_CHOI
-}
-
-enum dang_ky_cho_xac_thuc_gioi_tinh {
-  NAM
-  NU
-}
-
-enum de_xuat_nguyen_lieu_loai_de_xuat {
-  ADD
-  UPDATE
-}
-
-enum de_xuat_thuc_don_loai_doi_tuong {
-  BENH_NHAN
-  NHOM_BENH
-}
-
-enum de_xuat_nguyen_lieu_trang_thai {
-  RIENG_TU
-  CHO_DUYET
-  DA_DUYET
-  TU_CHOI
-}
-
-enum nguyen_lieu_loai_protein {
-  DONG_VAT
-  THUC_VAT
-}
-
-enum nguyen_lieu_trang_thai {
-  CHO_DUYET
-  DA_DUYET
-  TU_CHOI
-}

@@ -16,7 +16,7 @@ import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 export class ProfilesController {
   constructor(private readonly profilesService: ProfilesService) {}
 
-  @Get(['my-profile', '/api/users/check-profile'])
+  @Get(['my-profile', 'my'])
   @ApiOperation({ summary: 'Lấy thông tin hồ sơ của người dùng hiện tại' })
   @ApiResponse({ status: 200, description: 'Lấy hồ sơ thành công' })
   async getMyProfile(@CurrentUser() user: AuthenticatedUser) {

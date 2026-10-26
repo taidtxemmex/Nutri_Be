@@ -42,6 +42,7 @@ describe('ProfilesService', () => {
       expect(result.items[0]).toEqual({
         id: 'uuid-1',
         keycloakUserId: 'uuid-1',
+        username: 'bs_minhtri',
         fullName: 'Nguyễn Minh Trí',
         email: 'bsminhtri@gmail.com',
         phone: '0987654321',
@@ -79,6 +80,11 @@ describe('ProfilesService', () => {
     });
 
     it('should update profile using upsert', async () => {
+      mockPrisma.nguoi_dung.findUnique.mockResolvedValue({
+        id: 'uuid-1',
+        deleted_at: null,
+      });
+
       const result = await profilesService.updateMyProfile('uuid-1', {
         fullName: 'Nguyễn Minh Trí Updated',
         phone: '0911223344',

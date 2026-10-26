@@ -70,6 +70,7 @@ export class ProfilesService {
         active: true,
         keycloak_user_id: true,
         created_at: true,
+        deleted_at: true,
         ho_so_ca_nhan: {
           select: {
             ho_ten: true,
@@ -83,8 +84,10 @@ export class ProfilesService {
       },
     });
 
-    if (!user) {
-      throw new NotFoundException('Hồ sơ người dùng không tồn tại.');
+    if (!user || user.deleted_at) {
+      throw new NotFoundException(
+        'Hồ sơ người dùng không tồn tại hoặc tài khoản đã bị vô hiệu hóa.',
+      );
     }
 
     const dobStr = user.ho_so_ca_nhan?.ngay_sinh
@@ -123,6 +126,16 @@ export class ProfilesService {
    * Cập nhật hồ sơ người dùng hiện tại (với Debounced Invalidation 500ms)
    */
   async updateMyProfile(userId: string, dto: UpdateProfileDto) {
+    const existingUser = await this.prisma.nguoi_dung.findUnique({
+      where: { id: userId },
+      select: { id: true, deleted_at: true },
+    });
+    if (!existingUser || existingUser.deleted_at) {
+      throw new NotFoundException(
+        'Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị vô hiệu hóa.',
+      );
+    }
+
     const dobValue = dto.dob || dto.birthDate;
     const dobDate = dobValue ? new Date(dobValue) : undefined;
 
@@ -133,18 +146,15 @@ export class ProfilesService {
         ho_ten: dto.fullName,
         phone: dto.phone,
         dia_chi: dto.address,
-        gioi_tinh: dto.gender as any,
+        gioi_tinh: dto.gender,
         ngay_sinh: dobDate,
-        created_at: new Date(),
-        updated_at: new Date(),
       },
       update: {
         ...(dto.fullName !== undefined && { ho_ten: dto.fullName }),
         ...(dto.phone !== undefined && { phone: dto.phone }),
         ...(dto.address !== undefined && { dia_chi: dto.address }),
-        ...(dto.gender !== undefined && { gioi_tinh: dto.gender as any }),
+        ...(dto.gender !== undefined && { gioi_tinh: dto.gender }),
         ...(dobDate !== undefined && { ngay_sinh: dobDate }),
-        updated_at: new Date(),
       },
     });
 
@@ -186,7 +196,9 @@ export class ProfilesService {
       }
     }
 
-    const where: any = {};
+    const where: any = {
+      deleted_at: null,
+    };
     if (filter.keyword) {
       const keyword = filter.keyword.trim();
       where.OR = [
@@ -221,6 +233,7 @@ export class ProfilesService {
     const items = users.map((u) => ({
       id: u.id,
       keycloakUserId: u.keycloak_user_id || u.id,
+      username: u.ten_dang_nhap,
       fullName: u.ho_so_ca_nhan?.ho_ten || u.ten_dang_nhap,
       email: u.ho_so_ca_nhan?.email || '',
       phone: u.ho_so_ca_nhan?.phone || '',

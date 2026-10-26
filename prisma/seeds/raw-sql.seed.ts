@@ -1,0 +1,58 @@
+import { PrismaClient } from '@prisma/client';
+import * as mysql from 'mysql2/promise';
+import * as fs from 'fs';
+import * as path from 'path';
+
+function parseDatabaseUrl(url: string) {
+  const regex = /^mysql:\/\/([^:]+):([^@]+)@([^:]+):(\d+)\/([^?]+)/;
+  const match = url.match(regex);
+  if (!match) {
+    throw new Error(`Invalid DATABASE_URL format: ${url}`);
+  }
+  return {
+    user: decodeURIComponent(match[1]),
+    password: decodeURIComponent(match[2]),
+    host: match[3],
+    port: parseInt(match[4], 10),
+    database: match[5],
+  };
+}
+
+/**
+ * Nạp dữ liệu SQL lâm sàng thô (danh mục, nhóm bệnh, nguyên liệu chuẩn từ Viện Dinh Dưỡng)
+ * Chỉ nạp khi CSDL hoàn toàn trống để tránh xung đột khóa chính.
+ */
+export async function seedRawSqlData(prisma: PrismaClient, databaseUrl: string): Promise<void> {
+  const existingDanhMuc = await prisma.danh_muc.count();
+  const seedFilePath = path.join(__dirname, 'seed_data.sql');
+
+  if (existingDanhMuc === 0 && fs.existsSync(seedFilePath)) {
+    console.log(`📖 CSDL chưa có dữ liệu, đang nạp dữ liệu chuẩn từ: ${seedFilePath}...`);
+    const dbConfig = parseDatabaseUrl(databaseUrl);
+
+    const connection = await mysql.createConnection({
+      host: dbConfig.host,
+      port: dbConfig.port,
+      user: dbConfig.user,
+      password: dbConfig.password,
+      database: dbConfig.database,
+      multipleStatements: true,
+    });
+
+    const sqlContent = fs.readFileSync(seedFilePath, 'utf8');
+
+    await connection.query('SET FOREIGN_KEY_CHECKS = 0;');
+    await connection.query('SET UNIQUE_CHECKS = 0;');
+    await connection.query('SET NAMES utf8mb4;');
+
+    await connection.query(sqlContent);
+
+    await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
+    await connection.query('SET UNIQUE_CHECKS = 1;');
+    await connection.end();
+
+    console.log('   ✅ Đã nạp thành công dữ liệu lâm sàng từ file seed SQL!');
+  } else {
+    console.log(`   ℹ️  CSDL đã có sẵn ${existingDanhMuc} danh mục thực phẩm, bỏ qua nạp SQL thô.`);
+  }
+}
