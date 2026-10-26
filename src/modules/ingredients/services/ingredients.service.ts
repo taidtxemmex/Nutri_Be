@@ -252,9 +252,7 @@ export class IngredientsService {
       const inputWeight = Number(item.weight ?? item.weightGrams);
       const isNetWeight = item.isNetWeight !== undefined ? Boolean(item.isNetWeight) : true;
       const coefficient =
-        item.coefficient !== undefined && item.coefficient !== null
-          ? Number(item.coefficient)
-          : 1;
+        item.coefficient !== undefined && item.coefficient !== null ? Number(item.coefficient) : 1;
 
       const edibleRateVal =
         ingredient.edible !== undefined && ingredient.edible !== null
