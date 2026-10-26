@@ -1,0 +1,816 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ==========================================
+// 1. SYSTEM TABLES (HÀNG ĐỢI, CACHE, SEQUENCES)
+// ==========================================
+
+model SystemJob {
+  id          BigInt    @id @default(autoincrement())
+  queueName   String    @map("queue_name") @db.VarChar(50)
+  payload     String    @map("payload") @db.LongText
+  status      String    @default("PENDING") @map("status") @db.VarChar(20)
+  attempts    Int       @default(0) @map("attempts")
+  maxAttempts Int       @default(3) @map("max_attempts")
+  runAt       DateTime  @default(now()) @map("run_at") @db.DateTime(6)
+  priority    Int       @default(0) @map("priority")
+  lockedBy    String?   @map("locked_by") @db.VarChar(100)
+  lockedAt    DateTime? @map("locked_at") @db.DateTime(6)
+  lastError   String?   @map("last_error") @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTime(6)
+
+  @@index([status, runAt, priority], map: "idx_system_jobs_status_run_pri")
+  @@index([queueName, status], map: "idx_system_jobs_queue_status")
+  @@map("_system_jobs")
+}
+
+model SystemJobDlq {
+  id            BigInt   @id @default(autoincrement())
+  originalJobId BigInt   @map("original_job_id")
+  queueName     String   @map("queue_name") @db.VarChar(50)
+  payload       String   @map("payload") @db.LongText
+  errorStack    String?  @map("error_stack") @db.Text
+  failedAt      DateTime @default(now()) @map("failed_at") @db.DateTime(6)
+
+  @@index([queueName, failedAt], map: "idx_dlq_queue_failed")
+  @@map("_system_jobs_dlq")
+}
+
+model SystemSequence {
+  name       String   @id @map("name") @db.VarChar(50)
+  currentVal BigInt   @default(0) @map("current_val")
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.DateTime(6)
+
+  @@map("_system_sequences")
+}
+
+model SystemCache {
+  key       String   @id @map("cache_key") @db.VarChar(255)
+  value     String   @map("cache_value") @db.LongText
+  tag       String?  @map("tag") @db.VarChar(100)
+  expiresAt DateTime @map("expires_at") @db.DateTime(6)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(6)
+
+  @@index([key, expiresAt], map: "idx_cache_key_exp")
+  @@index([tag], map: "idx_cache_tag")
+  @@map("_system_cache")
+}
+
+// ==========================================
+// 2. NUTRI CLINICAL NUTRITION DOMAIN MODELS
+// ==========================================
+
+model benh_nhan {
+  id               BigInt              @id @default(autoincrement())
+  nguoi_dung_id    String              @db.Char(36)
+  ho_ten           String              @db.VarChar(255)
+  so_dien_thoai    String?             @db.VarChar(20)
+  ngay_sinh        DateTime?           @db.Date
+  gioi_tinh        benh_nhan_gioi_tinh
+  can_nang         Float?
+  chieu_cao        Float?
+  ghi_chu          String?             @db.Text
+  he_so_hoat_dong  Float?
+  ma_benh_nhan_bv  String?             @db.VarChar(255)
+  tao_luc          DateTime?           @db.DateTime(6)
+  chi_nam_sinh     Boolean?            @db.Bit(1)
+  nguoi_dung       nguoi_dung          @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "benh_nhan_ibfk_1")
+  de_xuat_thuc_don de_xuat_thuc_don[]
+  khau_phan_24h    khau_phan_24h[]
+  thuc_don         thuc_don[]
+
+  @@index([nguoi_dung_id], map: "benh_nhan_ibfk_1")
+  @@index([nguoi_dung_id, ho_ten], map: "idx_patient_user_name")
+  @@index([so_dien_thoai], map: "idx_patient_phone")
+  @@index([ma_benh_nhan_bv], map: "idx_patient_bv_code")
+}
+
+model bua_an {
+  id                BigInt              @id @default(autoincrement())
+  nguoi_dung_id     String              @db.Char(36)
+  ten_bua_an        String?             @db.VarChar(255)
+  gio_an            String              @db.VarChar(50)
+  trang_thai        bua_an_trang_thai?  @default(RIENG_TU)
+  la_cong_khai      Boolean?            @default(false)
+  nguoi_dung        nguoi_dung          @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "bua_an_ibfk_1")
+  chi_tiet_bua_an   chi_tiet_bua_an[]
+  chi_tiet_thuc_don chi_tiet_thuc_don[]
+
+  @@index([nguoi_dung_id], map: "bua_an_ibfk_1")
+  @@index([nguoi_dung_id, trang_thai], map: "idx_meal_user_status")
+}
+
+model chi_tiet_bua_an {
+  id              BigInt @id @default(autoincrement())
+  bua_an_id       BigInt
+  mon_an_id       BigInt
+  he_so_song_chin Float?
+  bua_an          bua_an @relation(fields: [bua_an_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "chi_tiet_bua_an_ibfk_1")
+  mon_an          mon_an @relation(fields: [mon_an_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chi_tiet_bua_an_ibfk_2")
+
+  @@unique([bua_an_id, mon_an_id], map: "uk_meal_dish")
+  @@index([bua_an_id], map: "bua_an_id")
+  @@index([mon_an_id], map: "mon_an_id")
+}
+
+model chi_tiet_mon_an {
+  id                   BigInt      @id @default(autoincrement())
+  mon_an_id            BigInt
+  nguyen_lieu_id       BigInt
+  khoi_luong_song_sach Float?
+  mon_an               mon_an      @relation(fields: [mon_an_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "chi_tiet_mon_an_ibfk_1")
+  nguyen_lieu          nguyen_lieu @relation(fields: [nguyen_lieu_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chi_tiet_mon_an_ibfk_2")
+
+  @@unique([mon_an_id, nguyen_lieu_id], map: "uk_dish_ingredient")
+  @@index([nguyen_lieu_id], map: "FKfkf5e70sxg3d4f90312mdcxke")
+  @@index([mon_an_id], map: "mon_an_id")
+}
+
+model chi_tiet_thuc_don {
+  id                BigInt   @id @default(autoincrement())
+  thuc_don_id       BigInt
+  bua_an_id         BigInt
+  so_tuan           Int?     @db.TinyInt
+  thu_tu_trong_tuan Int?     @db.TinyInt
+  thu_trong_tuan    Int?     @db.TinyInt
+  thuc_don          thuc_don @relation(fields: [thuc_don_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "chi_tiet_thuc_don_ibfk_1")
+  bua_an            bua_an   @relation(fields: [bua_an_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "chi_tiet_thuc_don_ibfk_2")
+
+  @@index([bua_an_id], map: "bua_an_id")
+  @@index([thuc_don_id], map: "thuc_don_id")
+  @@index([thuc_don_id, so_tuan, thu_trong_tuan], map: "idx_menu_detail_week_day")
+}
+
+model dang_ky {
+  id            BigInt             @id @default(autoincrement())
+  nguoi_dung_id String             @db.Char(36)
+  ma_goi        String             @db.VarChar(50)
+  ngay_bat_dau  DateTime           @db.DateTime(0)
+  ngay_ket_thuc DateTime           @db.DateTime(0)
+  trang_thai    dang_ky_trang_thai
+  thanh_toan_id BigInt?
+
+  @@index([nguoi_dung_id, trang_thai, ngay_ket_thuc], map: "idx_dang_ky_user_status_end")
+}
+
+model dang_ky_cho_xac_thuc {
+  id              BigInt                          @id @default(autoincrement())
+  dia_chi         String?                         @db.VarChar(255)
+  created_at      DateTime                        @db.DateTime(6)
+  ngay_sinh       DateTime?                       @db.Date
+  email           String                          @db.VarChar(255)
+  mat_khau_ma_hoa String                          @db.VarChar(512)
+  expires_at      DateTime                        @db.DateTime(6)
+  ho_ten          String?                         @db.VarChar(255)
+  gioi_tinh       dang_ky_cho_xac_thuc_gioi_tinh?
+  phone           String?                         @db.VarChar(255)
+  token_hash      String                          @unique(map: "UK_ab8mb59mlyohva6oewekv3vof") @db.VarChar(64)
+  ten_dang_nhap   String                          @db.VarChar(100)
+
+  @@index([email], map: "idx_pending_email")
+  @@index([expires_at], map: "idx_pending_expires")
+  @@index([ten_dang_nhap], map: "idx_pending_username")
+}
+
+model danh_muc {
+  id                                                         Int                   @id @default(autoincrement())
+  ten_danh_muc                                               String?               @db.VarChar(255)
+  de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_danh_mucTodanh_muc de_xuat_nguyen_lieu[] @relation("de_xuat_nguyen_lieu_danh_mucTodanh_muc")
+  nguyen_lieu_nguyen_lieu_danh_mucTodanh_muc                 nguyen_lieu[]         @relation("nguyen_lieu_danh_mucTodanh_muc")
+}
+
+model de_xuat_nguyen_lieu {
+  id                                                        BigInt                            @id @default(autoincrement())
+  ngay_tao                                                  DateTime                          @db.DateTime(6)
+  edible                                                    Float?
+  nguyen_lieu_id                                            BigInt?
+  ten_nguyen_lieu                                           String                            @db.VarChar(255)
+  loai_protein                                              de_xuat_nguyen_lieu_loai_protein?
+  ghi_chu                                                   String?                           @db.Text
+  gia_tri_dinh_duong_json                                   String                            @db.Text
+  loai_de_xuat                                              de_xuat_nguyen_lieu_loai_de_xuat
+  ly_do_tu_choi                                             String?                           @db.Text
+  ngay_duyet                                                DateTime?                         @db.DateTime(6)
+  trang_thai                                                de_xuat_nguyen_lieu_trang_thai
+  danh_muc                                                  Int
+  nguoi_tao_id                                              String                            @db.Char(36)
+  nguoi_duyet_id                                            String?                           @db.Char(36)
+  gia_tri_dinh_duong_cu_json                                String?                           @db.Text
+  nguoi_dung_de_xuat_nguyen_lieu_nguoi_duyet_idTonguoi_dung nguoi_dung?                       @relation("de_xuat_nguyen_lieu_nguoi_duyet_idTonguoi_dung", fields: [nguoi_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK442it118nspyay7dhwwb18vxt")
+  danh_muc_de_xuat_nguyen_lieu_danh_mucTodanh_muc           danh_muc                          @relation("de_xuat_nguyen_lieu_danh_mucTodanh_muc", fields: [danh_muc], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK950tlv8lq2qa531ipi8hsc8kk")
+  nguoi_dung_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung   nguoi_dung                        @relation("de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung", fields: [nguoi_tao_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKmsprows787btecd7rt3c5ks5w")
+  minh_chung                                                minh_chung[]
+
+  @@index([nguoi_duyet_id], map: "FK442it118nspyay7dhwwb18vxt")
+  @@index([danh_muc], map: "FK950tlv8lq2qa531ipi8hsc8kk")
+  @@index([nguoi_tao_id], map: "FKmsprows787btecd7rt3c5ks5w")
+}
+
+model de_xuat_thuc_don {
+  id                                                         BigInt                          @id @default(autoincrement())
+  ngay_phe_duyet                                             DateTime?                       @db.DateTime(6)
+  ngay_tao                                                   DateTime?                       @db.DateTime(6)
+  ten_thuc_don                                               String                          @db.VarChar(255)
+  loai_thuc_don                                              de_xuat_thuc_don_loai_thuc_don
+  ly_do_tu_choi                                              String?                         @db.Text
+  snapshot_json                                              String                          @db.LongText
+  trang_thai                                                 de_xuat_thuc_don_trang_thai
+  loai_doi_tuong                                             de_xuat_thuc_don_loai_doi_tuong
+  tong_nang_luong                                            String?                         @db.VarChar(255)
+  nguoi_phe_duyet_id                                         String?                         @db.Char(36)
+  nguoi_de_xuat_id                                           String?                         @db.Char(36)
+  nhom_benh_id                                               Int?
+  gioi_han_dinh_duong_id                                     BigInt?
+  menu_goc_id                                                BigInt
+  benh_nhan_id                                               BigInt?
+  benh_nhan                                                  benh_nhan?                      @relation(fields: [benh_nhan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK3c3jeeklf8w6abyvu3fo9oeyq")
+  nhom_benh_mo_rong                                          nhom_benh_mo_rong?              @relation(fields: [nhom_benh_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKbtfihw33e5fdwirtfg657reu1")
+  gioi_han_dinh_duong                                        gioi_han_dinh_duong?            @relation(fields: [gioi_han_dinh_duong_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKjo9oihpixfe1p3r7dpca8j3w3")
+  nguoi_dung_de_xuat_thuc_don_nguoi_phe_duyet_idTonguoi_dung nguoi_dung?                     @relation("de_xuat_thuc_don_nguoi_phe_duyet_idTonguoi_dung", fields: [nguoi_phe_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKrjw7ecrik8d6un29gfydh4dop")
+  nguoi_dung_de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung   nguoi_dung?                     @relation("de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung", fields: [nguoi_de_xuat_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKsncx10fbcqx5g9u4gv7fssepl")
+  thuc_don                                                   thuc_don                        @relation(fields: [menu_goc_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKtev5mo1ui2jqgbxxoohv4w27x")
+
+  @@index([benh_nhan_id], map: "FK3c3jeeklf8w6abyvu3fo9oeyq")
+  @@index([nhom_benh_id], map: "FKbtfihw33e5fdwirtfg657reu1")
+  @@index([gioi_han_dinh_duong_id], map: "FKjo9oihpixfe1p3r7dpca8j3w3")
+  @@index([nguoi_phe_duyet_id], map: "FKrjw7ecrik8d6un29gfydh4dop")
+  @@index([nguoi_de_xuat_id], map: "FKsncx10fbcqx5g9u4gv7fssepl")
+  @@index([menu_goc_id], map: "FKtev5mo1ui2jqgbxxoohv4w27x")
+}
+
+model gioi_han_dinh_duong {
+  id               BigInt                        @id @default(autoincrement())
+  ngay_tao         DateTime?                     @db.DateTime(6)
+  gioi_han_json    Json?
+  ten_gioi_han     String?                       @db.VarChar(255)
+  ngay_cap_nhat    DateTime?                     @db.DateTime(6)
+  canh_bao         gioi_han_dinh_duong_canh_bao?
+  nguoi_dung_id    String?                       @db.Char(36)
+  tai_su_dung      Boolean                       @db.Bit(1)
+  de_xuat_thuc_don de_xuat_thuc_don[]
+  nguoi_dung       nguoi_dung?                   @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKrhy3b2j8ghm5kkh86dya7djfb")
+  thuc_don         thuc_don[]
+
+  @@index([nguoi_dung_id], map: "FKrhy3b2j8ghm5kkh86dya7djfb")
+}
+
+model goi {
+  id              BigInt         @id @default(autoincrement())
+  ma_goi          String         @unique(map: "ma_goi") @db.VarChar(50)
+  ten_goi         String         @db.VarChar(255)
+  so_ngay_su_dung Int
+  gia_tien        Decimal        @db.Decimal(15, 2)
+  mo_ta           String?        @db.Text
+  trang_thai      goi_trang_thai
+  ngay_tao        DateTime?      @default(now()) @db.DateTime(0)
+  ngay_cap_nhat   DateTime?      @default(now()) @db.DateTime(0)
+}
+
+model he_so_song_chin {
+  id                   BigInt       @id @default(autoincrement())
+  nguyen_lieu_id       BigInt?
+  phuong_phap_che_bien String?      @db.VarChar(255)
+  he_so                Float?
+  is_public            Boolean?     @db.Bit(1)
+  nguoi_dung_id        String?      @db.Char(36)
+  nguoi_dung           nguoi_dung?  @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKbp142ea7u0i1tlprly2e82jxm")
+  nguyen_lieu          nguyen_lieu? @relation(fields: [nguyen_lieu_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_he_so_song_chin_nguyen_lieu")
+
+  @@index([nguoi_dung_id], map: "FKbp142ea7u0i1tlprly2e82jxm")
+  @@index([nguyen_lieu_id], map: "fk_he_so_song_chin_nguyen_lieu")
+  @@index([nguyen_lieu_id, phuong_phap_che_bien], map: "idx_coeff_ing_method")
+}
+
+model ho_so_ca_nhan {
+  id            BigInt                   @id @default(autoincrement())
+  nguoi_dung_id String?                  @unique(map: "nguoi_dung_id") @db.Char(36)
+  ho_ten        String?                  @db.VarChar(255)
+  ngay_sinh     DateTime?                @db.Date
+  gioi_tinh     ho_so_ca_nhan_gioi_tinh?
+  dia_chi       String?                  @db.VarChar(255)
+  email         String?                  @db.VarChar(255)
+  phone         String?                  @db.VarChar(255)
+  created_at    DateTime?                @default(now()) @db.DateTime(0)
+  updated_at    DateTime?                @default(now()) @db.DateTime(0)
+  nguoi_dung    nguoi_dung?              @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "ho_so_ca_nhan_ibfk_1")
+
+  @@index([email], map: "idx_profile_email")
+  @@index([phone], map: "idx_profile_phone")
+}
+
+model huong_dan_dinh_duong {
+  id               BigInt      @id @default(autoincrement())
+  ma_ky_hieu       String      @unique(map: "UK_c12m565jgtwbc5hrivj191sf7") @db.VarChar(255)
+  co_cau_khau_phan Json?
+  ten_benh         String      @db.VarChar(255)
+  luu_y            String?     @db.Text
+  nguyen_tac       String?     @db.Text
+  nguoi_dung_id    String?     @db.Char(36)
+  nguoi_dung       nguoi_dung? @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK24pmrtr8iqg05h0wr90a5g88v")
+
+  @@index([nguoi_dung_id], map: "FK24pmrtr8iqg05h0wr90a5g88v")
+}
+
+model khau_phan_24h {
+  id                   BigInt                  @id @default(autoincrement())
+  tao_luc              DateTime?               @db.DateTime(6)
+  ngay_an              DateTime                @db.Date
+  ghi_chu              String?                 @db.VarChar(255)
+  benh_nhan_id         BigInt
+  nguoi_dung_id        String?                 @db.Char(36)
+  kieu_nhap            khau_phan_24h_kieu_nhap
+  benh_nhan            benh_nhan               @relation(fields: [benh_nhan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK8aqjtjyd95rlsimqr2f5cosmj")
+  nguoi_dung           nguoi_dung?             @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKqt7efogms7js35qdvp3rfrct8")
+  khau_phan_24h_bua_an khau_phan_24h_bua_an[]
+
+  @@unique([benh_nhan_id, ngay_an], map: "UKmscxxi0es7bbg73tw1iwb2lnt")
+  @@index([nguoi_dung_id], map: "FKqt7efogms7js35qdvp3rfrct8")
+  @@index([nguoi_dung_id, ngay_an], map: "idx_intake_user_date")
+}
+
+model khau_phan_24h_bua_an {
+  id                        BigInt                      @id @default(autoincrement())
+  ten_bua                   String?                     @db.VarChar(255)
+  thu_tu_bua                Int
+  khau_phan_24h_id          BigInt
+  gio_an                    String?                     @db.VarChar(50)
+  khau_phan_24h             khau_phan_24h               @relation(fields: [khau_phan_24h_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKfdwggqcjm9js81ccolmy1r605")
+  khau_phan_24h_nguyen_lieu khau_phan_24h_nguyen_lieu[]
+
+  @@index([khau_phan_24h_id], map: "FKfdwggqcjm9js81ccolmy1r605")
+  @@index([khau_phan_24h_id, thu_tu_bua], map: "idx_intake_meal_order")
+}
+
+model khau_phan_24h_nguyen_lieu {
+  id                      BigInt               @id @default(autoincrement())
+  nguyen_lieu_id          BigInt
+  khoi_luong_song_sach    Float
+  khau_phan_24h_bua_an_id BigInt
+  khau_phan_24h_bua_an    khau_phan_24h_bua_an @relation(fields: [khau_phan_24h_bua_an_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK1ma9vy4almn90vk0qt5n0akar")
+  nguyen_lieu             nguyen_lieu          @relation(fields: [nguyen_lieu_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKk2t76jv540wnc38in39johnx5")
+
+  @@index([khau_phan_24h_bua_an_id], map: "FK1ma9vy4almn90vk0qt5n0akar")
+  @@index([nguyen_lieu_id], map: "FKk2t76jv540wnc38in39johnx5")
+  @@index([khau_phan_24h_bua_an_id, nguyen_lieu_id], map: "idx_intake_meal_ing")
+}
+
+model lich_su_dang_nhap {
+  id                 BigInt              @id @default(autoincrement())
+  ip_address         String?             @db.VarChar(100)
+  login_time         DateTime            @db.DateTime(6)
+  logout_time        DateTime?           @db.DateTime(6)
+  session_id         String?             @db.VarChar(100)
+  device_id          BigInt?
+  nguoi_dung_id      String              @db.Char(36)
+  nguoi_dung         nguoi_dung          @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKqe2qpqvfbbkwm23w03pl76yg5")
+  thiet_bi_dang_nhap thiet_bi_dang_nhap? @relation(fields: [device_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKrnkchmjhb2cxhlqb3ffc45tww")
+
+  @@index([nguoi_dung_id], map: "FKqe2qpqvfbbkwm23w03pl76yg5")
+  @@index([device_id], map: "FKrnkchmjhb2cxhlqb3ffc45tww")
+  @@index([session_id], map: "idx_login_session_id")
+  @@index([nguoi_dung_id, login_time(sort: Desc)], map: "idx_login_user_time")
+}
+
+model ma_xac_thuc {
+  id            BigInt     @id @default(autoincrement())
+  ngay_het_han  DateTime   @db.DateTime(6)
+  ma_token      String     @unique(map: "UK_p64rs7v4dlvxghardweeqwyfe") @db.VarChar(64)
+  nguoi_dung_id String     @unique(map: "UK_teim564lcp9scxbslwa55twu3") @db.VarChar(30)
+  nguoi_dung    nguoi_dung @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKr9iu02dnwlrpl4xkl8ep7pxrw")
+}
+
+model minh_chung {
+  id                  BigInt               @id @default(autoincrement())
+  bucket_name         String?              @db.VarChar(255)
+  link_ngoai          String?              @db.Text
+  dung_luong          BigInt?
+  mime_type           String?              @db.VarChar(255)
+  object_key          String?              @db.VarChar(255)
+  ten_file_goc        String?              @db.VarChar(255)
+  ngay_upload         DateTime             @db.DateTime(6)
+  de_xuat_id          BigInt?
+  nguoi_upload_id     String               @db.Char(36)
+  yeu_cau_id          BigInt?
+  yeu_cau_thanh_toan  yeu_cau_thanh_toan?  @relation(fields: [yeu_cau_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKlywjnrhx8eem203vry3jvcg5v")
+  nguoi_dung          nguoi_dung           @relation(fields: [nguoi_upload_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKo7m6qmwpnrs09t6q5hrytlhov")
+  de_xuat_nguyen_lieu de_xuat_nguyen_lieu? @relation(fields: [de_xuat_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKp5i387oficedotfi0a3brr9oh")
+
+  @@index([yeu_cau_id], map: "FKlywjnrhx8eem203vry3jvcg5v")
+  @@index([nguoi_upload_id], map: "FKo7m6qmwpnrs09t6q5hrytlhov")
+  @@index([de_xuat_id], map: "FKp5i387oficedotfi0a3brr9oh")
+}
+
+model mon_an {
+  id                                               BigInt             @id @default(autoincrement())
+  nguoi_dung_id                                    String?            @db.Char(36)
+  ten_mon                                          String             @db.VarChar(255)
+  trang_thai                                       mon_an_trang_thai? @default(RIENG_TU)
+  mon_goc_id                                       BigInt?
+  ly_do_tu_choi                                    String?            @db.Text
+  ngay_phe_duyet                                   DateTime?          @db.DateTime(6)
+  ngay_tao                                         DateTime?          @db.DateTime(6)
+  nguoi_phe_duyet_id                               String?            @db.Char(36)
+  recipe_hash                                      String?            @db.VarChar(64)
+  chi_tiet_bua_an                                  chi_tiet_bua_an[]
+  chi_tiet_mon_an                                  chi_tiet_mon_an[]
+  nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung nguoi_dung?        @relation("mon_an_nguoi_phe_duyet_idTonguoi_dung", fields: [nguoi_phe_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKtii3dvuoo8lxj35dwn1uknt9e")
+  mon_an                                           mon_an?            @relation("mon_anTomon_an", fields: [mon_goc_id], references: [id], onUpdate: NoAction, map: "fk_mon_an_goc")
+  other_mon_an                                     mon_an[]           @relation("mon_anTomon_an")
+  nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung      nguoi_dung?        @relation("mon_an_nguoi_dung_idTonguoi_dung", fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "mon_an_ibfk_1")
+
+  @@index([nguoi_phe_duyet_id], map: "FKtii3dvuoo8lxj35dwn1uknt9e")
+  @@index([mon_goc_id], map: "fk_mon_an_goc")
+  @@index([recipe_hash], map: "idx_mon_an_recipe_hash")
+  @@index([nguoi_dung_id], map: "mon_an_ibfk_1")
+  @@index([nguoi_dung_id, trang_thai, ngay_tao(sort: Desc)], map: "idx_dish_user_status_created")
+  @@index([trang_thai, ngay_tao(sort: Desc)], map: "idx_dish_status_created")
+}
+
+model nguoi_de_xuat {
+  id                BigInt     @id @default(autoincrement())
+  nguoi_dung_id     String     @unique(map: "nguoi_dung_id") @db.Char(36)
+  trinh_do_hoc_van  String?    @db.VarChar(100)
+  nghe_nghiep       String?    @db.VarChar(100)
+  don_vi_cong_tac   String?    @db.VarChar(255)
+  vi_tri_cong_tac   String?    @db.VarChar(255)
+  linh_vuc_cong_tac String?    @db.VarChar(100)
+  nguoi_dung        nguoi_dung @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_nguoi_de_xuat_nguoi_dung")
+}
+
+model nguoi_dung {
+  id                                                                   String                 @id @db.Char(36)
+  ten_dang_nhap                                                        String                 @db.VarChar(255)
+  mat_khau                                                             String?                @db.VarChar(255)
+  vai_tro                                                              nguoi_dung_vai_tro
+  kenh                                                                 nguoi_dung_kenh?
+  id_kenh                                                              String?                @db.VarChar(100)
+  active                                                               Boolean                @db.Bit(1)
+  keycloak_user_id                                                     String?                @db.VarChar(255)
+  created_at                                                           DateTime?              @default(now()) @db.DateTime(0)
+  updated_at                                                           DateTime?              @default(now()) @db.DateTime(0)
+  pro_expired_at                                                       DateTime?              @db.DateTime(6)
+  profile_completed                                                    Boolean                @db.Bit(1)
+  benh_nhan                                                            benh_nhan[]
+  bua_an                                                               bua_an[]
+  de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_nguoi_duyet_idTonguoi_dung   de_xuat_nguyen_lieu[]  @relation("de_xuat_nguyen_lieu_nguoi_duyet_idTonguoi_dung")
+  de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung     de_xuat_nguyen_lieu[]  @relation("de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung")
+  de_xuat_thuc_don_de_xuat_thuc_don_nguoi_phe_duyet_idTonguoi_dung     de_xuat_thuc_don[]     @relation("de_xuat_thuc_don_nguoi_phe_duyet_idTonguoi_dung")
+  de_xuat_thuc_don_de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung       de_xuat_thuc_don[]     @relation("de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung")
+  gioi_han_dinh_duong                                                  gioi_han_dinh_duong[]
+  he_so_song_chin                                                      he_so_song_chin[]
+  ho_so_ca_nhan                                                        ho_so_ca_nhan?
+  huong_dan_dinh_duong                                                 huong_dan_dinh_duong[]
+  khau_phan_24h                                                        khau_phan_24h[]
+  lich_su_dang_nhap                                                    lich_su_dang_nhap[]
+  ma_xac_thuc                                                          ma_xac_thuc?
+  minh_chung                                                           minh_chung[]
+  mon_an_mon_an_nguoi_phe_duyet_idTonguoi_dung                         mon_an[]               @relation("mon_an_nguoi_phe_duyet_idTonguoi_dung")
+  mon_an_mon_an_nguoi_dung_idTonguoi_dung                              mon_an[]               @relation("mon_an_nguoi_dung_idTonguoi_dung")
+  nguoi_de_xuat                                                        nguoi_de_xuat?
+  nguyen_lieu                                                          nguyen_lieu[]
+  nhom_benh_mo_rong                                                    nhom_benh_mo_rong[]
+  thiet_bi_dang_nhap                                                   thiet_bi_dang_nhap[]
+  thuc_don                                                             thuc_don[]
+  yeu_cau_thanh_toan_yeu_cau_thanh_toan_nguoi_phe_duyet_idTonguoi_dung yeu_cau_thanh_toan[]   @relation("yeu_cau_thanh_toan_nguoi_phe_duyet_idTonguoi_dung")
+  yeu_cau_thanh_toan_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung      yeu_cau_thanh_toan[]   @relation("yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung")
+
+  @@unique([ten_dang_nhap], map: "uk_nguoi_dung_username")
+  @@index([vai_tro, pro_expired_at], map: "idx_user_role_exp")
+  @@index([created_at], map: "idx_user_created_at")
+}
+
+model nguyen_lieu {
+  id                                      BigInt                      @id @default(autoincrement())
+  ten_nguyen_lieu                         String                      @db.VarChar(255)
+  danh_muc                                Int?
+  edible                                  Float?
+  water                                   Float?
+  protein                                 Float?
+  fat                                     Float?
+  fiber                                   Float?
+  ash                                     Float?
+  calci                                   Float?
+  phosphorous                             Float?
+  iron                                    Float?
+  zinc                                    Float?
+  sodium                                  Float?
+  potassium                               Float?
+  magnesium                               Float?
+  manganese                               Float?
+  copper                                  Float?
+  selenium                                Float?
+  vitaminC                                Float?
+  thiamine                                Float?
+  riboflavin                              Float?
+  niacin                                  Float?
+  pantothenicAcid                         Float?
+  vitaminB6                               Float?
+  folate                                  Float?
+  folicAcid                               Float?
+  biotin                                  Float?
+  vitaminB12                              Float?
+  retinol                                 Float?
+  vitaminD                                Float?
+  vitaminE                                Float?
+  vitaminK                                Float?
+  betaCarotene                            Float?
+  alphaCarotene                           Float?
+  betaCryptoxanthin                       Float?
+  lycopene                                Float?
+  luteinZeaxanthin                        Float?
+  isoflavoneTongSo                        Float?
+  daidzein                                Float?
+  genistein                               Float?
+  glycetin                                Float?
+  purine                                  Float?
+  tsAxitBeoNo                             Float?
+  palmitic                                Float?
+  margaric                                Float?
+  stearic                                 Float?
+  arachidic                               Float?
+  behenic                                 Float?
+  lignoceric                              Float?
+  tsAxitBeoKhongNo1NoiDoi                 Float?
+  myristoleic                             Float?
+  palmitoleic                             Float?
+  oleic                                   Float?
+  tsAxitBeoKhongNoNhieuNoiDoi             Float?
+  linoleic                                Float?
+  linolenic                               Float?
+  arachidonic                             Float?
+  epa                                     Float?
+  dha                                     Float?
+  tsAxitBeoTrans                          Float?
+  cholesterol                             Float?
+  phytosterol                             Float?
+  lysin                                   Float?
+  methionin                               Float?
+  tryptophan                              Float?
+  phenylalanin                            Float?
+  threonin                                Float?
+  valine                                  Float?
+  leucine                                 Float?
+  isoleucine                              Float?
+  arginine                                Float?
+  histidine                               Float?
+  cystine                                 Float?
+  tyrosine                                Float?
+  alanine                                 Float?
+  asparticAcid                            Float?
+  glutamicAcid                            Float?
+  glycine                                 Float?
+  proline                                 Float?
+  serine                                  Float?
+  loai_protein                            nguyen_lieu_loai_protein?
+  tao_boi_id                              String?                     @db.Char(36)
+  trang_thai                              nguyen_lieu_trang_thai?
+  chi_tiet_mon_an                         chi_tiet_mon_an[]
+  he_so_song_chin                         he_so_song_chin[]
+  khau_phan_24h_nguyen_lieu               khau_phan_24h_nguyen_lieu[]
+  danh_muc_nguyen_lieu_danh_mucTodanh_muc danh_muc?                   @relation("nguyen_lieu_danh_mucTodanh_muc", fields: [danh_muc], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nguyen_lieu_ibfk_1")
+  nguoi_dung                              nguoi_dung?                 @relation(fields: [tao_boi_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nguyen_lieu_ibfk_2")
+
+  @@index([danh_muc], map: "danh_muc")
+  @@index([tao_boi_id], map: "tao_boi_id")
+  @@index([trang_thai, danh_muc, ten_nguyen_lieu], map: "idx_ing_status_cat_name")
+  @@index([tao_boi_id, trang_thai], map: "idx_ing_creator_status")
+}
+
+model nhom_benh {
+  id                Int                 @id @default(autoincrement())
+  ma_nhom           String?             @unique(map: "ma_nhom") @db.VarChar(10)
+  ten_nhom          String?             @db.VarChar(255)
+  nhom_benh_mo_rong nhom_benh_mo_rong[]
+}
+
+model nhom_benh_mo_rong {
+  id               Int                @id @default(autoincrement())
+  ma_nhom_mo_rong  String?            @db.VarChar(20)
+  ten_hien_thi     String?            @db.VarChar(255)
+  nguoi_dung_id    String?            @db.Char(36)
+  ma_nhom_cha      Int?
+  de_xuat_thuc_don de_xuat_thuc_don[]
+  nhom_benh        nhom_benh?         @relation(fields: [ma_nhom_cha], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKm7btvfmi36owyphlk7re5v4y2")
+  nguoi_dung       nguoi_dung?        @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nhom_benh_mo_rong_ibfk_2")
+  thuc_don         thuc_don[]
+
+  @@index([ma_nhom_cha], map: "FKm7btvfmi36owyphlk7re5v4y2")
+  @@index([nguoi_dung_id], map: "bac_si_id")
+}
+
+model thiet_bi_dang_nhap {
+  id                BigInt                          @id @default(autoincrement())
+  created_at        DateTime                        @db.DateTime(6)
+  device_hash       String                          @db.VarChar(64)
+  device_name       String?                         @db.VarChar(255)
+  device_type       thiet_bi_dang_nhap_device_type?
+  is_active         Boolean                         @db.Bit(1)
+  updated_at        DateTime?                       @db.DateTime(6)
+  user_agent        String?                         @db.VarChar(500)
+  nguoi_dung_id     String                          @db.Char(36)
+  lich_su_dang_nhap lich_su_dang_nhap[]
+  nguoi_dung        nguoi_dung                      @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FK2uvu7lv3uj4ioedbf8wl2jt11")
+
+  @@unique([nguoi_dung_id, device_hash], map: "uk_user_device_hash")
+  @@index([nguoi_dung_id], map: "FK2uvu7lv3uj4ioedbf8wl2jt11")
+}
+
+model thuc_don {
+  id                     BigInt                  @id @default(autoincrement())
+  nguoi_dung_id          String                  @db.Char(36)
+  ten_thuc_don           String                  @db.VarChar(255)
+  loai_thuc_don          thuc_don_loai_thuc_don
+  loai_doi_tuong         thuc_don_loai_doi_tuong
+  benh_nhan_id           BigInt?
+  nhom_benh_id           Int?
+  ngay_tao               DateTime?               @db.Date
+  tong_nang_luong        String?                 @db.VarChar(255)
+  gioi_han_dinh_duong_id BigInt?
+  chi_tiet_thuc_don      chi_tiet_thuc_don[]
+  de_xuat_thuc_don       de_xuat_thuc_don[]
+  gioi_han_dinh_duong    gioi_han_dinh_duong?    @relation(fields: [gioi_han_dinh_duong_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKf6w6c6rdroab1wvpd77q5aggu")
+  nhom_benh_mo_rong      nhom_benh_mo_rong?      @relation(fields: [nhom_benh_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_thuc_don_nhom_benh_mo_rong")
+  nguoi_dung             nguoi_dung              @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "thuc_don_ibfk_1")
+  benh_nhan              benh_nhan?              @relation(fields: [benh_nhan_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "thuc_don_ibfk_2")
+
+  @@index([gioi_han_dinh_duong_id], map: "FKf6w6c6rdroab1wvpd77q5aggu")
+  @@index([benh_nhan_id], map: "benh_nhan_id")
+  @@index([nhom_benh_id], map: "fk_thuc_don_nhom_benh_mo_rong")
+  @@index([nguoi_dung_id], map: "thuc_don_ibfk_1")
+  @@index([nguoi_dung_id, loai_thuc_don, ngay_tao(sort: Desc)], map: "idx_menu_user_type_created")
+  @@index([benh_nhan_id, ngay_tao(sort: Desc)], map: "idx_menu_patient_created")
+}
+
+model yeu_cau_thanh_toan {
+  id                                                           BigInt                        @id @default(autoincrement())
+  nguoi_dung_id                                                String                        @db.Char(36)
+  ma_goi                                                       String                        @db.VarChar(50)
+  ten_goi                                                      String                        @db.VarChar(255)
+  so_ngay_su_dung                                              Int
+  so_tien                                                      Decimal                       @db.Decimal(15, 2)
+  trang_thai                                                   yeu_cau_thanh_toan_trang_thai
+  ly_do_tu_choi                                                String?                       @db.TinyText
+  ngay_tao                                                     DateTime?                     @default(now()) @db.DateTime(0)
+  ngay_phe_duyet                                               DateTime?                     @db.DateTime(0)
+  nguoi_phe_duyet_id                                           String?                       @db.Char(36)
+  ma_giao_dich                                                 String                        @unique(map: "UK_ehthwii962vn7vns2m3hw6ows") @db.VarChar(50)
+  minh_chung                                                   minh_chung[]
+  nguoi_dung_yeu_cau_thanh_toan_nguoi_phe_duyet_idTonguoi_dung nguoi_dung?                   @relation("yeu_cau_thanh_toan_nguoi_phe_duyet_idTonguoi_dung", fields: [nguoi_phe_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKsn2jkdkl35fi3wlnsxefqwhtq")
+  nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung      nguoi_dung                    @relation("yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung", fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKt8rh702i8c3t2re3tolicnqyh")
+
+  @@index([nguoi_phe_duyet_id], map: "FKsn2jkdkl35fi3wlnsxefqwhtq")
+  @@index([ma_giao_dich], map: "idx_yc_ma_giao_dich")
+  @@index([ngay_tao], map: "idx_yc_ngay_tao")
+  @@index([nguoi_dung_id], map: "idx_yc_nguoi_dung")
+  @@index([trang_thai], map: "idx_yc_trang_thai")
+  @@index([trang_thai, ngay_tao(sort: Desc)], map: "idx_payment_status_created")
+  @@index([nguoi_dung_id, ngay_tao(sort: Desc)], map: "idx_payment_user_created")
+}
+
+// ==========================================
+// 3. ENUMS
+// ==========================================
+
+enum mon_an_trang_thai {
+  RIENG_TU
+  CHO_DUYET
+  DA_DUYET
+  TU_CHOI
+  HE_THONG
+}
+
+enum nguoi_dung_vai_tro {
+  USER
+  USERPRO
+  SUPERADMIN
+  ADMIN
+}
+
+enum thuc_don_loai_thuc_don {
+  NGAY
+  TUAN
+  THANG
+}
+
+enum bua_an_trang_thai {
+  RIENG_TU
+  CHO_DUYET
+  DA_DUYET
+  TU_CHOI
+}
+
+enum de_xuat_thuc_don_loai_thuc_don {
+  NGAY
+  TUAN
+  THANG
+}
+
+enum ho_so_ca_nhan_gioi_tinh {
+  NAM
+  NU
+}
+
+enum nguoi_dung_kenh {
+  LOCAL
+  FACEBOOK
+  KEYCLOAK_GOOGLE
+}
+
+enum thiet_bi_dang_nhap_device_type {
+  WEB
+  ANDROID
+  IOS
+  DESKTOP
+  TABLET
+  POSTMAN
+  UNKNOWN
+}
+
+enum thuc_don_loai_doi_tuong {
+  BENH_NHAN
+  NHOM_BENH
+}
+
+enum benh_nhan_gioi_tinh {
+  NAM
+  NU
+}
+
+enum dang_ky_trang_thai {
+  ACTIVE
+  EXPIRED
+}
+
+enum de_xuat_nguyen_lieu_loai_protein {
+  THUC_VAT
+  DONG_VAT
+}
+
+enum gioi_han_dinh_duong_canh_bao {
+  OFF
+  GTE_5
+  GTE_10
+}
+
+enum goi_trang_thai {
+  ACTIVE
+  INACTIVE
+}
+
+enum khau_phan_24h_kieu_nhap {
+  INGREDIENT_ONLY
+  BY_MEAL
+}
+
+enum yeu_cau_thanh_toan_trang_thai {
+  APPROVED
+  REJECTED
+  PENDING
+}
+
+enum de_xuat_thuc_don_trang_thai {
+  RIENG_TU
+  CHO_DUYET
+  DA_DUYET
+  TU_CHOI
+}
+
+enum dang_ky_cho_xac_thuc_gioi_tinh {
+  NAM
+  NU
+}
+
+enum de_xuat_nguyen_lieu_loai_de_xuat {
+  ADD
+  UPDATE
+}
+
+enum de_xuat_thuc_don_loai_doi_tuong {
+  BENH_NHAN
+  NHOM_BENH
+}
+
+enum de_xuat_nguyen_lieu_trang_thai {
+  RIENG_TU
+  CHO_DUYET
+  DA_DUYET
+  TU_CHOI
+}
+
+enum nguyen_lieu_loai_protein {
+  DONG_VAT
+  THUC_VAT
+}
+
+enum nguyen_lieu_trang_thai {
+  CHO_DUYET
+  DA_DUYET
+  TU_CHOI
+}
