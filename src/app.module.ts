@@ -8,6 +8,9 @@ import { SecurityModule } from './security/security.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
+import { NutritionEngineModule } from './core/nutrition-engine/nutrition-engine.module';
+import { MasterDataModule } from './modules/master-data.module';
+import { IngredientsModule } from './modules/ingredients/ingredients.module';
 
 @Module({
   imports: [
@@ -19,9 +22,12 @@ import { ProfilesModule } from './modules/profiles/profiles.module';
     CacheModule,
     I18nModule,
     SecurityModule,
+    NutritionEngineModule,
     AuthModule,
     UsersModule,
     ProfilesModule,
+    MasterDataModule,
+    IngredientsModule,
   ],
 })
 export class AppModule implements NestModule {

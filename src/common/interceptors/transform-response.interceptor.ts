@@ -48,6 +48,7 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
             status: 200,
             message: 'success',
             data: response.items,
+            content: response.items,
             meta: {
               page,
               limit,

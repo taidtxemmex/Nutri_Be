@@ -125,5 +125,12 @@
   "error.nutrition_limit.not_found": "Không tìm thấy giới hạn dinh dưỡng",
   "error.proposer.not_found": "Không tìm thấy người đề xuất",
   "error.nutrition_guide.not_found": "Không tìm thấy hướng dẫn dinh dưỡng",
-  "error.nutrition_guide.in_use": "Không thể xóa hướng dẫn dinh dưỡng này vì đang được sử dụng"
+  "error.nutrition_guide.in_use": "Không thể xóa hướng dẫn dinh dưỡng này vì đang được sử dụng",
+  "ING_001": "Chỉ cho phép cập nhật nguyên liệu ở trạng thái ĐÃ DUYỆT",
+  "ING_002": "Nguyên liệu đang được sử dụng trong món ăn, khẩu phần 24h hoặc hệ số sống chín, không thể xóa",
+  "PROP_014": "Tên nguyên liệu đã tồn tại trong hệ thống",
+  "PROP_006": "Không tìm thấy nguyên liệu",
+  "PROP_007": "Không tìm thấy danh mục",
+  "CAT_001": "Danh mục đã tồn tại",
+  "CAT_002": "Không thể xóa danh mục vì đang được sử dụng"
 }

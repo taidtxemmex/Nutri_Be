@@ -4,5 +4,12 @@ export const CACHE_DEBOUNCE_WINDOW_MS = 500; // 500ms debounce window gom cụm 
 
 export const CACHE_TAG_USERS = 'users';
 export const CACHE_TAG_PROFILES = 'profiles';
+export const CACHE_TAG_CATEGORIES = 'categories';
+export const CACHE_TAG_DISEASE_GROUPS = 'disease_groups';
+export const CACHE_TAG_EXTENDED_DISEASE_GROUPS = 'extended_disease_groups';
+export const CACHE_TAG_PROPOSERS = 'proposers';
+
+export const CACHE_TTL_LOOKUP_SECONDS = 1800; // 30 phút cho public lookup (dropdown)
 
 export const buildUserCacheTag = (userId: string): string => `user:${userId}`;
+export const buildProposerCacheTag = (userId: string): string => `proposer:${userId}`;

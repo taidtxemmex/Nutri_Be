@@ -18,16 +18,16 @@ async function bootstrap() {
     prefix: `${STATIC_UPLOAD_PREFIX}/`,
   });
 
-  // 1. URL Rewriting Middleware: Maps legacy /api/* to /api/v1/* (100% Zero Breaking Changes for FE)
+  // 1. URL Rewriting Middleware: Maps legacy /api/v1/* to /api/* for seamless transition
   app.use((req: Request, res: Response, next: NextFunction) => {
-    if (req.url.startsWith('/api/') && !req.url.startsWith('/api/v1/')) {
-      req.url = req.url.replace('/api/', '/api/v1/');
+    if (req.url.startsWith('/api/v1/')) {
+      req.url = req.url.replace('/api/v1/', '/api/');
     }
     next();
   });
 
-  // 2. Global Prefix: api/v1
-  const globalPrefix = process.env.GLOBAL_PREFIX || 'api/v1';
+  // 2. Global Prefix: api
+  const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
 
   // 3. CORS
@@ -43,7 +43,7 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformResponseInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter());
 
-  // 5. Swagger OpenAPI UI at /api/v1/docs
+  // 5. Swagger OpenAPI UI at /api/docs
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Nutri Clinical Nutrition API')
     .setDescription('Nutri Clinical Nutrition & Diet Management System RESTful API Documentation')

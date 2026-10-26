@@ -125,5 +125,12 @@
   "error.nutrition_limit.not_found": "Không tìm thấy giới hạn dinh dưỡng",
   "error.proposer.not_found": "Không tìm thấy người đề xuất",
   "error.nutrition_guide.not_found": "Không tìm thấy hướng dẫn dinh dưỡng",
-  "error.nutrition_guide.in_use": "Không thể xóa hướng dẫn dinh dưỡng này vì đang được sử dụng"
+  "error.nutrition_guide.in_use": "Không thể xóa hướng dẫn dinh dưỡng này vì đang được sử dụng",
+  "ING_001": "Only approved ingredients can be updated",
+  "ING_002": "Ingredient is currently in use and cannot be deleted",
+  "PROP_014": "Ingredient name already exists in the system",
+  "PROP_006": "Ingredient not found",
+  "PROP_007": "Category not found",
+  "CAT_001": "Category already exists",
+  "CAT_002": "Category is currently in use"
 }
