@@ -93,12 +93,7 @@ describe('JWT Tampering, Expiration & Claims Parity', () => {
   });
 
   it('should reject malformed or non-JWT tokens', () => {
-    const malformedTokens = [
-      'not.a.valid.jwt.token',
-      'gibberish-string',
-      'header.only',
-      '',
-    ];
+    const malformedTokens = ['not.a.valid.jwt.token', 'gibberish-string', 'header.only', ''];
 
     for (const token of malformedTokens) {
       expect(() => {
@@ -113,8 +108,6 @@ describe('JWT Tampering, Expiration & Claims Parity', () => {
       email: 'missing@user.com',
     };
 
-    await expect(jwtStrategy.validate(invalidPayload)).rejects.toThrow(
-      UnauthorizedException,
-    );
+    await expect(jwtStrategy.validate(invalidPayload)).rejects.toThrow(UnauthorizedException);
   });
 });

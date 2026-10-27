@@ -15,12 +15,12 @@ describe('IngredientsController', () => {
         page: 1,
         limit: 20,
       }),
-      findSummary: jest.fn().mockResolvedValue([
-        { id: '1', ten_nguyen_lieu: 'Gạo tẻ', material: 'Gạo tẻ' },
-      ]),
-      findAllUnpaginated: jest.fn().mockResolvedValue([
-        { id: '1', ten_nguyen_lieu: 'Gạo tẻ', material: 'Gạo tẻ' },
-      ]),
+      findSummary: jest
+        .fn()
+        .mockResolvedValue([{ id: '1', ten_nguyen_lieu: 'Gạo tẻ', material: 'Gạo tẻ' }]),
+      findAllUnpaginated: jest
+        .fn()
+        .mockResolvedValue([{ id: '1', ten_nguyen_lieu: 'Gạo tẻ', material: 'Gạo tẻ' }]),
       findById: jest.fn().mockResolvedValue({
         id: '1',
         ten_nguyen_lieu: 'Gạo tẻ',
@@ -228,9 +228,7 @@ describe('IngredientsController', () => {
   describe('POST /calculate-summary', () => {
     it('should delegate to ingredientsService.calculateSummary and return result', async () => {
       const dto = {
-        items: [
-          { ingredientId: 1, weight: 100, isNetWeight: true, coefficient: 1 },
-        ],
+        items: [{ ingredientId: 1, weight: 100, isNetWeight: true, coefficient: 1 }],
       };
       const mockSummary = {
         totalGrossWeight: 100,

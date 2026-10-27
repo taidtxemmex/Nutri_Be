@@ -50,9 +50,7 @@ describe('RefreshTokenRotationService', () => {
     expect(rotationResult.newRefreshToken).not.toBe(initialToken);
 
     // Old token should now be revoked and rejected if attempted again
-    await expect(
-      service.validateAndRotateRefreshToken(initialToken),
-    ).rejects.toMatchObject({
+    await expect(service.validateAndRotateRefreshToken(initialToken)).rejects.toMatchObject({
       response: {
         code: AUTH_ERROR_REPLAY_ATTACK,
       },
@@ -71,9 +69,9 @@ describe('RefreshTokenRotationService', () => {
     const tokenB = rotation1.newRefreshToken;
 
     // 3. Attacker steals already-used tokenA and attempts replay!
-    await expect(
-      service.validateAndRotateRefreshToken(tokenA),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(service.validateAndRotateRefreshToken(tokenA)).rejects.toThrow(
+      UnauthorizedException,
+    );
 
     try {
       await service.validateAndRotateRefreshToken(tokenA);
@@ -84,9 +82,9 @@ describe('RefreshTokenRotationService', () => {
     }
 
     // 4. Token family should now be revoked; even tokenB is invalidated for safety!
-    await expect(
-      service.validateAndRotateRefreshToken(tokenB),
-    ).rejects.toThrow(UnauthorizedException);
+    await expect(service.validateAndRotateRefreshToken(tokenB)).rejects.toThrow(
+      UnauthorizedException,
+    );
   });
 
   it('should reject non-existent or invalid token with AUTH_001', async () => {
@@ -108,9 +106,7 @@ describe('RefreshTokenRotationService', () => {
       ttlMs: -1000,
     });
 
-    await expect(
-      service.validateAndRotateRefreshToken(rawToken),
-    ).rejects.toMatchObject({
+    await expect(service.validateAndRotateRefreshToken(rawToken)).rejects.toMatchObject({
       response: {
         code: AUTH_ERROR_TOKEN_EXPIRED,
       },
@@ -125,9 +121,7 @@ describe('RefreshTokenRotationService', () => {
     await service.revokeRefreshToken(token);
 
     // Attempting to rotate should trigger replay/revoked check
-    await expect(
-      service.validateAndRotateRefreshToken(token),
-    ).rejects.toMatchObject({
+    await expect(service.validateAndRotateRefreshToken(token)).rejects.toMatchObject({
       response: {
         code: AUTH_ERROR_REPLAY_ATTACK,
       },

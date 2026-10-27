@@ -185,9 +185,7 @@ describe('DishExcelService', () => {
 
   describe('2. importExcel', () => {
     it('should throw IMPORT_EMPTY_FILE if file buffer is empty or workbook has no data rows', async () => {
-      await expect(service.importExcel(Buffer.alloc(0), 'user-1')).rejects.toThrow(
-        HttpException,
-      );
+      await expect(service.importExcel(Buffer.alloc(0), 'user-1')).rejects.toThrow(HttpException);
 
       const wb = new ExcelJS.Workbook();
       const sheet = wb.addWorksheet('Mon_an');

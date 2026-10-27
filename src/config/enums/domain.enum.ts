@@ -38,6 +38,8 @@ export enum MenuType {
   NGAY = 'NGAY',
   TUAN = 'TUAN',
   THANG = 'THANG',
+  CONG_KHAI = 'CONG_KHAI',
+  MAU_HE_THONG = 'MAU_HE_THONG',
 }
 
 export enum TargetType {
@@ -75,4 +77,32 @@ export enum NutritionLimitWarning {
 export enum IntakeInputType {
   INGREDIENT_ONLY = 'INGREDIENT_ONLY',
   BY_MEAL = 'BY_MEAL',
+}
+
+export enum MenuExportType {
+  FULL = 'FULL',
+  NET = 'NET',
+  NET_NUTRITION = 'NET_NUTRITION',
+  RAW = 'RAW',
+  COOKED = 'COOKED',
+}
+
+export enum DailyIntakeClinicalReportType {
+  ALL_IN_ONE = 'ALL_IN_ONE',
+  RDA_COMPARISON = 'RDA_COMPARISON',
+  PLC_STRUCTURE = 'PLC_STRUCTURE',
+  MEAL_DISTRIBUTION = 'MEAL_DISTRIBUTION',
+  INGREDIENT_DETAILS = 'INGREDIENT_DETAILS',
+}
+
+export enum MenuProposalStatus {
+  CHO_DUYET = 'CHO_DUYET',
+  DA_DUYET = 'DA_DUYET',
+  TU_CHOI = 'TU_CHOI',
+}
+
+export enum IngredientStatus {
+  CHO_DUYET = 'CHO_DUYET',
+  DA_DUYET = 'DA_DUYET',
+  TU_CHOI = 'TU_CHOI',
 }

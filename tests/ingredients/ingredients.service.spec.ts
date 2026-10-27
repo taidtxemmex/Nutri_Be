@@ -167,10 +167,7 @@ describe('IngredientsService', () => {
       ]);
 
       try {
-        await service.create(
-          { material: 'Gạo tẻ' },
-          { id: 'user-1', role: UserRole.ADMIN },
-        );
+        await service.create({ material: 'Gạo tẻ' }, { id: 'user-1', role: UserRole.ADMIN });
         fail('Should have thrown PROP_014');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -214,11 +211,7 @@ describe('IngredientsService', () => {
       });
 
       try {
-        await service.update(
-          1,
-          { material: 'Tên mới' },
-          { id: 'admin-1', role: UserRole.ADMIN },
-        );
+        await service.update(1, { material: 'Tên mới' }, { id: 'admin-1', role: UserRole.ADMIN });
         fail('Should have thrown ING_001');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -463,9 +456,7 @@ describe('IngredientsService', () => {
 
       // Banana edible = 70%. Input 100g gross (cân cả vỏ)
       const dto = {
-        items: [
-          { ingredientId: 3, weight: 100, isNetWeight: false, coefficient: 1 },
-        ],
+        items: [{ ingredientId: 3, weight: 100, isNetWeight: false, coefficient: 1 }],
       };
 
       const result = await service.calculateSummary(dto as any);
@@ -486,9 +477,7 @@ describe('IngredientsService', () => {
 
       // Banana edible = 70%. Input 70g net (thịt quả ăn được sạch)
       const dto = {
-        items: [
-          { ingredientId: 3, weight: 70, isNetWeight: true, coefficient: 1 },
-        ],
+        items: [{ ingredientId: 3, weight: 70, isNetWeight: true, coefficient: 1 }],
       };
 
       const result = await service.calculateSummary(dto as any);
@@ -508,9 +497,7 @@ describe('IngredientsService', () => {
       mockPrisma.nguyen_lieu.findMany.mockResolvedValue([mockRice]);
 
       const dto = {
-        items: [
-          { id: 1, weightGrams: 200, isNetWeight: true },
-        ],
+        items: [{ id: 1, weightGrams: 200, isNetWeight: true }],
       };
 
       const result = await service.calculateSummary(dto as any);

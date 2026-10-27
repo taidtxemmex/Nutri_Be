@@ -16,8 +16,16 @@ describe('EvidencesService', () => {
     };
 
     mockStorageService = {
-      generatePreviewUrl: jest.fn().mockImplementation((key) => Promise.resolve(`http://localhost:8080/uploads/evidence/${key}?token=mock`)),
-      generateDownloadUrl: jest.fn().mockImplementation((key, name) => Promise.resolve(`http://localhost:8080/uploads/evidence/${key}?token=mock&download=1`)),
+      generatePreviewUrl: jest
+        .fn()
+        .mockImplementation((key) =>
+          Promise.resolve(`http://localhost:8080/uploads/evidence/${key}?token=mock`),
+        ),
+      generateDownloadUrl: jest
+        .fn()
+        .mockImplementation((key, name) =>
+          Promise.resolve(`http://localhost:8080/uploads/evidence/${key}?token=mock&download=1`),
+        ),
     } as any;
 
     service = new EvidencesService(mockPrisma, mockStorageService);
@@ -27,9 +35,7 @@ describe('EvidencesService', () => {
     it('should throw EVID_001 if evidence not found', async () => {
       mockPrisma.minh_chung.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.generatePreviewUrl(999, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.generatePreviewUrl(999, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'EVID_001' }),
           status: HttpStatus.NOT_FOUND,
@@ -92,7 +98,10 @@ describe('EvidencesService', () => {
 
       const url = await service.generateDownloadUrl(1, { id: 'admin-1', role: UserRole.ADMIN });
       expect(url).toContain('medical-doc-123.pdf');
-      expect(mockStorageService.generateDownloadUrl).toHaveBeenCalledWith('medical-doc-123.pdf', 'giay_kham.pdf');
+      expect(mockStorageService.generateDownloadUrl).toHaveBeenCalledWith(
+        'medical-doc-123.pdf',
+        'giay_kham.pdf',
+      );
     });
   });
 });

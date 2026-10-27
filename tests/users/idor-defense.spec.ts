@@ -120,9 +120,7 @@ describe('IDOR Defense System', () => {
     });
 
     it('should assert ownership correctly', () => {
-      expect(() =>
-        service.assertUserOwnershipOrAdmin('user-1', 'USER', 'user-1'),
-      ).not.toThrow();
+      expect(() => service.assertUserOwnershipOrAdmin('user-1', 'USER', 'user-1')).not.toThrow();
 
       expect(() =>
         service.assertUserOwnershipOrAdmin('admin-1', 'ADMIN', 'target-99'),

@@ -184,9 +184,7 @@ describe('MealsService', () => {
       });
       mockPrisma.chi_tiet_thuc_don.count.mockResolvedValue(2); // In use in 2 menus!
 
-      await expect(
-        service.delete(1, { id: 'user-1', role: UserRole.USER }),
-      ).rejects.toThrow(
+      await expect(service.delete(1, { id: 'user-1', role: UserRole.USER })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'MEAL_002' }),
           status: HttpStatus.CONFLICT,

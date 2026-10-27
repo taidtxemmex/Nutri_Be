@@ -26,7 +26,9 @@ describe('IngredientExcelService', () => {
             water: 13.8,
             protein: 7.9,
             fat: 0.7,
-            danh_muc_nguyen_lieu_danh_mucTodanh_muc: { ten_danh_muc: 'Ngũ cốc và sản phẩm chế biến' },
+            danh_muc_nguyen_lieu_danh_mucTodanh_muc: {
+              ten_danh_muc: 'Ngũ cốc và sản phẩm chế biến',
+            },
           },
         ]),
         create: jest.fn().mockResolvedValue({ id: BigInt(10) }),
@@ -120,8 +122,22 @@ describe('IngredientExcelService', () => {
     it('should successfully import valid rows with atomic commit', async () => {
       const wb = new ExcelJS.Workbook();
       const sheet = wb.addWorksheet('Sheet1');
-      sheet.addRow(['Tên nguyên liệu', 'Nhóm', 'Loại protein', 'Edible (%)', 'Water (g)', 'Protein (g)']);
-      sheet.addRow(['Gạo nếp cái hoa vàng', 'Ngũ cốc và sản phẩm chế biến', 'Thực vật', 100, 14, 8.2]);
+      sheet.addRow([
+        'Tên nguyên liệu',
+        'Nhóm',
+        'Loại protein',
+        'Edible (%)',
+        'Water (g)',
+        'Protein (g)',
+      ]);
+      sheet.addRow([
+        'Gạo nếp cái hoa vàng',
+        'Ngũ cốc và sản phẩm chế biến',
+        'Thực vật',
+        100,
+        14,
+        8.2,
+      ]);
 
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
 

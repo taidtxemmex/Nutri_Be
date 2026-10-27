@@ -15,6 +15,10 @@ import { DishesModule } from './modules/dishes/dishes.module';
 import { MealsModule } from './modules/meals/meals.module';
 import { CoefficientsModule } from './modules/coefficients/coefficients.module';
 import { EvidencesModule } from './modules/evidences/evidences.module';
+import { MenusModule } from './modules/menus/menus.module';
+import { MenuProposalsModule } from './modules/menu-proposals/menu-proposals.module';
+import { NutritionLimitSetsModule } from './modules/nutrition-limit-sets/nutrition-limit-sets.module';
+import { DailyIntakesModule } from './modules/daily-intakes/daily-intakes.module';
 
 @Module({
   imports: [
@@ -36,6 +40,10 @@ import { EvidencesModule } from './modules/evidences/evidences.module';
     MealsModule,
     CoefficientsModule,
     EvidencesModule,
+    MenusModule,
+    MenuProposalsModule,
+    NutritionLimitSetsModule,
+    DailyIntakesModule,
   ],
 })
 export class AppModule implements NestModule {

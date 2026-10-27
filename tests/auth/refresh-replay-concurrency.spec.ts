@@ -14,7 +14,9 @@ describe('Refresh Token Rotation Concurrency & Replay Attack Defense', () => {
       systemCache: {
         findUnique: jest.fn(async ({ where }) => {
           const val = fakeDatabaseCache.get(where.key);
-          return val ? { key: where.key, value: JSON.stringify(val), expiresAt: new Date(val.expiresAt) } : null;
+          return val
+            ? { key: where.key, value: JSON.stringify(val), expiresAt: new Date(val.expiresAt) }
+            : null;
         }),
         upsert: jest.fn(async ({ create, update, where }) => {
           const data = JSON.parse(create?.value || update?.value);

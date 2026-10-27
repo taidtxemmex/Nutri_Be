@@ -59,7 +59,9 @@ describe('IDOR Defense & Type Smashing Edge Cases', () => {
 
     it('should block type smashing with object: userId = { id: "victim" }', () => {
       expect(() => {
-        idorService.assertUserOwnershipOrAdmin(myUserId, UserRole.USER, { id: victimUserId } as any);
+        idorService.assertUserOwnershipOrAdmin(myUserId, UserRole.USER, {
+          id: victimUserId,
+        } as any);
       }).toThrow(ForbiddenException);
     });
 
@@ -83,7 +85,7 @@ describe('IDOR Defense & Type Smashing Edge Cases', () => {
         switchToHttp: () => ({
           getRequest: () => requestData,
         }),
-      } as any);
+      }) as any;
 
     it('should allow access when target userId in body matches authenticated user', () => {
       const ctx = createMockContext({

@@ -33,7 +33,10 @@ describe('DishesController', () => {
   });
 
   it('create should call service.create', async () => {
-    const res = await controller.create({ name: 'Món 1', details: [{ ingredientId: 1, netWeight: 100 }] }, { id: 'u1' });
+    const res = await controller.create(
+      { name: 'Món 1', details: [{ ingredientId: 1, netWeight: 100 }] },
+      { id: 'u1' },
+    );
     expect(res).toEqual({ id: '1', name: 'Món 1' });
     expect(service.create).toHaveBeenCalled();
   });

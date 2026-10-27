@@ -52,9 +52,7 @@ describe('AuthRateLimitGuard', () => {
     }
 
     // 6th request should fail
-    expect(() => guard.canActivate(createMockContext(ip, url))).toThrow(
-      HttpException,
-    );
+    expect(() => guard.canActivate(createMockContext(ip, url))).toThrow(HttpException);
 
     try {
       guard.canActivate(createMockContext(ip, url));
@@ -75,8 +73,6 @@ describe('AuthRateLimitGuard', () => {
     }
 
     // 4th request should fail
-    expect(() => guard.canActivate(createMockContext(ip, url))).toThrow(
-      HttpException,
-    );
+    expect(() => guard.canActivate(createMockContext(ip, url))).toThrow(HttpException);
   });
 });

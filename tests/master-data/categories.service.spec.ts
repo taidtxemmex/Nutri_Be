@@ -32,9 +32,7 @@ describe('CategoriesService', () => {
   describe('findAll', () => {
     it('should return paginated categories result with explicit field projection', async () => {
       mockPrisma.danh_muc.count.mockResolvedValue(1);
-      mockPrisma.danh_muc.findMany.mockResolvedValue([
-        { id: 1, ten_danh_muc: 'Thịt' },
-      ]);
+      mockPrisma.danh_muc.findMany.mockResolvedValue([{ id: 1, ten_danh_muc: 'Thịt' }]);
 
       const result = await service.findAll({ page: 1, limit: 20 });
 
@@ -67,9 +65,9 @@ describe('CategoriesService', () => {
     it('should throw CAT_001 if categoryName is duplicate', async () => {
       mockPrisma.danh_muc.findFirst.mockResolvedValue({ id: 1 });
 
-      await expect(
-        service.create({ categoryName: 'Thịt' } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.create({ categoryName: 'Thịt' } as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should create new category and invalidate cache', async () => {
@@ -88,18 +86,18 @@ describe('CategoriesService', () => {
     it('should throw PROP_007 if category not found', async () => {
       mockPrisma.danh_muc.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.update(999, { categoryName: 'Mới' } as any),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.update(999, { categoryName: 'Mới' } as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw CAT_001 if name is duplicated on other category', async () => {
       mockPrisma.danh_muc.findUnique.mockResolvedValue({ id: 1, ten_danh_muc: 'Thịt' });
       mockPrisma.danh_muc.findFirst.mockResolvedValue({ id: 2, ten_danh_muc: 'Cá' });
 
-      await expect(
-        service.update(1, { categoryName: 'Cá' } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.update(1, { categoryName: 'Cá' } as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

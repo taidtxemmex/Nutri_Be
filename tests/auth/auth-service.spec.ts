@@ -296,7 +296,9 @@ describe('AuthService', () => {
       expect(result.success).toBe(true);
       expect(mockPrisma.nguoi_dung.update).toHaveBeenCalled();
       expect(mockPrisma.ma_xac_thuc.delete).toHaveBeenCalled();
-      expect(mockRefreshTokenRotationService.revokeAllUserTokens).toHaveBeenCalledWith('user-uuid-1');
+      expect(mockRefreshTokenRotationService.revokeAllUserTokens).toHaveBeenCalledWith(
+        'user-uuid-1',
+      );
     });
   });
 });

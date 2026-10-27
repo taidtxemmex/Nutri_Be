@@ -104,9 +104,9 @@ describe('UsersService', () => {
     });
 
     it('should block regular user from accessing another user data with ForbiddenException (IDOR Defense)', async () => {
-      await expect(
-        usersService.getUserInfo('uuid-victim-user', regularUser),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(usersService.getUserInfo('uuid-victim-user', regularUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should allow ADMIN to view any target user profile', async () => {
@@ -244,9 +244,9 @@ describe('UsersService', () => {
     });
 
     it('should throw ForbiddenException when non-admin attempts soft delete', async () => {
-      await expect(
-        usersService.softDeleteUser('victim-id', regularUser),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(usersService.softDeleteUser('victim-id', regularUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should batch soft delete multiple users using updateMany (Rule 20)', async () => {
@@ -280,9 +280,9 @@ describe('UsersService', () => {
         { id: 'super-admin-id', vai_tro: UserRole.SUPERADMIN },
       ]);
 
-      await expect(
-        usersService.softDeleteBatch(['super-admin-id'], adminUser),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(usersService.softDeleteBatch(['super-admin-id'], adminUser)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('should batch update user status using updateMany (Rule 20)', async () => {
@@ -333,9 +333,7 @@ describe('UsersService', () => {
         { username: 'same_name', fullName: 'User B', email: 'b@nutritest.com' },
       ];
 
-      await expect(
-        usersService.createBatch(duplicateUsers, adminUser),
-      ).rejects.toThrow();
+      await expect(usersService.createBatch(duplicateUsers, adminUser)).rejects.toThrow();
     });
   });
 });

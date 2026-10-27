@@ -21,8 +21,8 @@ describe('SQL Injection Defense in Search & Queries', () => {
     "admin'--",
     "'; DROP TABLE nguoi_dung; --",
     "' UNION SELECT null, ten_dang_nhap, mat_khau FROM nguoi_dung --",
-    "\" OR \"\"=\"",
-    "1; SELECT * FROM nguoi_dung",
+    '" OR ""="',
+    '1; SELECT * FROM nguoi_dung',
   ];
 
   it.each(injectionPayloads)(

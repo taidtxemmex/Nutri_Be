@@ -409,9 +409,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
           trang_thai: DishStatus.RIENG_TU,
           ngay_tao: new Date(),
           chi_tiet_mon_an: {
-            create: [
-              { nguyen_lieu_id: BigInt(porkIngId), khoi_luong_song_sach: 150 },
-            ],
+            create: [{ nguyen_lieu_id: BigInt(porkIngId), khoi_luong_song_sach: 150 }],
           },
         },
       });
@@ -528,9 +526,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
       const updatePayload = {
         mealName: 'Bữa trưa giàu đạm chuyên sâu',
         time: '12:30',
-        dishes: [
-          { dishId: dish1Id, coefficient: 1.05 },
-        ],
+        dishes: [{ dishId: dish1Id, coefficient: 1.05 }],
       };
 
       // Layer 1: HTTP Status Code
@@ -567,9 +563,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
           ten_bua_an: 'Bữa ăn cần xóa',
           gio_an: '18:00',
           chi_tiet_bua_an: {
-            create: [
-              { mon_an_id: BigInt(dish1Id), he_so_song_chin: 1.0 },
-            ],
+            create: [{ mon_an_id: BigInt(dish1Id), he_so_song_chin: 1.0 }],
           },
         },
       });
@@ -644,7 +638,9 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
       expect(dbDish?.chi_tiet_mon_an.length).toBe(2);
 
       const beefItem = dbDish?.chi_tiet_mon_an.find((d) => Number(d.nguyen_lieu_id) === beefIngId);
-      const celeryItem = dbDish?.chi_tiet_mon_an.find((d) => Number(d.nguyen_lieu_id) === celeryIngId);
+      const celeryItem = dbDish?.chi_tiet_mon_an.find(
+        (d) => Number(d.nguyen_lieu_id) === celeryIngId,
+      );
 
       expect(beefItem).toBeDefined();
       expect(Number(beefItem?.khoi_luong_song_sach)).toBe(100);
@@ -710,9 +706,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
           name: 'Món chờ đề xuất',
-          details: [
-            { ingredientId: beefIngId, netWeight: 120 },
-          ],
+          details: [{ ingredientId: beefIngId, netWeight: 120 }],
         })
         .expect(200);
 
@@ -741,9 +735,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
           name: 'Món để admin duyệt',
-          details: [
-            { ingredientId: porkIngId, netWeight: 200 },
-          ],
+          details: [{ ingredientId: porkIngId, netWeight: 200 }],
         })
         .expect(200);
 
@@ -841,9 +833,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
           name: 'Món chuẩn bị khóa bất biến',
-          details: [
-            { ingredientId: beefIngId, netWeight: 100 },
-          ],
+          details: [{ ingredientId: beefIngId, netWeight: 100 }],
         })
         .expect(200);
 
@@ -865,9 +855,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
           name: 'Cố tình đổi tên món đã duyệt',
-          details: [
-            { ingredientId: beefIngId, netWeight: 200 },
-          ],
+          details: [{ ingredientId: beefIngId, netWeight: 200 }],
         })
         .expect(400);
 
@@ -952,9 +940,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .set('Authorization', `Bearer ${regularToken}`)
         .send({
           name: 'Bò xào hành tây thơm ngon đặc biệt',
-          details: [
-            { ingredientId: beefIngId, netWeight: 100 },
-          ],
+          details: [{ ingredientId: beefIngId, netWeight: 100 }],
         })
         .expect(200);
 
@@ -1107,4 +1093,3 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
     });
   });
 });
-

@@ -180,9 +180,7 @@ describe('Ingredients Master E2E & 3-Layer Persistence Validation', () => {
       expect(res.body.meta).toHaveProperty('totalItems');
       expect(res.body.meta).toHaveProperty('page', 1);
 
-      const targetItem = res.body.data.find(
-        (item: any) => item.material === 'Gạo tẻ ST25 cao cấp',
-      );
+      const targetItem = res.body.data.find((item: any) => item.material === 'Gạo tẻ ST25 cao cấp');
       expect(targetItem).toBeDefined();
 
       // CÁC CỘT ĐỊNH DANH PHẢI CÓ
@@ -453,9 +451,11 @@ describe('Ingredients Master E2E & 3-Layer Persistence Validation', () => {
       expect(activeRecord).toBeNull();
 
       // Kiểm tra bằng raw query để thấy trường deleted_at thực tế trong MySQL
-      const [softDeletedRecord]: any = await helper.getPrisma().$queryRawUnsafe(
-        `SELECT id, ten_nguyen_lieu, deleted_at FROM \`nguyen_lieu\` WHERE id = ${ing.id.toString()};`,
-      );
+      const [softDeletedRecord]: any = await helper
+        .getPrisma()
+        .$queryRawUnsafe(
+          `SELECT id, ten_nguyen_lieu, deleted_at FROM \`nguyen_lieu\` WHERE id = ${ing.id.toString()};`,
+        );
       expect(softDeletedRecord).toBeDefined();
       expect(softDeletedRecord.deleted_at).not.toBeNull();
     });

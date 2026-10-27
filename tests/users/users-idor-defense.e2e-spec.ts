@@ -64,7 +64,9 @@ describe('Users IDOR Defense & PII Protection - E2E Tests', () => {
         .expect(403);
 
       expect(res.body.error.code).toBe('ERR_IDOR_VIOLATION');
-      expect(res.body.error.message).toContain('Bạn không có quyền truy cập dữ liệu của người dùng khác');
+      expect(res.body.error.message).toContain(
+        'Bạn không có quyền truy cập dữ liệu của người dùng khác',
+      );
     });
 
     it('Admin được quyền xem thông tin của bất kỳ người dùng nào phục vụ kiểm toán', async () => {
@@ -181,8 +183,14 @@ describe('Users IDOR Defense & PII Protection - E2E Tests', () => {
         role: 'ADMIN',
       });
 
-      const { user: user1 } = await helper.createTestUser({ username: 'status_target_1', active: true });
-      const { user: user2 } = await helper.createTestUser({ username: 'status_target_2', active: true });
+      const { user: user1 } = await helper.createTestUser({
+        username: 'status_target_1',
+        active: true,
+      });
+      const { user: user2 } = await helper.createTestUser({
+        username: 'status_target_2',
+        active: true,
+      });
 
       const res = await request(httpServer)
         .put('/api/v1/users/batch-status')

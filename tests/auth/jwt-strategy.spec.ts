@@ -53,9 +53,7 @@ describe('JwtStrategy', () => {
   it('should throw UnauthorizedException if sub or id is missing', async () => {
     const invalidPayload: any = { username: 'test_user' };
 
-    await expect(strategy.validate(invalidPayload)).rejects.toThrow(
-      UnauthorizedException,
-    );
+    await expect(strategy.validate(invalidPayload)).rejects.toThrow(UnauthorizedException);
   });
 
   it('should throw UnauthorizedException if user is deactivated (active = false)', async () => {

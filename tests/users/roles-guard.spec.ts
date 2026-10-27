@@ -83,19 +83,11 @@ describe('RolesGuard', () => {
 
   it('should allow DOCTOR / BAC_SI / EXPERT to access clinical endpoints', () => {
     // User with role BAC_SI accessing endpoint requiring BAC_SI
-    const context1 = createMockContext(
-      { id: 'doc-1', role: 'BAC_SI' },
-      ['BAC_SI'],
-      false,
-    );
+    const context1 = createMockContext({ id: 'doc-1', role: 'BAC_SI' }, ['BAC_SI'], false);
     expect(guard.canActivate(context1)).toBe(true);
 
     // User with role EXPERT accessing endpoint requiring BAC_SI (semantic alias)
-    const context2 = createMockContext(
-      { id: 'doc-2', role: UserRole.EXPERT },
-      ['BAC_SI'],
-      false,
-    );
+    const context2 = createMockContext({ id: 'doc-2', role: UserRole.EXPERT }, ['BAC_SI'], false);
     expect(guard.canActivate(context2)).toBe(true);
   });
 

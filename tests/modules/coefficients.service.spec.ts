@@ -47,7 +47,10 @@ describe('CoefficientsService', () => {
     });
 
     it('should throw COEF_002 if private coefficient already exists for user', async () => {
-      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({ id: BigInt(1), ten_nguyen_lieu: 'Thịt bò' });
+      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        ten_nguyen_lieu: 'Thịt bò',
+      });
       mockPrisma.he_so_song_chin.findFirst.mockResolvedValue({ id: BigInt(10) });
 
       await expect(
@@ -64,7 +67,10 @@ describe('CoefficientsService', () => {
     });
 
     it('should throw COEF_003 if public coefficient already exists when Admin creates', async () => {
-      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({ id: BigInt(1), ten_nguyen_lieu: 'Thịt bò' });
+      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        ten_nguyen_lieu: 'Thịt bò',
+      });
       mockPrisma.he_so_song_chin.findFirst.mockResolvedValue({ id: BigInt(10), is_public: true });
 
       await expect(
@@ -81,7 +87,10 @@ describe('CoefficientsService', () => {
     });
 
     it('should create public coefficient successfully by Admin', async () => {
-      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({ id: BigInt(1), ten_nguyen_lieu: 'Thịt bò' });
+      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        ten_nguyen_lieu: 'Thịt bò',
+      });
       mockPrisma.he_so_song_chin.findFirst.mockResolvedValue(null);
       mockPrisma.he_so_song_chin.create.mockResolvedValue({
         id: BigInt(100),
@@ -108,9 +117,7 @@ describe('CoefficientsService', () => {
     it('should throw COEF_001 if coefficient to update is not found', async () => {
       mockPrisma.he_so_song_chin.findUnique.mockResolvedValue(null);
 
-      await expect(
-        service.update(999, { coefficient: 0.9 }, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.update(999, { coefficient: 0.9 }, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'COEF_001' }),
         }),
@@ -142,9 +149,7 @@ describe('CoefficientsService', () => {
       });
       mockPrisma.he_so_song_chin.delete.mockRejectedValue(new Error('Foreign key violation'));
 
-      await expect(
-        service.delete(1, { id: 'user-1', role: UserRole.USER }),
-      ).rejects.toThrow(
+      await expect(service.delete(1, { id: 'user-1', role: UserRole.USER })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'COEF_004' }),
           status: HttpStatus.CONFLICT,

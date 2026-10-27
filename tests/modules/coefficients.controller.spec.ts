@@ -20,7 +20,10 @@ describe('CoefficientsController', () => {
   });
 
   it('should call create and return result', async () => {
-    const res = await controller.create({ ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.85 }, { id: 'u1' });
+    const res = await controller.create(
+      { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.85 },
+      { id: 'u1' },
+    );
     expect(res).toEqual({ id: '1', coefficient: 0.85 });
     expect(service.create).toHaveBeenCalled();
   });

@@ -116,9 +116,7 @@ describe('DishesService', () => {
         trang_thai: DishStatus.DA_DUYET,
       });
 
-      await expect(
-        service.update(10, { name: 'Sửa tên' }, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.update(10, { name: 'Sửa tên' }, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'DISH_002' }),
           status: HttpStatus.BAD_REQUEST,
@@ -133,9 +131,7 @@ describe('DishesService', () => {
         trang_thai: DishStatus.HE_THONG,
       });
 
-      await expect(
-        service.update(10, { name: 'Sửa tên' }, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.update(10, { name: 'Sửa tên' }, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'DISH_002' }),
           status: HttpStatus.BAD_REQUEST,
@@ -153,9 +149,7 @@ describe('DishesService', () => {
         chi_tiet_mon_an: [],
       });
 
-      await expect(
-        service.proposeDish(10, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.proposeDish(10, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'PROP_020' }),
           status: HttpStatus.BAD_REQUEST,
@@ -173,9 +167,7 @@ describe('DishesService', () => {
         })
         .mockResolvedValueOnce({ id: BigInt(20) }); // pending proposal exists
 
-      await expect(
-        service.proposeDish(10, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.proposeDish(10, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'PROP_017' }),
           status: HttpStatus.BAD_REQUEST,
@@ -197,9 +189,7 @@ describe('DishesService', () => {
         .mockResolvedValueOnce(null) // no pending
         .mockResolvedValueOnce({ id: BigInt(50) }); // duplicate approved dish found in DB by index!
 
-      await expect(
-        service.proposeDish(10, { id: 'user-1' }),
-      ).rejects.toThrow(
+      await expect(service.proposeDish(10, { id: 'user-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'PROP_021' }),
           status: HttpStatus.BAD_REQUEST,
@@ -243,9 +233,7 @@ describe('DishesService', () => {
         trang_thai: DishStatus.RIENG_TU,
       });
 
-      await expect(
-        service.approveDish(10, { id: 'admin-1' }),
-      ).rejects.toThrow(
+      await expect(service.approveDish(10, { id: 'admin-1' })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'DISH_001' }),
           status: HttpStatus.BAD_REQUEST,
@@ -331,9 +319,7 @@ describe('DishesService', () => {
         trang_thai: DishStatus.DA_DUYET,
       });
 
-      await expect(
-        service.delete(10, { id: 'user-1', role: UserRole.USER }),
-      ).rejects.toThrow(
+      await expect(service.delete(10, { id: 'user-1', role: UserRole.USER })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'DISH_004' }),
           status: HttpStatus.FORBIDDEN,
@@ -350,9 +336,7 @@ describe('DishesService', () => {
 
       mockPrisma.chi_tiet_bua_an.count.mockResolvedValue(1); // In use!
 
-      await expect(
-        service.delete(10, { id: 'user-1', role: UserRole.USER }),
-      ).rejects.toThrow(
+      await expect(service.delete(10, { id: 'user-1', role: UserRole.USER })).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'DISH_003' }),
           status: HttpStatus.CONFLICT,
