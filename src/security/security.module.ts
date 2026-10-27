@@ -9,6 +9,7 @@ import { AuthRateLimitGuard } from './rate-limit/auth-rate-limit.guard';
 import { ThrottlerBehindProxyGuard } from './rate-limit/throttler-behind-proxy.guard';
 import { ExcelMagicByteValidationPipe } from './excel/excel-magic-byte.pipe';
 import { ExcelThrottleGuard } from './excel/excel-throttle.guard';
+import { SubscriptionGuard } from './guards/subscription.guard';
 import { PrismaModule } from '../core/database/prisma.module';
 import {
   THROTTLE_DEFAULT_LIMIT,
@@ -49,6 +50,7 @@ import {
     AuthRateLimitGuard,
     ExcelMagicByteValidationPipe,
     ExcelThrottleGuard,
+    SubscriptionGuard,
     ThrottlerBehindProxyGuard,
     {
       provide: APP_GUARD,
@@ -63,6 +65,7 @@ import {
     AuthRateLimitGuard,
     ExcelMagicByteValidationPipe,
     ExcelThrottleGuard,
+    SubscriptionGuard,
     ThrottlerBehindProxyGuard,
     ThrottlerModule,
   ],

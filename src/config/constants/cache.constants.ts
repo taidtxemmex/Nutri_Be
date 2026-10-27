@@ -14,6 +14,9 @@ export const CACHE_TAG_PROPOSERS = 'proposers';
 export const CACHE_TAG_MENUS = 'menus';
 export const CACHE_TAG_DAILY_INTAKES = 'daily_intakes';
 export const CACHE_TAG_PATIENTS = 'patients';
+export const CACHE_TAG_PACKAGES = 'packages';
+export const CACHE_TAG_PLANS = 'plans';
+export const CACHE_TAG_SUBSCRIPTIONS = 'subscriptions';
 
 export const CACHE_TTL_LOOKUP_SECONDS = 1800; // 30 phút cho public lookup (dropdown)
 export const CACHE_TTL_EXCEL_TEMPLATE_SECONDS = 1800; // 30 phút cho Excel template cache
@@ -46,3 +49,7 @@ export const buildExtendedDiseaseGroupCacheTag = (id: string | number | bigint):
   `extended_disease_group:${id}`;
 export const buildExtendedDiseaseGroupDetailCacheKey = (id: string | number | bigint): string =>
   `extended_disease_group:detail:${id}`;
+export const buildPackageCacheTag = (id: string | number | bigint): string => `package:${id}`;
+export const buildPlanCacheTag = (id: string | number | bigint): string => `plan:${id}`;
+export const buildSubscriptionCacheTag = (id: string | number | bigint): string =>
+  `subscription:${id}`;

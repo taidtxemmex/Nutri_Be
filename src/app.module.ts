@@ -21,6 +21,11 @@ import { NutritionLimitSetsModule } from './modules/nutrition-limit-sets/nutriti
 import { DailyIntakesModule } from './modules/daily-intakes/daily-intakes.module';
 import { PatientsModule } from './modules/patients/patients.module';
 import { IngredientProposalsModule } from './modules/ingredient-proposals/ingredient-proposals.module';
+import { FilesModule } from './modules/files/files.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
+import { CronModule } from './core/cron/cron.module';
+import { QueueModule } from './core/queue/queue.module';
 
 @Module({
   imports: [
@@ -32,6 +37,8 @@ import { IngredientProposalsModule } from './modules/ingredient-proposals/ingred
     CacheModule,
     I18nModule,
     SecurityModule,
+    CronModule,
+    QueueModule,
     NutritionEngineModule,
     AuthModule,
     UsersModule,
@@ -48,6 +55,9 @@ import { IngredientProposalsModule } from './modules/ingredient-proposals/ingred
     MenuProposalsModule,
     NutritionLimitSetsModule,
     DailyIntakesModule,
+    FilesModule,
+    SubscriptionsModule,
+    ChatbotModule,
   ],
 })
 export class AppModule implements NestModule {

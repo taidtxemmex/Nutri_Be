@@ -24,5 +24,6 @@
       "@modules/*": ["src/modules/*"],
       "@security/*": ["src/security/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist"]
 }

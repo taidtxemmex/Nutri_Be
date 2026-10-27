@@ -52,17 +52,6 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
 }
 
-export enum PackageStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-}
-
-export enum PaymentRequestStatus {
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  PENDING = 'PENDING',
-}
-
 export enum ProteinType {
   THUC_VAT = 'THUC_VAT',
   DONG_VAT = 'DONG_VAT',
@@ -104,5 +93,19 @@ export enum MenuProposalStatus {
 export enum IngredientStatus {
   CHO_DUYET = 'CHO_DUYET',
   DA_DUYET = 'DA_DUYET',
+  TU_CHOI = 'TU_CHOI',
+}
+
+export enum PackageStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
+
+export enum PaymentRequestStatus {
+  PENDING = 'PENDING',
+  CHO_DUYET = 'CHO_DUYET',
+  APPROVED = 'APPROVED',
+  DA_DUYET = 'DA_DUYET',
+  REJECTED = 'REJECTED',
   TU_CHOI = 'TU_CHOI',
 }

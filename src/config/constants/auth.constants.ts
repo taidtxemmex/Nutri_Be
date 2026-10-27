@@ -16,6 +16,7 @@ export const ROLES_KEY = 'roles';
 export const IS_PUBLIC_KEY = 'isPublic';
 export const SKIP_TRANSFORM_KEY = 'skipTransform';
 export const IDOR_OWNERSHIP_KEY = 'idorOwnership';
+export const REQUIRE_PRO_KEY = 'require_pro';
 
 export const REFRESH_TOKEN_CACHE_TAG = 'refresh_token';
 export const REFRESH_TOKEN_KEY_PREFIX = 'rt:';
@@ -29,6 +30,7 @@ export const AUTH_ERROR_IDOR_VIOLATION = 'ERR_IDOR_VIOLATION';
 export const AUTH_ERROR_REPLAY_ATTACK = 'AUTH_REPLAY_ATTACK';
 export const AUTH_ERROR_USER_NOT_FOUND = 'USER_NOT_FOUND';
 export const AUTH_ERROR_INACTIVE_ACCOUNT = 'USER_INACTIVE';
+export const ERR_PRO_SUBSCRIPTION_REQUIRED = 'ERR_PRO_SUBSCRIPTION_REQUIRED';
 
 export const THROTTLE_AUTH_LIMIT = 5;
 export const THROTTLE_AUTH_TTL = 60;

@@ -29,6 +29,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.DISH_MANAGE,
     Permission.MENU_VIEW,
     Permission.PACKAGE_VIEW,
+    Permission.PACKAGE_MANAGE,
     Permission.PAYMENT_REQUEST_APPROVE,
     Permission.REPORT_EXPORT_EXCEL,
     Permission.DATA_IMPORT_EXCEL,

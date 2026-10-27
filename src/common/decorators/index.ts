@@ -9,3 +9,5 @@ export * from './api-standard-response.decorator';
 export * from './auth.decorator';
 export * from './api-controller.decorator';
 export * from './api-file.decorator';
+export * from '../../security/decorators/require-pro.decorator';
+
