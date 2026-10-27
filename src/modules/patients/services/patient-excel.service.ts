@@ -1,8 +1,10 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger, Optional } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { CacheService } from '../../../core/cache/cache.service';
+import { CACHE_TAG_PATIENTS } from '../../../config/constants/cache.constants';
 import { PatientCodeAllocator } from './patient-code-allocator.service';
 
 @Injectable()
@@ -23,7 +25,10 @@ export class PatientExcelService {
 
   private readonly ACTIVITY_FACTORS = [1.2, 1.375, 1.55, 1.725, 1.9];
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly cacheService?: CacheService,
+  ) {}
 
   /**
    * 1. Tải Template mẫu Excel import bệnh nhân
@@ -137,9 +142,7 @@ export class PatientExcelService {
     const existingCodes = existingPatients
       .map((p) => p.ma_benh_nhan_bv)
       .filter(Boolean) as string[];
-    const existingPhones = existingPatients
-      .map((p) => p.so_dien_thoai)
-      .filter(Boolean) as string[];
+    const existingPhones = existingPatients.map((p) => p.so_dien_thoai).filter(Boolean) as string[];
 
     const allocator = new PatientCodeAllocator(existingCodes, existingPhones);
     const codesInFile = new Set<string>();
@@ -259,11 +262,13 @@ export class PatientExcelService {
           ho_ten: fullName,
           so_dien_thoai: phone,
           ngay_sinh: dobDate,
+          chi_nam_sinh: birthYearOnly,
           gioi_tinh: gender,
           can_nang: weight,
           chieu_cao: height,
           he_so_hoat_dong: activity,
           ghi_chu: note,
+          deleted_at: null,
           tao_luc: new Date(),
         });
       }
@@ -287,6 +292,10 @@ export class PatientExcelService {
       }
     });
 
+    if (this.cacheService) {
+      await this.cacheService.invalidateTag(CACHE_TAG_PATIENTS);
+    }
+
     return {
       success: true,
       message: `Import thành công ${validPatientsData.length} bệnh nhân`,
@@ -296,13 +305,32 @@ export class PatientExcelService {
 
   private getCleanString(val: any): string | null {
     if (val == null) return null;
-    const str = String(val).trim();
-    return str.length > 0 ? str : null;
+    let str: string;
+    if (typeof val === 'object' && val !== null) {
+      if ('formula' in val) {
+        str = String(val.formula || val.result || '').trim();
+      } else if ('result' in val) {
+        str = String(val.result || '').trim();
+      } else if ('text' in val) {
+        str = String(val.text || '').trim();
+      } else {
+        str = String(val).trim();
+      }
+    } else {
+      str = String(val).trim();
+    }
+    if (str.length === 0) return null;
+    if (/^[=+@\-\t\r]/.test(str)) {
+      str = "'" + str;
+    }
+    return str;
   }
 
-  private parseDobValue(
-    val: any,
-  ): { date: Date | null; birthYearOnly: boolean; error: string | null } {
+  private parseDobValue(val: any): {
+    date: Date | null;
+    birthYearOnly: boolean;
+    error: string | null;
+  } {
     const currentYear = new Date().getFullYear();
     if (val instanceof Date) {
       if (val.getFullYear() < 1900 || val.getFullYear() > currentYear) {
@@ -319,6 +347,29 @@ export class PatientExcelService {
       return { date: new Date(y, 0, 1), birthYearOnly: true, error: null };
     }
 
+    // Hỗ trợ định dạng ISO YYYY-MM-DD hoặc YYYY/MM/DD
+    if (/^\d{4}[\/\-]\d{1,2}[\/\-]\d{1,2}$/.test(str)) {
+      const [y, m, d] = str.split(/[\/\-]/).map(Number);
+      const dt = new Date(y, m - 1, d);
+      if (
+        isNaN(dt.getTime()) ||
+        dt.getFullYear() !== y ||
+        dt.getMonth() !== m - 1 ||
+        dt.getDate() !== d
+      ) {
+        return {
+          date: null,
+          birthYearOnly: false,
+          error: 'Ngày sinh không đúng định dạng (dd/MM/yyyy hoặc yyyy-MM-dd)',
+        };
+      }
+      if (dt > new Date()) {
+        return { date: null, birthYearOnly: false, error: 'Ngày sinh không được ở tương lai' };
+      }
+      return { date: dt, birthYearOnly: false, error: null };
+    }
+
+    // Hỗ trợ định dạng Việt Nam DD/MM/YYYY hoặc DD-MM-YYYY
     const parts = str.split(/[\/\-]/);
     if (parts.length === 3) {
       const d = parseInt(parts[0], 10);

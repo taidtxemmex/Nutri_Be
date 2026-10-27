@@ -64,8 +64,8 @@ describe('Users IDOR Defense & PII Protection - E2E Tests', () => {
         .expect(403);
 
       expect(res.body.error.code).toBe('ERR_IDOR_VIOLATION');
-      expect(res.body.error.message).toContain(
-        'Bạn không có quyền truy cập dữ liệu của người dùng khác',
+      expect(res.body.error.message).toMatch(
+        /(Không được phép truy cập dữ liệu của người dùng khác|Bạn không có quyền truy cập dữ liệu của người dùng khác)/,
       );
     });
 

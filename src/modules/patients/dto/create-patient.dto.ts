@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsNumber, IsBoolean, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePatientDto {
@@ -17,9 +17,23 @@ export class CreatePatientDto {
   @IsString()
   patientCode?: string;
 
+  @ApiPropertyOptional({ example: true, description: 'Tự động sinh mã theo SĐT' })
+  @IsOptional()
+  @IsBoolean()
+  autoGenerateCode?: boolean;
+
   @ApiPropertyOptional({ example: '1985-06-15', description: 'Ngày sinh (YYYY-MM-DD)' })
   @IsOptional()
   dob?: string | Date;
+
+  @ApiPropertyOptional({ example: '1985-06-15', description: 'Ngày sinh (alias dateOfBirth)' })
+  @IsOptional()
+  dateOfBirth?: string | Date;
+
+  @ApiPropertyOptional({ example: false, description: 'Chỉ lưu năm sinh' })
+  @IsOptional()
+  @IsBoolean()
+  birthYearOnly?: boolean;
 
   @ApiProperty({ example: 'NAM', description: 'Giới tính (NAM / NU)' })
   @IsString()
@@ -52,4 +66,12 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({
+    example: 'Bệnh nhân có tiền sử tiểu đường Type 2',
+    description: 'Ghi chú lâm sàng (alias note)',
+  })
+  @IsOptional()
+  @IsString()
+  note?: string;
 }

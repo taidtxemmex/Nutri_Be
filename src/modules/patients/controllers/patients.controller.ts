@@ -23,15 +23,22 @@ import {
   PatientQueryDto,
   PatientResponseDto,
   PatientCodePreviewDto,
+  CreateAnthropometryDto,
+  AnthropometryQueryDto,
+  AnthropometryResponseDto,
+  CreateMedicalRecordDto,
+  MedicalRecordQueryDto,
+  MedicalRecordResponseDto,
 } from '../dto';
 import {
   ApiController,
   ApiStandardResponse,
   ApiPaginatedResponse,
-  Auth,
   CurrentUser,
 } from '../../../common/decorators';
 import { ParseBigIntPipe } from '../../../common/pipes/parse-bigint.pipe';
+
+const PATIENT_ID_PARAM = { name: 'id', description: 'ID bệnh nhân' };
 
 @ApiController('Patients', ['patients'], { auth: true })
 export class PatientsController {
@@ -70,14 +77,12 @@ export class PatientsController {
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader(
-      'Content-Disposition',
-      'attachment; filename=Template_import_benh_nhan.xlsx',
-    );
+    res.setHeader('Content-Disposition', 'attachment; filename=Template_import_benh_nhan.xlsx');
     return res.end(buffer);
   }
 
   @Post('import')
+  @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Import bệnh nhân từ file Excel (trả về file nếu có lỗi)' })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(FileInterceptor('file'))
@@ -96,6 +101,7 @@ export class PatientsController {
     const result = await this.patientExcelService.importExcel(file.buffer, user);
 
     if (!result.success && result.errorFileBuffer) {
+      res.status(HttpStatus.OK);
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -110,13 +116,15 @@ export class PatientsController {
     return res.status(HttpStatus.OK).json({
       status: HttpStatus.OK,
       message: result.message,
-      data: { count: result.count },
+      success: true,
+      count: result.count,
+      data: { success: true, count: result.count },
     });
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Lấy chi tiết hồ sơ bệnh nhân' })
-  @ApiParam({ name: 'id', description: 'ID bệnh nhân' })
+  @ApiParam(PATIENT_ID_PARAM)
   @ApiStandardResponse({
     type: PatientResponseDto,
     description: 'Chi tiết hồ sơ bệnh nhân',
@@ -145,7 +153,7 @@ export class PatientsController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật hồ sơ bệnh nhân' })
-  @ApiParam({ name: 'id', description: 'ID bệnh nhân' })
+  @ApiParam(PATIENT_ID_PARAM)
   @ApiStandardResponse({
     type: PatientResponseDto,
     description: 'Cập nhật bệnh nhân thành công',
@@ -160,7 +168,7 @@ export class PatientsController {
 
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa hồ sơ bệnh nhân (chỉ khi không có thực đơn/khẩu phần)' })
-  @ApiParam({ name: 'id', description: 'ID bệnh nhân' })
+  @ApiParam(PATIENT_ID_PARAM)
   @ApiStandardResponse({
     description: 'Xóa hồ sơ bệnh nhân thành công',
   })
@@ -169,5 +177,73 @@ export class PatientsController {
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
     return this.patientsService.delete(id, user);
+  }
+
+  // ==========================================
+  // SUB-RESOURCE ENDPOINTS (Rule 12 Decomposition)
+  // ==========================================
+
+  @Get(':id/anthropometry')
+  @ApiOperation({ summary: 'Lấy lịch sử biến thiên thể trạng nhân trắc học phân trang' })
+  @ApiParam(PATIENT_ID_PARAM)
+  @ApiPaginatedResponse({
+    type: AnthropometryResponseDto,
+    description: 'Danh sách nhân trắc học phân trang sắp xếp theo ngày đo mới nhất',
+  })
+  async getAnthropometry(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Query() query: AnthropometryQueryDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.patientsService.getAnthropometryHistory(id, query, user);
+  }
+
+  @Post(':id/anthropometry')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Ghi nhận biến thiên cân nặng, chiều cao, BMI, huyết áp' })
+  @ApiParam(PATIENT_ID_PARAM)
+  @ApiStandardResponse({
+    type: AnthropometryResponseDto,
+    status: 201,
+    description: 'Ghi nhận thể trạng nhân trắc học thành công',
+  })
+  async createAnthropometry(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Body() dto: CreateAnthropometryDto,
+    @CurrentUser() user: any,
+  ): Promise<AnthropometryResponseDto> {
+    return this.patientsService.createAnthropometry(id, dto, user);
+  }
+
+  @Get(':id/medical-records')
+  @ApiOperation({ summary: 'Lấy danh sách hồ sơ khám bệnh lâm sàng phân trang' })
+  @ApiParam(PATIENT_ID_PARAM)
+  @ApiPaginatedResponse({
+    type: MedicalRecordResponseDto,
+    description: 'Danh sách bệnh án phân trang sắp xếp theo ngày khám mới nhất',
+  })
+  async getMedicalRecords(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Query() query: MedicalRecordQueryDto,
+    @CurrentUser() user: any,
+  ) {
+    return this.patientsService.getMedicalRecords(id, query, user);
+  }
+
+  @Post(':id/medical-records')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Lưu hồ sơ khám bệnh, chẩn đoán, mã ICD-10 và thực đơn can thiệp' })
+  @ApiParam(PATIENT_ID_PARAM)
+  @ApiStandardResponse({
+    type: MedicalRecordResponseDto,
+    status: 201,
+    description: 'Lưu hồ sơ bệnh án thành công',
+  })
+  async createMedicalRecord(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @Body() dto: CreateMedicalRecordDto,
+    @CurrentUser() user: any,
+  ): Promise<MedicalRecordResponseDto> {
+    return this.patientsService.createMedicalRecord(id, dto, user);
   }
 }

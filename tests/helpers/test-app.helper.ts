@@ -82,6 +82,8 @@ export class TestAppHelper {
       'de_xuat_nguyen_lieu',
       'gioi_han_dinh_duong',
       'thuc_don',
+      'benh_nhan_nhan_trac',
+      'benh_nhan_benh_an',
       'benh_nhan',
       'nguyen_lieu',
       'danh_muc',
