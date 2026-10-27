@@ -21,7 +21,7 @@ import {
   MenuDishDto,
 } from '../dto';
 import { MenuType, TargetType, DishStatus } from '../../../config/enums/domain.enum';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import {
   CACHE_TAG_MENUS,
   CACHE_TAG_PATIENTS,
@@ -46,7 +46,7 @@ export class MenusService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   /**

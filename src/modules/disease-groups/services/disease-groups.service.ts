@@ -19,6 +19,7 @@ import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
 } from '../../../config/constants/pagination.constants';
+import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
   CreateDiseaseGroupDto,
   UpdateDiseaseGroupDto,
@@ -47,9 +48,7 @@ export class DiseaseGroupsService {
    * Tích hợp Perpetual Cache (Rule 23)
    */
   async findAll(query?: DiseaseGroupQueryDto): Promise<PaginatedDiseaseGroupsResult> {
-    const page = Math.max(1, Number(query?.page) || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, Number(query?.limit) || DEFAULT_LIMIT));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(query);
 
     const cacheKey = this.cacheService?.generateKey('disease-groups:list', {
       page,

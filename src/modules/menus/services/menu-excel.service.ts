@@ -11,6 +11,7 @@ import { MenuExportType, MenuType } from '../../../config/enums/domain.enum';
 import { EXCEL_FONT_FAMILY, EXCEL_STYLES } from '../../../config/constants/excel.constants';
 import { Writable } from 'stream';
 import { Response } from 'express';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import {
   MenuMarketPlanStreamer,
   MarketPlanIngredient,
@@ -168,17 +169,12 @@ export class MenuExcelService {
     // 2. Thiết lập HTTP Response Headers nếu outputStream là Express Response
     if (outputStream && typeof (outputStream as any).setHeader === 'function') {
       const res = outputStream as Response;
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      setExcelResponseHeaders(
+        res,
+        `thuc_don_${String(menu.id || menuIdOrData)}_${exportType.toLowerCase()}.xlsx`,
       );
       res.setHeader('Transfer-Encoding', 'chunked');
       res.setHeader('X-Accel-Buffering', 'no');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="thuc_don_${String(menu.id || menuIdOrData)}_${exportType.toLowerCase()}.xlsx"`,
-      );
     }
 
     // 3. Khởi tạo WorkbookWriter O(1) RAM với useSharedStrings = false

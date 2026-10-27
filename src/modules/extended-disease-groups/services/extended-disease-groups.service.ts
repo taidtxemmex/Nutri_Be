@@ -12,6 +12,7 @@ import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
 } from '../../../config/constants/pagination.constants';
+import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
   CreateExtendedDiseaseGroupDto,
   UpdateExtendedDiseaseGroupDto,
@@ -42,9 +43,7 @@ export class ExtendedDiseaseGroupsService {
     userId: string,
     query?: ExtendedDiseaseGroupQueryDto,
   ): Promise<PaginatedExtendedDiseaseGroupsResult> {
-    const page = Math.max(1, Number(query?.page) || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, Number(query?.limit) || DEFAULT_LIMIT));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(query);
 
     const cacheKey = this.cacheService?.generateKey(`extended-disease-groups:${userId}`, {
       page,

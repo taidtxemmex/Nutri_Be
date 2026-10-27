@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { DishesService } from '../services/dishes.service';
 import { DishExcelService } from '../services/dish-excel.service';
 import {
@@ -118,11 +119,7 @@ export class DishesController {
     const safeFileName = path.basename('Template_import_mon_an.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    setExcelResponseHeaders(res, safeFileName);
 
     if (fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -154,13 +151,9 @@ export class DishesController {
     const result = await this.excelService.importExcel(file.buffer, user?.id);
 
     if (!result.success && result.errorFileBuffer) {
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${result.errorFileName || 'dish_import_errors.xlsx'}"`,
+      setExcelResponseHeaders(
+        res,
+        result.errorFileName || 'dish_import_errors.xlsx',
       );
       return res.end(result.errorFileBuffer);
     }
@@ -180,6 +173,7 @@ export class DishesController {
   }
 
   @Post('export')
+  @HttpCode(HttpStatus.OK)
   @Auth()
   @SkipTransform()
   @ApiOperation({ summary: 'Xuất danh sách món ăn ra tập tin Excel' })

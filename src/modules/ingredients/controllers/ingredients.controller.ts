@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { IngredientsService } from '../services/ingredients.service';
 import { IngredientExcelService } from '../services/ingredient-excel.service';
 import {
@@ -95,11 +96,7 @@ export class IngredientsController {
     const safeFileName = path.basename('Template_import_nguyen_lieu.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    setExcelResponseHeaders(res, safeFileName);
 
     if (isDefault && fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -134,13 +131,9 @@ export class IngredientsController {
 
     // Nếu import phát hiện lỗi ở các dòng -> Trả file Excel chứa cột chú thích lỗi cho Client
     if (!result.success && result.errorFileBuffer) {
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${result.errorFileName || 'ingredient_import_errors.xlsx'}"`,
+      setExcelResponseHeaders(
+        res,
+        result.errorFileName || 'ingredient_import_errors.xlsx',
       );
       return res.end(result.errorFileBuffer);
     }

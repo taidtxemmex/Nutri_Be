@@ -19,6 +19,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { ExtendedDiseaseGroupsService } from '../services/extended-disease-groups.service';
 import { ExtendedDiseaseGroupsImportService } from '../services/extended-disease-groups-import.service';
 import {
@@ -60,10 +61,7 @@ export class ExtendedDiseaseGroupsController {
     const safeFileName = path.basename('Template_import_nhom_benh_mo_rong.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${safeFileName}"`,
-    });
+    setExcelResponseHeaders(res, safeFileName);
 
     if (fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -90,10 +88,10 @@ export class ExtendedDiseaseGroupsController {
 
     // Có lỗi -> trả file Excel kèm cột "Kết quả import" cho frontend download
     if (!result.success && result.errorFileBytes) {
-      res.set({
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename=${result.errorFileName || 'extended_disease_group_import_result.xlsx'}`,
-      });
+      setExcelResponseHeaders(
+        res,
+        result.errorFileName || 'extended_disease_group_import_result.xlsx',
+      );
       return res.send(result.errorFileBytes);
     }
 

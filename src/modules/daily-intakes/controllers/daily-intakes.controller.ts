@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { DailyIntakesService } from '../services/daily-intakes.service';
 import { DailyIntakeExcelService } from '../services/daily-intake-excel.service';
 import {
@@ -64,8 +65,7 @@ export class DailyIntakesController {
     return this.service.getAll(query, user);
   }
 
-  @Get('template')
-  @Get('import-template')
+  @Get(['template', 'import-template'])
   @Auth()
   @SkipTransform()
   @ApiOperation({ summary: 'Tải file Excel mẫu để nhập liệu khẩu phần 24h (theo bữa hoặc theo ngày)' })
@@ -86,10 +86,7 @@ export class DailyIntakesController {
     const safeFileName = path.basename(fileName);
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="${safeFileName}"`,
-    });
+    setExcelResponseHeaders(res, safeFileName);
 
     if (fs.existsSync(filePath)) {
       fs.createReadStream(filePath).pipe(res);
@@ -227,13 +224,9 @@ export class DailyIntakesController {
     });
 
     if (!result.success && result.errorFileBuffer) {
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${result.errorFileName || 'error_import_intake.xlsx'}"`,
+      setExcelResponseHeaders(
+        res,
+        result.errorFileName || 'error_import_intake.xlsx',
       );
       res.end(result.errorFileBuffer);
       return;
@@ -273,10 +266,10 @@ export class DailyIntakesController {
     const reportType =
       bodyDto?.reportType || qReportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="bao_cao_lam_sang_24h_${id}_${reportType.toLowerCase()}.xlsx"`,
-    });
+    setExcelResponseHeaders(
+      res,
+      `bao_cao_lam_sang_24h_${id}_${reportType.toLowerCase()}.xlsx`,
+    );
 
     await this.excelService.streamClinicalReport(BigInt(id), res, reportType, user?.id);
   }
@@ -299,10 +292,10 @@ export class DailyIntakesController {
     if (!body?.templateType && targetId) {
       const reportType = body.reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
-      res.set({
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="bao_cao_lam_sang_24h_${targetId}_${reportType.toLowerCase()}.xlsx"`,
-      });
+      setExcelResponseHeaders(
+        res,
+        `bao_cao_lam_sang_24h_${targetId}_${reportType.toLowerCase()}.xlsx`,
+      );
 
       await this.excelService.streamClinicalReport(
         BigInt(targetId),

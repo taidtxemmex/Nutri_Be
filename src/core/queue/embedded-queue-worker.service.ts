@@ -122,6 +122,9 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
     let failedCount = 0;
 
     try {
+      // 0. Phục hồi các jobs kẹt do worker chết trước đó (lockedAt > 10 phút)
+      await this.recoverStuckJobs();
+
       // 1. Transaction Atomic Claim với MySQL SKIP LOCKED (Connection Pool Protection Law)
       claimedJobs = await this.claimPendingJobs(limit);
 
@@ -345,6 +348,35 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
       this.logger.error(
         `Job id ${rawJob.id} đã vượt quá ${maxAttempts} lần thử. Đã chuyển sang Dead Letter Queue (_system_jobs_dlq).`,
       );
+    }
+  }
+
+  /**
+   * C4: Phục hồi các jobs bị kẹt ở trạng thái 'processing' quá 10 phút do worker chết/crash
+   */
+  async recoverStuckJobs(timeoutMs = 10 * 60 * 1000): Promise<number> {
+    try {
+      const staleThreshold = new Date(Date.now() - timeoutMs);
+      const result = await this.prisma.systemJob.updateMany({
+        where: {
+          status: 'processing',
+          lockedAt: { lt: staleThreshold },
+        },
+        data: {
+          status: 'pending',
+          lockedBy: null,
+          lockedAt: null,
+        },
+      });
+      if (result.count > 0) {
+        this.logger.warn(
+          `[EmbeddedQueueWorker] Đã phục hồi ${result.count} jobs bị kẹt quá hạn về trạng thái pending.`,
+        );
+      }
+      return result.count;
+    } catch (err: any) {
+      this.logger.warn(`Lỗi phục hồi jobs kẹt: ${err?.message}`);
+      return 0;
     }
   }
 }

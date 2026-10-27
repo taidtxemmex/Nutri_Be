@@ -10,7 +10,7 @@ import {
   MenuProposalDetailDto,
 } from '../dto';
 import { MenuDetailResponseDto } from '../../menus/dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import { MenuExportType, MenuType, MenuProposalStatus } from '../../../config/enums/domain.enum';
 
 @Injectable()
@@ -26,7 +26,7 @@ export class MenuProposalsService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   /**
@@ -110,6 +110,7 @@ export class MenuProposalsService {
       where: {
         menu_goc_id: menuId,
         trang_thai: MenuProposalStatus.CHO_DUYET,
+        deleted_at: null,
       },
       select: { id: true },
     });
@@ -269,7 +270,9 @@ export class MenuProposalsService {
     const skip = (page - 1) * limit;
 
     const normalizedStatuses = this.normalizeStatuses(query.statuses);
-    const where: any = {};
+    const where: any = {
+      deleted_at: null,
+    };
 
     if (normalizedStatuses.length > 0) {
       where.trang_thai = { in: normalizedStatuses };
@@ -327,7 +330,10 @@ export class MenuProposalsService {
    */
   async getMyProposals(currentUser: { id: string; role?: string }): Promise<MenuProposalListDto[]> {
     const rows = await this.prisma.de_xuat_thuc_don.findMany({
-      where: { nguoi_de_xuat_id: currentUser.id },
+      where: {
+        nguoi_de_xuat_id: currentUser.id,
+        deleted_at: null,
+      },
       select: {
         id: true,
         menu_goc_id: true,
@@ -372,7 +378,10 @@ export class MenuProposalsService {
    */
   async getPublicProposals(): Promise<MenuProposalListDto[]> {
     const rows = await this.prisma.de_xuat_thuc_don.findMany({
-      where: { trang_thai: 'DA_DUYET' },
+      where: {
+        trang_thai: 'DA_DUYET',
+        deleted_at: null,
+      },
       select: {
         id: true,
         menu_goc_id: true,
@@ -420,8 +429,8 @@ export class MenuProposalsService {
     currentUser: { id: string; role?: string },
   ): Promise<MenuProposalDetailDto> {
     const proposalId = BigInt(id);
-    const proposal = await this.prisma.de_xuat_thuc_don.findUnique({
-      where: { id: proposalId },
+    const proposal = await this.prisma.de_xuat_thuc_don.findFirst({
+      where: { id: proposalId, deleted_at: null },
       include: {
         nguoi_dung_de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung: {
           select: { ten_dang_nhap: true },
@@ -489,8 +498,8 @@ export class MenuProposalsService {
     currentUser?: { id: string; role?: string },
   ): Promise<MenuDetailResponseDto> {
     const proposalId = BigInt(id);
-    const proposal = await this.prisma.de_xuat_thuc_don.findUnique({
-      where: { id: proposalId },
+    const proposal = await this.prisma.de_xuat_thuc_don.findFirst({
+      where: { id: proposalId, deleted_at: null },
       include: {
         nguoi_dung_de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung: {
           select: { ten_dang_nhap: true },
@@ -570,8 +579,8 @@ export class MenuProposalsService {
   ): Promise<{ success: boolean; message: string }> {
     const proposalId = BigInt(id);
 
-    const proposal = await this.prisma.de_xuat_thuc_don.findUnique({
-      where: { id: proposalId },
+    const proposal = await this.prisma.de_xuat_thuc_don.findFirst({
+      where: { id: proposalId, deleted_at: null },
     });
 
     if (!proposal) {
@@ -626,8 +635,8 @@ export class MenuProposalsService {
   ): Promise<{ success: boolean; message: string }> {
     const proposalId = BigInt(id);
 
-    const proposal = await this.prisma.de_xuat_thuc_don.findUnique({
-      where: { id: proposalId },
+    const proposal = await this.prisma.de_xuat_thuc_don.findFirst({
+      where: { id: proposalId, deleted_at: null },
     });
 
     if (!proposal) {
@@ -669,8 +678,8 @@ export class MenuProposalsService {
     currentUser?: { id: string; role?: string },
   ): Promise<Buffer> {
     const proposalId = BigInt(id);
-    const proposal = await this.prisma.de_xuat_thuc_don.findUnique({
-      where: { id: proposalId },
+    const proposal = await this.prisma.de_xuat_thuc_don.findFirst({
+      where: { id: proposalId, deleted_at: null },
     });
 
     if (!proposal) {
@@ -698,5 +707,40 @@ export class MenuProposalsService {
       servings: 1,
       userId: currentUser?.id,
     });
+  }
+
+  /**
+   * 10. DELETE /api/menu-proposals/:id: Xóa mềm đề xuất thực đơn (Soft-delete)
+   */
+  async deleteProposal(
+    idParam: string | number | bigint,
+    currentUser: { id: string; role?: string },
+  ): Promise<{ success: boolean; message: string }> {
+    const id = BigInt(idParam);
+    const existing = await this.prisma.de_xuat_thuc_don.findFirst({
+      where: { id, deleted_at: null },
+    });
+
+    if (!existing) {
+      throw new HttpException(
+        { code: 'PROPOSAL_NOT_FOUND', message: 'Không tìm thấy đề xuất thực đơn' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (!this.isAdmin(currentUser) && existing.nguoi_de_xuat_id !== currentUser.id) {
+      throw new HttpException(
+        { code: 'FORBIDDEN', message: 'Không có quyền xóa đề xuất này' },
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    await this.prisma.de_xuat_thuc_don.update({
+      where: { id },
+      data: { deleted_at: new Date() },
+    });
+
+    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    return { success: true, message: 'Xóa đề xuất thực đơn thành công' };
   }
 }

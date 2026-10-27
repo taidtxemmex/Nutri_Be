@@ -1,7 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CreateIngredientProposalDto } from '../dto/create-ingredient-proposal.dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class IngredientProposalsService {
@@ -10,7 +10,7 @@ export class IngredientProposalsService {
   constructor(private readonly prisma: PrismaService) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   /**

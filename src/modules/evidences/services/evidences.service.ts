@@ -1,7 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { EvidenceStorageService } from './evidence-storage.service';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import { MAX_FILE_SIZE_BYTES } from '../../../config/upload.constants';
 
 @Injectable()
@@ -14,7 +14,7 @@ export class EvidencesService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   private async findAndCheckPermission(

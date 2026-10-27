@@ -231,6 +231,7 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
       process.env.NODE_ENV = 'production';
       process.env.JWT_SECRET = 'c8b3a199857d45e0bb1b4d08b3e8e2c34d88e6a4b1234567890abcdef1234567';
       process.env.DATABASE_URL = 'mysql://user:pass@localhost:3306/db';
+      process.env.STORAGE_HMAC_SECRET = 'storage_hmac_secret_super_strong_for_production_testing_2026';
 
       expect(() => validateProductionSecrets()).not.toThrow();
     });

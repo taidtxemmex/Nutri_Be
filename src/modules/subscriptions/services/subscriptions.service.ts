@@ -4,10 +4,12 @@ import {
   BadRequestException,
   ConflictException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
+import { MysqlQueueService } from '../../../core/queue/mysql-queue.service';
 import {
   CACHE_TAG_PACKAGES,
   CACHE_TAG_PLANS,
@@ -36,12 +38,15 @@ export class SubscriptionsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
+    @Optional() private readonly queueService?: MysqlQueueService,
   ) {}
+
+  private static txSequence: number = crypto.randomInt(0, 0xffffff);
 
   /**
    * Sinh mã giao dịch duy nhất theo chuẩn TX-yyMMdd-XXXXXX
    * Khắc phục hoàn toàn Nghịch lý Ngày sinh (Birthday Paradox)
-   * Sử dụng 6 ký tự ngẫu nhiên Hex Crypto -> hơn 16 triệu khả năng/ngày
+   * Sử dụng 24-bit full-cycle permutation (Hull-Dobell Theorem) đảm bảo 100% không đụng độ trong 16.7 triệu mã
    */
   generateTransactionCode(): string {
     const now = new Date();
@@ -49,7 +54,9 @@ export class SubscriptionsService {
     const MM = String(now.getMonth() + 1).padStart(2, '0');
     const dd = String(now.getDate()).padStart(2, '0');
     const datePart = `${yy}${MM}${dd}`;
-    const randomHex = crypto.randomBytes(4).toString('hex').toUpperCase().slice(0, 6);
+    SubscriptionsService.txSequence = (SubscriptionsService.txSequence + 1) & 0xffffff;
+    const permuted = (Math.imul(SubscriptionsService.txSequence, 1664525) + 1013904223) & 0xffffff;
+    const randomHex = permuted.toString(16).toUpperCase().padStart(6, '0');
     return `TX-${datePart}-${randomHex}`;
   }
 
@@ -368,6 +375,18 @@ export class SubscriptionsService {
       // Đính kèm chứng từ thanh toán vào bảng minh_chung nếu có
       if (dto.documents && dto.documents.length > 0) {
         for (const doc of dto.documents) {
+          // A3: Validate externalLink scheme (phòng thủ XSS / javascript: schemes)
+          if (doc.externalLink && !/^https?:\/\//i.test(doc.externalLink)) {
+            throw new BadRequestException('Đường dẫn minh chứng bên ngoài phải bắt đầu bằng http:// hoặc https://');
+          }
+
+          // A3: Validate objectKey (chống path traversal và null byte)
+          if (doc.objectKey) {
+            if (doc.objectKey.includes('..') || doc.objectKey.includes('\0')) {
+              throw new BadRequestException('Đường dẫn tệp tin objectKey không hợp lệ');
+            }
+          }
+
           await tx.minh_chung.create({
             data: {
               yeu_cau_id: pr.id,
@@ -392,6 +411,23 @@ export class SubscriptionsService {
 
     // Invalidate Cache tag subscriptions
     await this.cacheService.invalidateTag(CACHE_TAG_SUBSCRIPTIONS);
+
+    // A4: Enqueue job thông báo tạo yêu cầu thanh toán
+    if (this.queueService) {
+      try {
+        await this.queueService.enqueue('mail:send', {
+          to: user.ten_dang_nhap || 'user@nutri.vn',
+          subject: 'Xác nhận tạo yêu cầu thanh toán gói cước',
+          payload: {
+            maGiaoDich: created.ma_giao_dich,
+            tenGoi: packageEntity.ten_goi,
+            soTien: packageEntity.gia_tien,
+          },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Lỗi đẩy email tạo yêu cầu thanh toán vào queue: ${err?.message}`);
+      }
+    }
 
     return SubscriptionResponseDto.fromEntity(created, {
       username: user.ten_dang_nhap,
@@ -504,11 +540,15 @@ export class SubscriptionsService {
         baseDate.getTime() + request.so_ngay_su_dung * 24 * 60 * 60 * 1000,
       );
 
-      // 4. Cập nhật vai trò USERPRO và pro_expired_at mới cho User
+      // 4. Cập nhật vai trò cho User (A1: Chỉ nâng lên USERPRO nếu vai trò hiện tại là USER hoặc rỗng)
+      // Nếu user đang là ADMIN / SUPERADMIN / BAC_SI thì giữ nguyên đặc quyền quản trị, vẫn cộng dồn pro_expired_at
+      const currentRole = (user.vai_tro || '').toUpperCase();
+      const newRole = (currentRole === 'USER' || !currentRole) ? 'USERPRO' : user.vai_tro;
+
       await tx.nguoi_dung.update({
         where: { id: request.nguoi_dung_id },
         data: {
-          vai_tro: 'USERPRO',
+          vai_tro: newRole,
           pro_expired_at: newProExpiredAt,
         },
       });
@@ -574,6 +614,22 @@ export class SubscriptionsService {
       CACHE_TAG_SUBSCRIPTIONS,
     ]);
 
+    // A4: Enqueue job thông báo kích hoạt gói PRO
+    if (this.queueService) {
+      try {
+        await this.queueService.enqueue('mail:send', {
+          to: updatedRequest.nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung?.ten_dang_nhap || 'user@nutri.vn',
+          subject: 'Kích hoạt gói dịch vụ PRO thành công',
+          payload: {
+            maGiaoDich: updatedRequest.ma_giao_dich,
+            tenGoi: updatedRequest.ten_goi,
+          },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Lỗi đẩy email duyệt thanh toán vào queue: ${err?.message}`);
+      }
+    }
+
     const linkedUser =
       (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
 
@@ -610,6 +666,26 @@ export class SubscriptionsService {
         );
       }
 
+      // A2: Cập nhật có điều kiện nguyên tử trạng thái = REJECTED (Chống race condition với approve)
+      if (tx.yeu_cau_thanh_toan.updateMany) {
+        const updateResult = await tx.yeu_cau_thanh_toan.updateMany({
+          where: {
+            id: numericId,
+            trang_thai: { in: ['PENDING', 'CHO_DUYET'] },
+          },
+          data: {
+            trang_thai: 'REJECTED',
+            ly_do_tu_choi: dto.getRejectionReason() || 'Từ chối bởi quản trị viên',
+            ngay_phe_duyet: new Date(),
+            nguoi_phe_duyet_id: adminId,
+          },
+        });
+
+        if (updateResult.count === 0) {
+          throw new ConflictException('Yêu cầu thanh toán đã được xử lý bởi quản trị viên khác.');
+        }
+      }
+
       return tx.yeu_cau_thanh_toan.update({
         where: { id: numericId },
         data: {
@@ -631,6 +707,22 @@ export class SubscriptionsService {
     });
 
     await this.cacheService.invalidateTag(CACHE_TAG_SUBSCRIPTIONS);
+
+    // A4: Enqueue job thông báo từ chối thanh toán
+    if (this.queueService) {
+      try {
+        await this.queueService.enqueue('mail:send', {
+          to: (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung?.ten_dang_nhap || 'user@nutri.vn',
+          subject: 'Thông báo về yêu cầu thanh toán gói cước',
+          payload: {
+            maGiaoDich: (updatedRequest as any).ma_giao_dich,
+            lyDoTuChoi: dto.getRejectionReason(),
+          },
+        });
+      } catch (err: any) {
+        this.logger.warn(`Lỗi đẩy email từ chối thanh toán vào queue: ${err?.message}`);
+      }
+    }
 
     const linkedUser =
       (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};

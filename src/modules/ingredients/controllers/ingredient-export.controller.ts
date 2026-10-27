@@ -1,4 +1,4 @@
-import { Post, Body, Res } from '@nestjs/common';
+import { Post, Body, Res, HttpCode, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiOperation } from '@nestjs/swagger';
 import { IngredientExcelService } from '../services/ingredient-excel.service';
@@ -10,6 +10,7 @@ export class IngredientExportController {
   constructor(private readonly excelService: IngredientExcelService) {}
 
   @Post('ingredients')
+  @HttpCode(HttpStatus.OK)
   @SkipTransform()
   @ApiOperation({
     summary: 'Xuất danh sách nguyên liệu ra file Excel dạng Stream O(1) RAM (Tương thích đường dẫn NutriFE)',

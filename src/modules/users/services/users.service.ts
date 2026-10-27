@@ -30,6 +30,7 @@ import {
   DEFAULT_PAGE,
   MAX_LIMIT,
 } from '../../../config/constants/pagination.constants';
+import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import { QueryUsersDto, UpdateUserInfoReqDto, CreateUserItemDto } from '../dto';
 import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 import { UserInfoViewResponse } from '../interfaces/user-info-view.interface';
@@ -94,9 +95,7 @@ export class UsersService {
    * Tích hợp Caching 15s và chuẩn hóa query params (Rule 23 & Rule 25)
    */
   async findAll(query: QueryUsersDto): Promise<PaginatedUsersResult> {
-    const page = Math.max(1, Number(query.page) || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, Number(query.limit) || DEFAULT_LIMIT));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(query);
 
     const cacheKey = this.cacheService?.generateKey('users:list', {
       page,

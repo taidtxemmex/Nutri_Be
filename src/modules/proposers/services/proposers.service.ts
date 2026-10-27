@@ -18,6 +18,7 @@ import {
   DEFAULT_LIMIT,
   MAX_LIMIT,
 } from '../../../config/constants/pagination.constants';
+import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
   CreateProposerDto,
   UpdateProposerDto,
@@ -45,9 +46,7 @@ export class ProposersService {
    * Danh sách hồ sơ người đề xuất có phân trang (Anti-OOM, Lean Projections)
    */
   async findAll(query?: ProposerQueryDto): Promise<PaginatedProposersResult> {
-    const page = Math.max(1, Number(query?.page) || DEFAULT_PAGE);
-    const limit = Math.min(MAX_LIMIT, Math.max(1, Number(query?.limit) || DEFAULT_LIMIT));
-    const skip = (page - 1) * limit;
+    const { page, limit, skip } = normalizePagination(query);
 
     const cacheKey = this.cacheService?.generateKey('proposers:list', {
       page,

@@ -1,6 +1,7 @@
-import { Get, Post, Put, Body, Param, Query, Res, HttpStatus } from '@nestjs/common';
+import { Get, Post, Put, Delete, Body, Param, Query, Res, HttpStatus } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { MenuProposalsService } from '../services/menu-proposals.service';
 import {
   RejectProposalDto,
@@ -146,12 +147,19 @@ export class MenuProposalsController {
   ): Promise<void> {
     const buffer = await this.service.exportProposalExcel(id, req.columns, user);
 
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="de_xuat_thuc_don_${id}.xlsx"`,
-      'Content-Length': buffer.length,
-    });
-
+    setExcelResponseHeaders(res, `de_xuat_thuc_don_${id}.xlsx`);
+    res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
+  }
+
+  @Delete(':id')
+  @Auth()
+  @ApiOperation({ summary: 'Xóa đề xuất thực đơn (Xóa mềm soft-delete)' })
+  @ApiParam({ name: 'id', description: 'ID đề xuất' })
+  async deleteProposal(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.service.deleteProposal(id, user);
   }
 }

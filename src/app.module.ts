@@ -24,6 +24,8 @@ import { IngredientProposalsModule } from './modules/ingredient-proposals/ingred
 import { FilesModule } from './modules/files/files.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { ChatbotModule } from './modules/chatbot/chatbot.module';
+import { NutritionGuidesModule } from './modules/nutrition-guides/nutrition-guides.module';
+import { HealthModule } from './modules/health/health.module';
 import { CronModule } from './core/cron/cron.module';
 import { QueueModule } from './core/queue/queue.module';
 
@@ -58,6 +60,8 @@ import { QueueModule } from './core/queue/queue.module';
     FilesModule,
     SubscriptionsModule,
     ChatbotModule,
+    NutritionGuidesModule,
+    HealthModule,
   ],
 })
 export class AppModule implements NestModule {

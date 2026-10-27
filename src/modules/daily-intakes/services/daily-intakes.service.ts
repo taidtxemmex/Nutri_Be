@@ -14,7 +14,7 @@ import {
 } from '../dto';
 import { RdaComparisonEngine, RdaComparisonResult } from '../engines/rda-comparison.engine';
 import { DemographicProfile } from '../engines/rda-reference-data';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import { Gender, IntakeInputType } from '../../../config/enums/domain.enum';
 import {
   CACHE_TAG_DAILY_INTAKES,
@@ -40,7 +40,7 @@ export class DailyIntakesService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   /**

@@ -11,7 +11,7 @@ import {
   DishCloneRequestDto,
   DishCloneResponseDto,
 } from '../dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import { DishStatus } from '../../../config/enums/domain.enum';
 import {
   CACHE_TAG_DISHES,
@@ -35,7 +35,7 @@ export class DishesService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   private isPublicDish(dish: { trang_thai?: string | null }): boolean {

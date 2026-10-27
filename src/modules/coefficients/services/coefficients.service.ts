@@ -3,7 +3,7 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { CACHE_TTL_PERPETUAL } from '../../../config/constants/cache.constants';
 import { CreateCoefficientDto, UpdateCoefficientDto, CoefficientResponseDto } from '../dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class CoefficientsService {
@@ -16,7 +16,7 @@ export class CoefficientsService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   private mapToDto(item: any): CoefficientResponseDto {

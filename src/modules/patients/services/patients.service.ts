@@ -13,7 +13,7 @@ import {
   MedicalRecordQueryDto,
   MedicalRecordResponseDto,
 } from '../dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import { AnthropometryEngine } from './anthropometry.service';
 import { PatientCodeAllocatorService } from './patient-code-allocator.service';
 import {
@@ -37,7 +37,7 @@ export class PatientsService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   /**

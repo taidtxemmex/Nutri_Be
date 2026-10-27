@@ -8,7 +8,7 @@ import {
   NutritionLimitSetResponseDto,
 } from '../dto';
 import { NutritionLimitWarning } from '../../../config/enums/domain.enum';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class NutritionLimitSetsService {
@@ -21,7 +21,7 @@ export class NutritionLimitSetsService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   private mapToDto(entity: any): NutritionLimitSetResponseDto {

@@ -12,7 +12,7 @@ import {
   DailyIntakeExportRequestDto,
   DailyIntakeExportTemplateType,
 } from '../dto/daily-intake-export-request.dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -205,7 +205,7 @@ export class DailyIntakeReportStreamService {
   constructor(private readonly prisma: PrismaService) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   /**

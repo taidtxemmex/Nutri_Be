@@ -1,4 +1,4 @@
-import { IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
@@ -7,6 +7,7 @@ export class CreateCategoryDto {
     example: 'Thịt gia cầm',
     description: 'Tên danh mục (CamelCase FE convention)',
   })
+  @IsOptional()
   @IsString({ message: 'Tên danh mục phải là chuỗi' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(255, { message: 'Tên danh mục tối đa 255 ký tự' })
@@ -16,6 +17,7 @@ export class CreateCategoryDto {
     example: 'Thịt gia cầm',
     description: 'Tên danh mục (Snake/Tiếng Việt convention)',
   })
+  @IsOptional()
   @IsString({ message: 'Tên danh mục phải là chuỗi' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(255, { message: 'Tên danh mục tối đa 255 ký tự' })

@@ -5,6 +5,9 @@
 
 export const EXCEL_FONT_FAMILY = 'Calibri';
 
+export const EXCEL_MIME_TYPE =
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
 export const EXCEL_STYLES = {
   FONTS: {
     TITLE: { name: EXCEL_FONT_FAMILY, size: 14, bold: true, color: { argb: 'FF1F497D' } },

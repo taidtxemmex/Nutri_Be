@@ -21,6 +21,7 @@ import {
   ErrorRowItem,
   BaseExcelStreamer,
   ExcelColumnDefinition,
+  setExcelResponseHeaders,
 } from '../../../core/excel-engine';
 import { streamPrismaInBatches } from '../../../core/excel-engine/prisma-cursor-streamer';
 
@@ -682,14 +683,10 @@ export class DishExcelService {
 
     if (stream && typeof (stream as any).setHeader === 'function') {
       const res = stream as Response;
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
+      res.status(200);
+      setExcelResponseHeaders(res, 'dishes.xlsx');
       res.setHeader('Transfer-Encoding', 'chunked');
       res.setHeader('X-Accel-Buffering', 'no');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader('Content-Disposition', 'attachment; filename="dishes.xlsx"');
     }
 
     let dishes: any[] = [];
@@ -801,8 +798,27 @@ export class DishExcelService {
         const ingNutrients: Record<string, number> = {};
         if (ing) {
           const ratio = net / 100.0;
+          const carb = Math.max(
+            0,
+            100 -
+              (Number(ing.water || 0) +
+                Number(ing.protein || 0) +
+                Number(ing.fat || 0) +
+                Number(ing.fiber || 0) +
+                Number(ing.ash || 0)),
+          );
+          const energy =
+            Number(ing.protein || 0) * 4 + Number(ing.fat || 0) * 9 + carb * 4;
+          const vitaminARae =
+            Number(ing.retinol || 0) + Number(ing.betaCarotene || 0) / 12;
+
           for (const col of columnsToExport) {
-            const rawVal = Number(ing[col.key] ?? 0);
+            let rawVal = 0;
+            if (col.key === 'carbohydrate') rawVal = carb;
+            else if (col.key === 'energy') rawVal = energy;
+            else if (col.key === 'vitaminARae') rawVal = vitaminARae;
+            else rawVal = Number(ing[col.key] ?? 0);
+
             const val = this.round2(rawVal * ratio);
             ingNutrients[col.key] = val;
             rowValues.push(val);
@@ -851,14 +867,23 @@ export class DishExcelService {
         where.ten_mon = { contains: dto.keyword.trim() };
       }
 
-      // Lean query projection (Rule 11)
+      // Lean query projection (Rule 11) - Chỉ select các cột tồn tại trong Prisma nguyen_lieu
       const ingredientSelect: any = {
         id: true,
         ten_nguyen_lieu: true,
         edible: true,
+        water: true,
+        protein: true,
+        fat: true,
+        fiber: true,
+        ash: true,
+        retinol: true,
+        betaCarotene: true,
       };
       for (const col of columnsToExport) {
-        ingredientSelect[col.key] = true;
+        if (!['carbohydrate', 'energy', 'vitaminARae'].includes(col.key)) {
+          ingredientSelect[col.key] = true;
+        }
       }
 
       const select: any = {

@@ -56,15 +56,24 @@ export class FilesController {
    * Tải lên một hoặc nhiều tệp tin lên ổ đĩa cứng VPS
    * Tương thích 100% với endpoint POST /api/files và POST /api/v1/files/upload
    * Chống MIME Spoofing qua FileMagicBytePipe (Kiểm tra Magic Bytes nhị phân)
+   * Giới hạn kích thước tối đa 5MB/file, tối đa 5 files chống OOM
    */
+  @UseGuards(JwtAuthGuard)
   @Post(['upload', ''])
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 5,
+      },
+    }),
+  )
   @ApiMultiFiles('file', {
-    description: 'Danh sách tệp tin tải lên (JPG, PNG, WebP, GIF, PDF)',
+    description: 'Danh sách tệp tin tải lên (JPG, PNG, WebP, GIF, PDF) - Tối đa 5MB/file',
   })
   @ApiOperation({
-    summary: 'Tải lên tập tin đa phương tiện với xác thực Magic Bytes',
+    summary: 'Tải lên tập tin đa phương tiện với xác thực Magic Bytes (Yêu cầu đăng nhập)',
   })
   @ApiStandardResponse({
     description: 'Tải lên thành công, trả về danh sách đối tượng tệp tin',
@@ -74,6 +83,7 @@ export class FilesController {
   async uploadFiles(
     @UploadedFiles(new FileMagicBytePipe())
     files: Express.Multer.File[],
+    @Query('folder') folder?: string,
   ): Promise<FileUploadResponseDto[]> {
     if (!files || files.length === 0) {
       throw new BadRequestException({
@@ -82,9 +92,16 @@ export class FilesController {
       });
     }
 
+    let subDir = 'public/uploads';
+    if (folder === 'payments' || folder === 'payment') {
+      subDir = 'protected/payments';
+    } else if (folder === 'evidence') {
+      subDir = 'protected/evidence';
+    }
+
     const uploadResults: FileUploadResponseDto[] = [];
     for (const file of files) {
-      const result = await this.storageService.upload(file);
+      const result = await this.storageService.upload(file, subDir);
       uploadResults.push(result);
     }
 
@@ -93,12 +110,18 @@ export class FilesController {
 
   /**
    * Tải lên tệp minh chứng y tế / hóa đơn thanh toán
-   * Lưu vào thư mục bảo mật protected/evidence và lưu bản ghi vào bảng minh_chung
+   * Lưu vào thư mục bảo mật protected/payments hoặc protected/evidence và lưu bản ghi vào bảng minh_chung
    */
   @Post('upload-evidence')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+      },
+    }),
+  )
   @ApiFile('file', {
     description: 'Tập tin minh chứng (Ảnh kết quả xét nghiệm, hóa đơn chuyển khoản)',
   })
@@ -158,10 +181,11 @@ export class FilesController {
       uploaderId = firstUser ? firstUser.id : 'system-evidence-uploader';
     }
 
-    // 3. Lưu file an toàn vào thư mục protected/evidence (Có rollback dọn đĩa nếu DB fail)
+    // 3. Lưu file an toàn vào thư mục protected (payments cho biên lai, evidence cho y tế)
     let uploadRes: any;
+    const subFolder = body.paymentRequestId ? 'protected/payments' : 'protected/evidence';
     try {
-      uploadRes = await this.storageService.upload(file, 'protected/evidence');
+      uploadRes = await this.storageService.upload(file, subFolder);
 
       const evidence = await this.prisma.minh_chung.create({
         data: {

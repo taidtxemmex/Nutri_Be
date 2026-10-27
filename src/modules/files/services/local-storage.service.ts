@@ -48,8 +48,11 @@ export class LocalStorageService {
     }
 
     // 2. Secret key cho HMAC signature (Tài liệu nhạy cảm / Evidence)
-    const secret = this.configService.get<string>('JWT_SECRET');
-    this.secretKey = secret || 'nutri_secure_storage_hmac_secret_key_default_32chars';
+    const hmacSecret = this.configService.get<string>('STORAGE_HMAC_SECRET') || this.configService.get<string>('JWT_SECRET');
+    if (!hmacSecret && process.env.NODE_ENV === 'production') {
+      throw new Error('Fatal Security Exception: STORAGE_HMAC_SECRET or JWT_SECRET must be configured.');
+    }
+    this.secretKey = hmacSecret || 'nutri_secure_storage_hmac_secret_key_default_32chars';
 
     const port = this.configService.get<string>('PORT', '8080');
     this.appUrl = this.configService.get<string>('APP_URL', `http://localhost:${port}`);

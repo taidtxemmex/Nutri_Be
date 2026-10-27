@@ -391,6 +391,63 @@ describe('SubscriptionsService', () => {
       jest.useRealTimers();
     });
 
+    it('should keep ADMIN role when an ADMIN user subscribes to PRO (do not downgrade to USERPRO)', async () => {
+      const now = new Date('2026-10-27T10:00:00.000Z');
+      jest.useFakeTimers().setSystemTime(now);
+
+      mockPrisma.yeu_cau_thanh_toan.findUnique.mockResolvedValue({
+        id: BigInt(60),
+        nguoi_dung_id: 'admin-user-id',
+        ma_goi: 'PRO_1M',
+        ten_goi: 'Gói Pro 1 Tháng',
+        so_ngay_su_dung: 30,
+        so_tien: 199000,
+        trang_thai: 'PENDING',
+        ma_giao_dich: 'TX-261027-333333',
+      });
+
+      mockPrisma.$queryRaw.mockResolvedValue([
+        {
+          id: 'admin-user-id',
+          vai_tro: 'ADMIN',
+          pro_expired_at: null,
+        },
+      ]);
+
+      mockPrisma.nguoi_dung.update.mockResolvedValue({});
+      mockPrisma.dang_ky.create.mockResolvedValue({});
+      mockPrisma.yeu_cau_thanh_toan.update.mockResolvedValue({
+        id: BigInt(60),
+        nguoi_dung_id: 'admin-user-id',
+        ma_goi: 'PRO_1M',
+        ten_goi: 'Gói Pro 1 Tháng',
+        so_ngay_su_dung: 30,
+        so_tien: 199000,
+        trang_thai: 'APPROVED',
+        ngay_phe_duyet: now,
+        ma_giao_dich: 'TX-261027-333333',
+        minh_chung: [],
+        nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung: {
+          ten_dang_nhap: 'admin_boss',
+          ho_so_ca_nhan: { ho_ten: 'Admin Boss' },
+        },
+      });
+
+      await service.approveSubscription('60', 'superadmin-id');
+
+      // Assert: Role must remain ADMIN, not USERPRO!
+      expect(mockPrisma.nguoi_dung.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'admin-user-id' },
+          data: expect.objectContaining({
+            vai_tro: 'ADMIN',
+          }),
+        }),
+      );
+
+      jest.useRealTimers();
+    });
+
     it('should throw BadRequestException if approving an already APPROVED request', async () => {
       mockPrisma.yeu_cau_thanh_toan.findUnique.mockResolvedValue({
         id: BigInt(52),
@@ -419,6 +476,68 @@ describe('SubscriptionsService', () => {
       expect(res.trang_thai).toBe('REJECTED');
       expect(res.ly_do_tu_choi).toBe('Không thấy tiền nổi');
       expect(mockCacheService.invalidateTag).toHaveBeenCalledWith(CACHE_TAG_SUBSCRIPTIONS);
+    });
+
+    it('should throw BadRequestException if rejecting an already REJECTED request', async () => {
+      mockPrisma.yeu_cau_thanh_toan.findUnique.mockResolvedValue({
+        id: BigInt(54),
+        trang_thai: 'REJECTED',
+      });
+
+      const dto = new SubscriptionApproveDto();
+      await expect(service.rejectSubscription('54', 'admin-id', dto)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('Document Security Validation in Request Subscription', () => {
+    it('should reject request subscription if document externalLink has invalid scheme (e.g. javascript:)', async () => {
+      mockPrisma.goi.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        ma_goi: 'PRO_1M',
+        ten_goi: 'Gói Pro 1 Tháng',
+        so_ngay_su_dung: 30,
+        gia_tien: 199000,
+        trang_thai: 'ACTIVE',
+      });
+      mockPrisma.nguoi_dung.findFirst.mockResolvedValue({
+        id: 'user-1',
+        ten_dang_nhap: 'user_1',
+      });
+
+      const dto = new SubscriptionRequestDto();
+      dto.packageCode = 'PRO_1M';
+      dto.documents = [
+        {
+          externalLink: 'javascript:alert(1)',
+        },
+      ];
+
+      await expect(service.requestSubscription('user-1', dto)).rejects.toThrow(BadRequestException);
+    });
+
+    it('should reject request subscription if document objectKey has path traversal', async () => {
+      mockPrisma.goi.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        ma_goi: 'PRO_1M',
+        ten_goi: 'Gói Pro 1 Tháng',
+        so_ngay_su_dung: 30,
+        gia_tien: 199000,
+        trang_thai: 'ACTIVE',
+      });
+      mockPrisma.nguoi_dung.findFirst.mockResolvedValue({
+        id: 'user-1',
+        ten_dang_nhap: 'user_1',
+      });
+
+      const dto = new SubscriptionRequestDto();
+      dto.packageCode = 'PRO_1M';
+      dto.documents = [
+        {
+          objectKey: '../../../etc/passwd',
+        },
+      ];
+
+      await expect(service.requestSubscription('user-1', dto)).rejects.toThrow(BadRequestException);
     });
   });
 });

@@ -4,17 +4,15 @@ import {
   AUTH_ERROR_IDOR_VIOLATION,
   AUTH_ERROR_UNAUTHORIZED,
 } from '../../config/constants/auth.constants';
-import { UserRole } from '../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../config/enums/role.enum';
 
 @Injectable()
 export class IdorDefenseService {
   /**
-   * Check if a role has administrator privileges
+   * Check if a role has administrator privileges (SSOT via isAdminRole)
    */
   isAdmin(role?: string): boolean {
-    if (!role) return false;
-    const normalized = role.toUpperCase();
-    return normalized === UserRole.ADMIN || normalized === UserRole.SUPERADMIN;
+    return isAdminRole(role);
   }
 
   /**

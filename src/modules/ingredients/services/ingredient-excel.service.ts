@@ -11,6 +11,7 @@ import {
   ErrorRowItem,
   BaseExcelStreamer,
   ExcelColumnDefinition,
+  setExcelResponseHeaders,
 } from '../../../core/excel-engine';
 import { streamPrismaInBatches } from '../../../core/excel-engine/prisma-cursor-streamer';
 import { CacheService } from '../../../core/cache/cache.service';
@@ -277,17 +278,10 @@ export class IngredientExcelService {
   ): Promise<void> {
     if (outputStream && typeof (outputStream as any).setHeader === 'function') {
       const res = outputStream as Response;
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
+      res.status(200);
+      setExcelResponseHeaders(res, 'danh_sach_nguyen_lieu.xlsx');
       res.setHeader('Transfer-Encoding', 'chunked');
       res.setHeader('X-Accel-Buffering', 'no');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-      res.setHeader(
-        'Content-Disposition',
-        'attachment; filename="danh_sach_nguyen_lieu.xlsx"',
-      );
     }
 
     const cacheKey = this.cacheService

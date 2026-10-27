@@ -1,6 +1,39 @@
 import { IsOptional, IsInt, Min, Max, IsString, IsIn } from 'class-validator';
 import { Type, Transform, Expose } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  DEFAULT_PAGE,
+  DEFAULT_LIMIT,
+  MAX_LIMIT,
+} from '../../config/constants/pagination.constants';
+
+export interface NormalizedPagination {
+  page: number;
+  limit: number;
+  skip: number;
+}
+
+/**
+ * Single Source of Truth chuẩn hóa phân trang (Pillar II & DRY D10)
+ */
+export function normalizePagination(
+  query?: { page?: number | string; limit?: number | string; size?: number | string },
+  defaultLimit = DEFAULT_LIMIT,
+  maxLimit = MAX_LIMIT,
+): NormalizedPagination {
+  const rawPage = query?.page ? Number(query.page) : DEFAULT_PAGE;
+  const page = isNaN(rawPage) || rawPage < 1 ? DEFAULT_PAGE : Math.floor(rawPage);
+
+  const rawLimit = query?.limit !== undefined ? query.limit : query?.size;
+  const parsedLimit = rawLimit ? Number(rawLimit) : defaultLimit;
+  const limit =
+    isNaN(parsedLimit) || parsedLimit < 1
+      ? defaultLimit
+      : Math.min(maxLimit, Math.floor(parsedLimit));
+
+  const skip = (page - 1) * limit;
+  return { page, limit, skip };
+}
 
 export class BasePaginationQueryDto {
   @ApiPropertyOptional({ default: 1, description: 'Page number (1-based index)' })

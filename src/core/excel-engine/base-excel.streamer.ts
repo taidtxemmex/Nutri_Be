@@ -5,6 +5,7 @@ import { ExcelSecurityUtil } from '../../security/excel/excel-security.util';
 import {
   EXCEL_STYLES,
   EXCEL_FONT_FAMILY,
+  EXCEL_MIME_TYPE,
 } from '../../config/constants/excel.constants';
 
 export interface ExcelStreamOptions {
@@ -65,10 +66,7 @@ export abstract class BaseExcelStreamer<TRecord = any> {
     // 1. Cấu hình HTTP Response Headers nếu stream là Express Response
     if (this.isHttpResponse) {
       const res = this.outputStream as Response;
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
+      res.setHeader('Content-Type', EXCEL_MIME_TYPE);
       res.setHeader('Transfer-Encoding', 'chunked');
       res.setHeader('X-Accel-Buffering', 'no'); // Tắt buffering phía proxy Nginx
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

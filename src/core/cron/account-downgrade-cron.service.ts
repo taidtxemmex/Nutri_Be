@@ -8,6 +8,7 @@ import { UserRole } from '../../config/enums/role.enum';
 @Injectable()
 export class AccountDowngradeCronService {
   private readonly logger = new Logger(AccountDowngradeCronService.name);
+  private isJobRunning = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -15,16 +16,23 @@ export class AccountDowngradeCronService {
   ) {}
 
   /**
-   * Cron chạy định kỳ mỗi đêm lúc 00:00 (hoặc mỗi giờ)
-   * Quét và tự động hạ cấp tài khoản PRO hết hạn, đồng thời dọn dẹp các token hết hạn
+   * Cron chạy định kỳ mỗi giờ để hạ cấp tài khoản hết hạn kịp thời (Chống trễ tới 24h)
+   * Có cờ chống chạy chồng isJobRunning
    */
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
+  @Cron(CronExpression.EVERY_HOUR)
   async handleAccountDowngradeCron(): Promise<void> {
+    if (this.isJobRunning) {
+      this.logger.warn('Cron job hạ cấp tài khoản đang chạy từ lượt trước. Bỏ qua tick này.');
+      return;
+    }
+    this.isJobRunning = true;
     this.logger.log('Bắt đầu cron job quét hạ cấp tài khoản PRO hết hạn...');
     try {
       await this.downgradeExpiredAccounts();
     } catch (err: any) {
       this.logger.error(`Lỗi khi quét hạ cấp tài khoản: ${err?.message}`, err?.stack);
+    } finally {
+      this.isJobRunning = false;
     }
   }
 
@@ -43,6 +51,7 @@ export class AccountDowngradeCronService {
 
   /**
    * Quét và tự động hạ cấp các tài khoản USERPRO có pro_expired_at < NOW()
+   * Tuân thủ chia lô BATCH_SIZE = 100 chống tràn RAM (Anti-OOM)
    * 1. UPDATE nguoi_dung SET vai_tro = 'USER' WHERE vai_tro = 'USERPRO' AND pro_expired_at < NOW()
    * 2. Cập nhật trạng thái trong dang_ky thành 'HET_HAN'
    * 3. Invalidate cache 'users' và các tag 'user:${id}' tương ứng
@@ -53,74 +62,88 @@ export class AccountDowngradeCronService {
     downgradedUserIds: string[];
   }> {
     const now = referenceDate;
+    const BATCH_SIZE = 100;
 
-    // 1. Tìm các tài khoản USERPRO đã hết hạn
-    const expiredUsers = await this.prisma.nguoi_dung.findMany({
-      where: {
-        vai_tro: UserRole.USERPRO,
-        pro_expired_at: {
-          lt: now,
+    let totalDowngraded = 0;
+    let totalUpdatedRegistrations = 0;
+    const allDowngradedUserIds: string[] = [];
+
+    let hasMore = true;
+    while (hasMore) {
+      const expiredBatch = await this.prisma.nguoi_dung.findMany({
+        where: {
+          vai_tro: UserRole.USERPRO,
+          pro_expired_at: {
+            lt: now,
+          },
+          deleted_at: null,
         },
-        deleted_at: null,
-      },
-      select: {
-        id: true,
-      },
-    });
+        select: {
+          id: true,
+        },
+        take: BATCH_SIZE,
+      });
 
-    if (expiredUsers.length === 0) {
+      if (expiredBatch.length === 0) {
+        break;
+      }
+
+      const userIds = expiredBatch.map((u) => u.id);
+
+      // Cập nhật bảng nguoi_dung cho lô này
+      const updateResult = await this.prisma.nguoi_dung.updateMany({
+        where: {
+          id: { in: userIds },
+          vai_tro: UserRole.USERPRO,
+          pro_expired_at: { lt: now },
+        },
+        data: {
+          vai_tro: UserRole.USER,
+        },
+      });
+
+      // Cập nhật bảng dang_ky cho các user trong lô này
+      const updateDangKyResult = await this.prisma.dang_ky.updateMany({
+        where: {
+          OR: [
+            { nguoi_dung_id: { in: userIds }, trang_thai: { not: 'HET_HAN' } },
+          ],
+        },
+        data: {
+          trang_thai: 'HET_HAN',
+        },
+      });
+
+      // Invalidate cache cho lô này
+      if (this.cacheService) {
+        const tagsToInvalidate = [
+          CACHE_TAG_USERS,
+          ...userIds.map((id) => buildUserCacheTag(id)),
+        ];
+        await this.cacheService.invalidateTags(tagsToInvalidate);
+      }
+
+      totalDowngraded += updateResult.count;
+      totalUpdatedRegistrations += updateDangKyResult.count;
+      allDowngradedUserIds.push(...userIds);
+
+      if (expiredBatch.length < BATCH_SIZE) {
+        hasMore = false;
+      }
+    }
+
+    if (totalDowngraded > 0) {
+      this.logger.log(
+        `Đã hạ cấp thành công ${totalDowngraded} tài khoản USERPRO về USER, cập nhật ${totalUpdatedRegistrations} bản ghi dang_ky sang HET_HAN.`,
+      );
+    } else {
       this.logger.log('Không có tài khoản USERPRO nào hết hạn cần hạ cấp.');
-      return {
-        downgradedCount: 0,
-        updatedRegistrations: 0,
-        downgradedUserIds: [],
-      };
     }
-
-    const userIds = expiredUsers.map((u) => u.id);
-
-    // 2. Cập nhật bảng nguoi_dung: vai_tro = 'USER'
-    const updateResult = await this.prisma.nguoi_dung.updateMany({
-      where: {
-        id: { in: userIds },
-        vai_tro: UserRole.USERPRO,
-        pro_expired_at: { lt: now },
-      },
-      data: {
-        vai_tro: UserRole.USER,
-      },
-    });
-
-    // 3. Cập nhật trạng thái trong dang_ky thành 'HET_HAN'
-    const updateDangKyResult = await this.prisma.dang_ky.updateMany({
-      where: {
-        OR: [
-          { nguoi_dung_id: { in: userIds }, trang_thai: { not: 'HET_HAN' } },
-          { ngay_ket_thuc: { lt: now }, trang_thai: { not: 'HET_HAN' } },
-        ],
-      },
-      data: {
-        trang_thai: 'HET_HAN',
-      },
-    });
-
-    // 4. Invalidate cache
-    if (this.cacheService) {
-      const tagsToInvalidate = [
-        CACHE_TAG_USERS,
-        ...userIds.map((id) => buildUserCacheTag(id)),
-      ];
-      await this.cacheService.invalidateTags(tagsToInvalidate);
-    }
-
-    this.logger.log(
-      `Đã hạ cấp thành công ${updateResult.count} tài khoản USERPRO về USER, cập nhật ${updateDangKyResult.count} bản ghi dang_ky sang HET_HAN.`,
-    );
 
     return {
-      downgradedCount: updateResult.count,
-      updatedRegistrations: updateDangKyResult.count,
-      downgradedUserIds: userIds,
+      downgradedCount: totalDowngraded,
+      updatedRegistrations: totalUpdatedRegistrations,
+      downgradedUserIds: allDowngradedUserIds,
     };
   }
 

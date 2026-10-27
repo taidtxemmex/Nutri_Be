@@ -174,51 +174,23 @@ export class IntakeCalculationEngine {
   private static readonly ONE = new Decimal(1);
 
   /**
-   * Chuyển đổi an toàn giá trị bất kỳ sang Decimal
+   * Chuyển đổi an toàn giá trị bất kỳ sang Decimal (Tái sử dụng NutritionEngine - DRY D1)
    */
   public static toDecimal(val: unknown, fallback = 0): Decimal {
-    if (val === null || val === undefined || val === '') {
-      return new Decimal(fallback);
-    }
-    if (val instanceof Decimal) {
-      return val.isNaN() ? new Decimal(fallback) : val;
-    }
-    try {
-      const d = new Decimal(String(val).trim());
-      return d.isNaN() ? new Decimal(fallback) : d;
-    } catch {
-      return new Decimal(fallback);
-    }
+    return NutritionEngine.toDecimal(val, fallback);
   }
 
   /**
-   * CÔNG THỨC CHUẨN BỘ Y TẾ:
+   * CÔNG THỨC CHUẨN BỘ Y TẾ (Tái sử dụng NutritionEngine - DRY D1)
    * Tính khối lượng thực tế ăn được (Net Weight):
    * netWeight = rawWeight * (edible / 100)
-   *
-   * @param rawWeightInput Khối lượng thực phẩm ban đầu (g)
-   * @param edibleInput Tỷ lệ ăn được (%) - ví dụ 75 đối với chuối, 100 đối với gạo
-   * @param isNetWeight Nếu true: đã là khối lượng sạch
    */
   public static calculateNetWeight(
     rawWeightInput: unknown,
     edibleInput?: unknown,
     isNetWeight = false,
   ): Decimal {
-    const rawWeight = Decimal.max(this.ZERO, this.toDecimal(rawWeightInput, 0));
-    if (isNetWeight) {
-      return rawWeight;
-    }
-
-    let edible =
-      edibleInput !== undefined && edibleInput !== null && edibleInput !== ''
-        ? this.toDecimal(edibleInput, 100)
-        : this.ONE_HUNDRED;
-
-    // Giới hạn biên tỷ lệ ăn được từ 0% đến 100%
-    edible = Decimal.max(this.ZERO, Decimal.min(this.ONE_HUNDRED, edible));
-
-    return rawWeight.times(edible.dividedBy(this.ONE_HUNDRED));
+    return NutritionEngine.calculateNetWeight(rawWeightInput, edibleInput, isNetWeight);
   }
 
   /**

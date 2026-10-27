@@ -54,6 +54,24 @@ export function validateProductionSecrets(): void {
     throw new Error('Fatal Configuration Error: DATABASE_URL environment variable is required.');
   }
 
-  // 3. Thông báo hoàn tất kiểm tra an ninh khởi động
+  // 3. Kiểm tra STORAGE_HMAC_SECRET (Khóa ký xác thực URL xem trước/tải về tài liệu bảo mật)
+  const hmacSecret = process.env.STORAGE_HMAC_SECRET;
+  if (!hmacSecret) {
+    if (isProduction) {
+      logger.error('CRITICAL SECURITY VIOLATION: STORAGE_HMAC_SECRET environment variable is missing in PRODUCTION!');
+      throw new Error('Fatal Security Exception: STORAGE_HMAC_SECRET must be explicitly configured in production.');
+    } else {
+      logger.warn('WARNING: STORAGE_HMAC_SECRET is not configured. Falling back to JWT_SECRET.');
+    }
+  } else if (hmacSecret.length < 32) {
+    if (isProduction) {
+      logger.error('CRITICAL SECURITY VIOLATION: STORAGE_HMAC_SECRET entropy is too low (< 32 characters)!');
+      throw new Error('Fatal Security Exception: STORAGE_HMAC_SECRET must be at least 32 characters for adequate entropy.');
+    } else {
+      logger.warn('WARNING: STORAGE_HMAC_SECRET should be at least 32 characters long for cryptographic safety.');
+    }
+  }
+
+  // 4. Thông báo hoàn tất kiểm tra an ninh khởi động
   logger.log(`[Security Audit] Secrets validation completed successfully. Mode: ${isProduction ? 'PRODUCTION (STRICT)' : 'NON-PRODUCTION'}`);
 }

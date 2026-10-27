@@ -3,7 +3,7 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { NutritionCalculatorService, MealInput } from '../../../core/nutrition-engine';
 import { CreateMealDto, UpdateMealDto, MealResponseDto, MealDishResponseDto } from '../dto';
-import { UserRole } from '../../../config/enums/role.enum';
+import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class MealsService {
@@ -17,7 +17,7 @@ export class MealsService {
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
-    return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
+    return isAdminRole(user);
   }
 
   private mapMealEntityToResponse(meal: any): MealResponseDto {

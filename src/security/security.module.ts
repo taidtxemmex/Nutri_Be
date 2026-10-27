@@ -56,6 +56,10 @@ import {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,
     },
+    {
+      provide: APP_GUARD,
+      useClass: SubscriptionGuard,
+    },
   ],
   exports: [
     IdorDefenseService,

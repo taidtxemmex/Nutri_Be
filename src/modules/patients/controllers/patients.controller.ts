@@ -17,6 +17,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { PatientsService } from '../services/patients.service';
 import { PatientExcelService } from '../services/patient-excel.service';
 import {
@@ -77,11 +78,7 @@ export class PatientsController {
     const safeFileName = path.basename('Template_import_benh_nhan.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+    setExcelResponseHeaders(res, safeFileName);
 
     if (fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -112,13 +109,9 @@ export class PatientsController {
 
     if (!result.success && result.errorFileBuffer) {
       res.status(HttpStatus.OK);
-      res.setHeader(
-        'Content-Type',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      );
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename=${result.errorFileName || 'patient_import_result.xlsx'}`,
+      setExcelResponseHeaders(
+        res,
+        result.errorFileName || 'patient_import_result.xlsx',
       );
       return res.end(result.errorFileBuffer);
     }

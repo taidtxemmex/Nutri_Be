@@ -296,6 +296,7 @@ model de_xuat_thuc_don {
   nguoi_dung_de_xuat_thuc_don_nguoi_phe_duyet_idTonguoi_dung nguoi_dung?                     @relation("de_xuat_thuc_don_nguoi_phe_duyet_idTonguoi_dung", fields: [nguoi_phe_duyet_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKrjw7ecrik8d6un29gfydh4dop")
   nguoi_dung_de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung   nguoi_dung?                     @relation("de_xuat_thuc_don_nguoi_de_xuat_idTonguoi_dung", fields: [nguoi_de_xuat_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKsncx10fbcqx5g9u4gv7fssepl")
   thuc_don                                                   thuc_don                        @relation(fields: [menu_goc_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKtev5mo1ui2jqgbxxoohv4w27x")
+  deleted_at                                                 DateTime?                       @map("deleted_at") @db.DateTime(0)
 
   @@index([benh_nhan_id], map: "FK3c3jeeklf8w6abyvu3fo9oeyq")
   @@index([nhom_benh_id], map: "FKbtfihw33e5fdwirtfg657reu1")
@@ -303,6 +304,7 @@ model de_xuat_thuc_don {
   @@index([nguoi_phe_duyet_id], map: "FKrjw7ecrik8d6un29gfydh4dop")
   @@index([nguoi_de_xuat_id], map: "FKsncx10fbcqx5g9u4gv7fssepl")
   @@index([menu_goc_id], map: "FKtev5mo1ui2jqgbxxoohv4w27x")
+  @@index([deleted_at], map: "idx_de_xuat_thuc_don_deleted_at")
 }
 
 model gioi_han_dinh_duong {
@@ -447,7 +449,7 @@ model ma_xac_thuc {
   id            BigInt     @id @default(autoincrement())
   ngay_het_han  DateTime   @db.DateTime(6)
   ma_token      String     @unique(map: "UK_p64rs7v4dlvxghardweeqwyfe") @db.VarChar(64)
-  nguoi_dung_id String     @unique(map: "UK_teim564lcp9scxbslwa55twu3") @db.VarChar(30)
+  nguoi_dung_id String     @unique(map: "UK_teim564lcp9scxbslwa55twu3") @db.Char(36)
   nguoi_dung    nguoi_dung @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKr9iu02dnwlrpl4xkl8ep7pxrw")
 }
 

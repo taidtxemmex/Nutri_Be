@@ -20,24 +20,24 @@ export class PlansController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
   @Public()
-  @Get(['getAll', 'active', ''])
-  @ApiOperation({ summary: 'Lấy danh sách các gói cước đang kích hoạt' })
+  @Get(['active', 'getAll'])
+  @ApiOperation({ summary: 'Lấy danh sách các gói cước đang kích hoạt để người dùng đăng ký' })
   @ApiStandardResponse({
     type: PlanResponseDto,
     isArray: true,
     description: 'Danh sách gói cước kích hoạt',
   })
-  async getAllPlans(): Promise<PlanResponseDto[]> {
+  async getActivePlans(): Promise<PlanResponseDto[]> {
     return this.subscriptionsService.findAllPlans(true);
   }
 
-  @Public()
-  @Get('all')
-  @ApiOperation({ summary: 'Lấy toàn bộ danh sách gói cước (bao gồm cả tạm ngưng)' })
+  @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Get(['all', ''])
+  @ApiOperation({ summary: 'Admin lấy danh sách toàn bộ gói cước (bao gồm cả tạm ngưng)' })
   @ApiStandardResponse({
     type: PlanResponseDto,
     isArray: true,
-    description: 'Toàn bộ danh sách gói cước',
+    description: 'Toàn bộ danh sách gói cước cho quản trị viên',
   })
   async getAllPlansAdmin(): Promise<PlanResponseDto[]> {
     return this.subscriptionsService.findAllPlans(false);
