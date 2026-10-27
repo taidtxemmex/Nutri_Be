@@ -13,6 +13,15 @@ import {
 } from '../dto';
 import { UserRole } from '../../../config/enums/role.enum';
 import { DishStatus } from '../../../config/enums/domain.enum';
+import {
+  CACHE_TAG_DISHES,
+  CACHE_TAG_INGREDIENTS,
+  CACHE_TTL_PERPETUAL,
+  buildDishCacheTag,
+  buildDishDetailCacheKey,
+  buildIngredientCacheTag,
+  buildIngredientDetailCacheKey,
+} from '../../../config/constants/cache.constants';
 
 @Injectable()
 export class DishesService {
@@ -130,10 +139,26 @@ export class DishesService {
     }));
 
     for (const d of coalescedDetails) {
-      const ing = await this.prisma.nguyen_lieu.findFirst({
-        where: { id: BigInt(d.ingredientId), deleted_at: null },
-        select: { id: true },
-      });
+      let ing: any;
+      if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+        ing = await this.cacheService.getOrSet(
+          buildIngredientDetailCacheKey(d.ingredientId),
+          CACHE_TTL_PERPETUAL,
+          async () => {
+            return this.prisma.nguyen_lieu.findFirst({
+              where: { id: BigInt(d.ingredientId), deleted_at: null },
+              select: { id: true },
+            });
+          },
+          [CACHE_TAG_INGREDIENTS, buildIngredientCacheTag(d.ingredientId)],
+        );
+      } else {
+        ing = await this.prisma.nguyen_lieu.findFirst({
+          where: { id: BigInt(d.ingredientId), deleted_at: null },
+          select: { id: true },
+        });
+      }
+
       if (!ing) {
         throw new HttpException(
           { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
@@ -179,7 +204,16 @@ export class DishesService {
       });
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(savedDish?.id || ''),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return this.mapToDetailDto(savedDish);
   }
 
@@ -230,21 +264,68 @@ export class DishesService {
    * 3. Lấy danh sách món ăn công khai (ĐÃ DUYỆT)
    */
   async getPublicDishes(currentUserId?: string): Promise<DishSummaryDto[]> {
-    const dishes = await this.prisma.mon_an.findMany({
-      where: {
-        trang_thai: DishStatus.DA_DUYET,
-        deleted_at: null,
-      },
-      include: {
-        chi_tiet_mon_an: {
-          include: { nguyen_lieu: true },
+    const cacheKey = `dishes:public:${currentUserId || 'anon'}`;
+    const fetchDishes = async () => {
+      const dishes = await this.prisma.mon_an.findMany({
+        where: {
+          trang_thai: DishStatus.DA_DUYET,
+          deleted_at: null,
         },
-      },
-      orderBy: { ten_mon: 'asc' },
-      take: 100,
-    });
+        include: {
+          chi_tiet_mon_an: {
+            include: { nguyen_lieu: true },
+          },
+        },
+        orderBy: { ten_mon: 'asc' },
+        take: 100,
+      });
 
-    return dishes.map((d) => this.mapToSummaryDto(d, currentUserId));
+      return dishes.map((d) => this.mapToSummaryDto(d, currentUserId));
+    };
+
+    if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      return this.cacheService.getOrSet(cacheKey, CACHE_TTL_PERPETUAL, fetchDishes, [
+        CACHE_TAG_DISHES,
+      ]);
+    }
+
+    return fetchDishes();
+  }
+
+  /**
+   * Lấy danh sách món ăn với perpetual cache
+   */
+  async findAll(query?: any): Promise<DishSummaryDto[]> {
+    const cacheKey =
+      this.cacheService && typeof this.cacheService.generateKey === 'function'
+        ? this.cacheService.generateKey('dishes:list', query || {})
+        : `dishes:list:${JSON.stringify(query || {})}`;
+
+    const fetchDishes = async () => {
+      const dishes = await this.prisma.mon_an.findMany({
+        where: {
+          deleted_at: null,
+          trang_thai: DishStatus.DA_DUYET,
+        },
+        include: {
+          chi_tiet_mon_an: {
+            include: { nguyen_lieu: true },
+          },
+        },
+        orderBy: { ten_mon: 'asc' },
+        take: 100,
+      });
+
+      return dishes.map((d) => this.mapToSummaryDto(d));
+    };
+
+    if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      return this.cacheService.getOrSet(cacheKey, CACHE_TTL_PERPETUAL, fetchDishes, [
+        CACHE_TAG_DISHES,
+      ]);
+    }
+
+    return fetchDishes();
   }
 
   /**
@@ -326,14 +407,28 @@ export class DishesService {
     id: string | number,
     currentUser?: { id?: string; role?: string },
   ): Promise<DishResponseDto> {
-    const dish = await this.prisma.mon_an.findFirst({
-      where: { id: BigInt(id), deleted_at: null },
-      include: {
-        chi_tiet_mon_an: {
-          include: { nguyen_lieu: true },
+    const fetchDish = async () => {
+      return this.prisma.mon_an.findFirst({
+        where: { id: BigInt(id), deleted_at: null },
+        include: {
+          chi_tiet_mon_an: {
+            include: { nguyen_lieu: true },
+          },
         },
-      },
-    });
+      });
+    };
+
+    let dish: any;
+    if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      dish = await this.cacheService.getOrSet(
+        buildDishDetailCacheKey(id),
+        CACHE_TTL_PERPETUAL,
+        fetchDish,
+        [CACHE_TAG_DISHES, buildDishCacheTag(id)],
+      );
+    } else {
+      dish = await fetchDish();
+    }
 
     if (!dish) {
       throw new HttpException(
@@ -419,10 +514,25 @@ export class DishesService {
       }));
 
       for (const d of coalescedDetails) {
-        const ing = await this.prisma.nguyen_lieu.findFirst({
-          where: { id: BigInt(d.ingredientId), deleted_at: null },
-          select: { id: true },
-        });
+        let ing: any;
+        if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+          ing = await this.cacheService.getOrSet(
+            buildIngredientDetailCacheKey(d.ingredientId),
+            CACHE_TTL_PERPETUAL,
+            async () => {
+              return this.prisma.nguyen_lieu.findFirst({
+                where: { id: BigInt(d.ingredientId), deleted_at: null },
+                select: { id: true },
+              });
+            },
+            [CACHE_TAG_INGREDIENTS, buildIngredientCacheTag(d.ingredientId)],
+          );
+        } else {
+          ing = await this.prisma.nguyen_lieu.findFirst({
+            where: { id: BigInt(d.ingredientId), deleted_at: null },
+            select: { id: true },
+          });
+        }
         if (!ing) {
           throw new HttpException(
             { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
@@ -477,7 +587,16 @@ export class DishesService {
       });
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(id),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return this.mapToDetailDto(updatedDish);
   }
 
@@ -565,7 +684,17 @@ export class DishesService {
       return clone;
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(cloned.id),
+          buildDishCacheTag(dishId),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return {
       id: cloned.id.toString(),
       originalDishId: original.id.toString(),
@@ -656,7 +785,16 @@ export class DishesService {
       },
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(id),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return { message: 'Đã gửi đề xuất' };
   }
 
@@ -692,7 +830,16 @@ export class DishesService {
       },
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(id),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return { message: 'Đã duyệt' };
   }
 
@@ -732,7 +879,16 @@ export class DishesService {
       },
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(id),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return { message: 'Đã từ chối đề xuất' };
   }
 
@@ -792,7 +948,16 @@ export class DishesService {
       data: { deleted_at: new Date() },
     });
 
-    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
+    if (this.cacheService) {
+      if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_DISHES,
+          buildDishCacheTag(id),
+        ]);
+      } else if (typeof this.cacheService.invalidateTag === 'function') {
+        await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
+      }
+    }
     return { message: `Xoá thành công món ăn với id: ${id}` };
   }
 }

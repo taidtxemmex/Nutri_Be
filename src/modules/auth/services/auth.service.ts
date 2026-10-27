@@ -456,8 +456,10 @@ export class AuthService {
     let googleData: { sub: string; email: string; name?: string; picture?: string };
 
     try {
-      // Xác thực chữ ký token thực tế qua Google TokenInfo API
-      const res = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${rawToken}`);
+      // Xác thực chữ ký token thực tế qua Google TokenInfo API (URL encoded)
+      const res = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(rawToken)}`,
+      );
       if (!res.ok) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_UNAUTHORIZED,
@@ -471,6 +473,24 @@ export class AuthService {
           message: 'Token Google không chứa đầy đủ thông tin danh tính (sub, email).',
         });
       }
+
+      // Kiểm tra audience (Client ID) chống token giả mạo từ app khác
+      const expectedAudience = process.env.GOOGLE_CLIENT_ID;
+      if (expectedAudience && info.aud && info.aud !== expectedAudience) {
+        throw new UnauthorizedException({
+          code: AUTH_ERROR_UNAUTHORIZED,
+          message: 'Token Google không thuộc về ứng dụng này (Client ID mismatch).',
+        });
+      }
+
+      // Kiểm tra trạng thái xác thực email
+      if (info.email_verified === 'false' || info.email_verified === false) {
+        throw new UnauthorizedException({
+          code: AUTH_ERROR_UNAUTHORIZED,
+          message: 'Địa chỉ email Google chưa được xác thực.',
+        });
+      }
+
       googleData = {
         sub: info.sub,
         email: info.email,

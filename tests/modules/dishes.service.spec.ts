@@ -104,7 +104,9 @@ describe('DishesService', () => {
       expect(res.id).toBe('100');
       expect(res.recipeHash).toBe(computeRecipeHash([{ ingredientId: 1, weight: 150 }]));
       expect(res.totalNutrients.protein).toBeCloseTo(30.0, 1);
-      expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(['dishes']);
+      expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(
+        expect.arrayContaining(['dishes', 'dish:100']),
+      );
     });
   });
 
@@ -222,7 +224,9 @@ describe('DishesService', () => {
           recipe_hash: hash,
         },
       });
-      expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(['dishes']);
+      expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(
+        expect.arrayContaining(['dishes', 'dish:10']),
+      );
     });
   });
 
@@ -307,7 +311,9 @@ describe('DishesService', () => {
       const res = await service.cloneDish(15, {}, { id: 'user-1' });
       expect(res.id).toBe('101');
       expect(res.originalDishId).toBe('15');
-      expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(['dishes']);
+      expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(
+        expect.arrayContaining(['dishes', 'dish:101', 'dish:15']),
+      );
     });
   });
 

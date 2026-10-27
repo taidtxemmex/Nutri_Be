@@ -14,6 +14,8 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
 import { IngredientsService } from '../services/ingredients.service';
@@ -40,7 +42,7 @@ import {
 } from '../../../common/decorators';
 import { UserRole } from '../../../config/enums/role.enum';
 
-@ApiController('Ingredients', ['ingredient', 'ingredients'])
+@ApiController('Ingredients', ['ingredients', 'ingredient'])
 export class IngredientsController {
   constructor(
     private readonly ingredientsService: IngredientsService,
@@ -88,13 +90,25 @@ export class IngredientsController {
     @Res() res: Response,
   ) {
     const colArray = typeof columns === 'string' ? [columns] : columns;
-    const buffer = await this.excelService.generateTemplate(colArray);
+    const isDefault = !colArray || colArray.length === 0;
+
+    const safeFileName = path.basename('Template_import_nguyen_lieu.xlsx');
+    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename="ingredient_template.xlsx"');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+
+    if (isDefault && fs.existsSync(filePath)) {
+      return fs.createReadStream(filePath).pipe(res);
+    }
+
+    const buffer = await this.excelService.generateTemplate(colArray);
+    if (isDefault) {
+      fs.promises.writeFile(filePath, buffer).catch(() => {});
+    }
     return res.end(buffer);
   }
 
@@ -134,7 +148,11 @@ export class IngredientsController {
     return res.status(HttpStatus.OK).json({
       status: 200,
       message: result.message || 'Import thành công',
-      data: result,
+      data: {
+        total: result.totalImported ?? result.total ?? 0,
+        imported: result.totalImported ?? result.imported ?? 0,
+        skipped: result.skipped ?? 0,
+      },
       meta: {
         timestamp: new Date().toISOString(),
       },
@@ -143,15 +161,9 @@ export class IngredientsController {
 
   @Post('export')
   @SkipTransform()
-  @ApiOperation({ summary: 'Xuất danh sách nguyên liệu ra file Excel' })
-  async exportIngredients(@Body() dto: ExportIngredientDto, @Res() res: Response) {
-    const buffer = await this.excelService.exportIngredients(dto);
-    res.setHeader(
-      'Content-Type',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-    );
-    res.setHeader('Content-Disposition', 'attachment; filename="danh_sach_nguyen_lieu.xlsx"');
-    return res.end(buffer);
+  @ApiOperation({ summary: 'Xuất danh sách nguyên liệu ra file Excel dạng Stream O(1) RAM' })
+  async exportIngredients(@Body() dto: ExportIngredientDto, @Res() res: Response): Promise<void> {
+    await this.excelService.streamExportIngredients(dto, res);
   }
 
   @Post('approve/:pendingId')
@@ -164,6 +176,18 @@ export class IngredientsController {
   })
   async approvePending(@Param('pendingId') pendingId: string): Promise<IngredientDetailDto> {
     return this.ingredientsService.approve(pendingId);
+  }
+
+  @Post('reject/:pendingId')
+  @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
+  @ApiOperation({ summary: 'Từ chối nguyên liệu đề xuất (Admin/SuperAdmin)' })
+  @ApiParam({ name: 'pendingId', description: 'ID nguyên liệu chờ duyệt' })
+  @ApiStandardResponse({
+    type: IngredientDetailDto,
+    description: 'Từ chối nguyên liệu thành công',
+  })
+  async rejectPending(@Param('pendingId') pendingId: string): Promise<IngredientDetailDto> {
+    return this.ingredientsService.rejectPending(pendingId);
   }
 
   @Get()

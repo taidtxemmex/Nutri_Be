@@ -29,6 +29,9 @@ describe('NutritionLimitSetsService', () => {
 
     mockCache = {
       invalidateTag: jest.fn().mockResolvedValue(true),
+      debouncedInvalidateTags: jest.fn().mockResolvedValue(undefined),
+      getOrSet: jest.fn((k, ttl, fn) => fn()),
+      generateKey: jest.fn((prefix) => `cache:${prefix}:key`),
     };
 
     service = new NutritionLimitSetsService(mockPrisma, mockCache);

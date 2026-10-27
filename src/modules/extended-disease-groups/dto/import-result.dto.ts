@@ -13,6 +13,15 @@ export class ImportResultDto {
   @ApiPropertyOptional({ example: 15, description: 'Số lượng bản ghi import thành công' })
   totalImported?: number;
 
+  @ApiPropertyOptional({ example: 15, description: 'Tổng số dòng' })
+  total?: number;
+
+  @ApiPropertyOptional({ example: 15, description: 'Số dòng đã import' })
+  imported?: number;
+
+  @ApiPropertyOptional({ example: 0, description: 'Số dòng bỏ qua' })
+  skipped?: number;
+
   @ApiPropertyOptional({ example: 0, description: 'Số lượng dòng bị lỗi' })
   totalErrors?: number;
 

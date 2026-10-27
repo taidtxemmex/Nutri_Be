@@ -10,6 +10,13 @@ import { CacheService } from '../../../core/cache/cache.service';
 import { MenuExportType, MenuType } from '../../../config/enums/domain.enum';
 import { EXCEL_FONT_FAMILY, EXCEL_STYLES } from '../../../config/constants/excel.constants';
 import { Writable } from 'stream';
+import { Response } from 'express';
+import {
+  MenuMarketPlanStreamer,
+  MarketPlanIngredient,
+  MarketPlanMenuContext,
+  MOH_14_FOOD_GROUPS,
+} from './menu-market-plan.streamer';
 
 export interface MenuExportOptions {
   exportType?: MenuExportType;
@@ -99,12 +106,12 @@ export class MenuExcelService {
 
     // Nếu là RAW -> Thêm sheet Tổng hợp đi chợ toàn chu kỳ
     if (exportType === MenuExportType.RAW) {
-      this.buildRawShoppingSummarySheet(workbook, menu, servings);
+      await this.buildRawShoppingSummarySheet(workbook, menu, servings);
     }
 
     // Nếu là COOKED -> Thêm sheet Hướng dẫn định lượng nhà bếp
     if (exportType === MenuExportType.COOKED) {
-      this.buildCookedKitchenSummarySheet(workbook, menu, servings);
+      await this.buildCookedKitchenSummarySheet(workbook, menu, servings);
     }
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
@@ -127,15 +134,234 @@ export class MenuExcelService {
 
   /**
    * Stream Excel trực tiếp ra HTTP response stream chống tràn RAM (Anti-OOM)
+   * Sử dụng exceljs.stream.xlsx.WorkbookWriter với useSharedStrings: false
+   * Tuân thủ Task 6.3 [T9.3] & Pillar III Memory Protection
    */
   async streamMenuExcel(
     menuIdOrData: bigint | number | string | any,
-    outputStream: Writable,
+    outputStream: Response | Writable,
     options: MenuExportOptions = {},
   ): Promise<void> {
-    const buffer = await this.exportMenuExcel(menuIdOrData, options);
-    outputStream.write(buffer);
-    outputStream.end();
+    const exportType = options.exportType || MenuExportType.FULL;
+    const servings = options.servings && options.servings > 0 ? options.servings : 1;
+
+    const isIdQuery =
+      typeof menuIdOrData === 'string' ||
+      typeof menuIdOrData === 'number' ||
+      typeof menuIdOrData === 'bigint';
+
+    // 1. Nạp dữ liệu thực đơn & phân quyền
+    const menu = isIdQuery
+      ? await this.fetchMenuWithFullRelations(menuIdOrData, options.userId)
+      : menuIdOrData;
+
+    if (!menu) {
+      throw new HttpException(
+        {
+          code: 'MENU_NOT_FOUND',
+          message: 'Không tìm thấy thực đơn yêu cầu xuất Excel',
+        },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // 2. Thiết lập HTTP Response Headers nếu outputStream là Express Response
+    if (outputStream && typeof (outputStream as any).setHeader === 'function') {
+      const res = outputStream as Response;
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader('Transfer-Encoding', 'chunked');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="thuc_don_${String(menu.id || menuIdOrData)}_${exportType.toLowerCase()}.xlsx"`,
+      );
+    }
+
+    // 3. Khởi tạo WorkbookWriter O(1) RAM với useSharedStrings = false
+    const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({
+      stream: outputStream,
+      useStyles: true,
+      useSharedStrings: false,
+    });
+
+    const selectedColumns = this.resolveExportColumns(options.columns);
+
+    // Ghi sheet chính THUC_DON
+    await this.buildMenuSheet(workbook as any, menu, exportType, selectedColumns, servings);
+
+    // Nếu là RAW -> Thêm sheet Tổng hợp đi chợ toàn chu kỳ
+    if (exportType === MenuExportType.RAW) {
+      await this.buildRawShoppingSummarySheet(workbook as any, menu, servings);
+    }
+
+    // Nếu là COOKED -> Thêm sheet Hướng dẫn định lượng nhà bếp
+    if (exportType === MenuExportType.COOKED) {
+      await this.buildCookedKitchenSummarySheet(workbook as any, menu, servings);
+    }
+
+    // Cam kết toàn bộ workbook ra stream
+    await workbook.commit();
+  }
+
+  /**
+   * Xuất Kế Hoạch Đi Chợ chuẩn 14 nhóm thực phẩm Bộ Y Tế dạng Stream O(1) RAM
+   * Quy đổi ngược khối lượng sạch sang sống thô: W_thô = W_sạch / (edible / 100) * servings
+   * Tính toán hao hụt sơ chế và nhiệt chế biến (Task 6.3 [T9.3])
+   */
+  async streamMarketPlanExcel(
+    menuIdOrData: bigint | number | string | any,
+    outputStream: Response | Writable,
+    options: {
+      servings?: number;
+      cycle?: string;
+      week?: number;
+      day?: number;
+      userId?: string;
+    } = {},
+  ): Promise<void> {
+    const isIdQuery =
+      typeof menuIdOrData === 'string' ||
+      typeof menuIdOrData === 'number' ||
+      typeof menuIdOrData === 'bigint';
+
+    const menu = isIdQuery
+      ? await this.fetchMenuWithFullRelations(menuIdOrData, options.userId)
+      : menuIdOrData;
+
+    if (!menu) {
+      throw new HttpException(
+        { code: 'MENU_NOT_FOUND', message: 'Không tìm thấy thực đơn yêu cầu xuất kế hoạch đi chợ' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const servings = options.servings && options.servings > 0 ? options.servings : 1;
+    const allDetails = menu.chi_tiet_thuc_don || menu.menuDetails || [];
+    let filteredDetails = allDetails;
+    if (options.week) {
+      filteredDetails = filteredDetails.filter(
+        (d: any) => (d.so_tuan ?? d.weekNo ?? 1) === Number(options.week),
+      );
+    }
+    if (options.day) {
+      filteredDetails = filteredDetails.filter(
+        (d: any) => (d.thu_trong_tuan ?? d.dayOfWeek ?? 1) === Number(options.day),
+      );
+    }
+
+    // Gom nguyên liệu toàn chu kỳ/bộ lọc
+    const ingMap = new Map<string, MarketPlanIngredient>();
+    for (const md of filteredDetails) {
+      const meal = md.bua_an || md.meal;
+      if (!meal) continue;
+      const mealDetails = meal.chi_tiet_bua_an || meal.mealDetails || [];
+      for (const mItem of mealDetails) {
+        const dish = mItem.mon_an || mItem.dish;
+        if (!dish) continue;
+        const dishDetails = dish.chi_tiet_mon_an || dish.details || [];
+        for (const dd of dishDetails) {
+          const ing = dd.nguyen_lieu || dd.ingredient;
+          if (!ing) continue;
+          const net = Number(dd.khoi_luong_song_sach ?? dd.netWeight ?? 0);
+          const edible = Number(ing.ty_le_an_duoc ?? ing.edible ?? 100);
+          const name = ing.ten_nguyen_lieu || ing.material || `NL #${dd.nguyen_lieu_id || dd.ingredientId}`;
+          const catId = Number(ing.danh_muc || 15);
+          const catName = MOH_14_FOOD_GROUPS[catId] || 'Nhóm khác';
+          const coef = Number(mItem.he_so_song_chin ?? dish.he_so_song_chin ?? 1.0);
+          const key = `${ing.id || name}`.trim().toLowerCase();
+
+          if (!ingMap.has(key)) {
+            ingMap.set(key, {
+              id: ing.id,
+              name,
+              categoryId: catId,
+              categoryName: catName,
+              edible,
+              netWeight1: 0,
+              rawWeight1: 0,
+              lossPercent: 100 - edible,
+              lossWeight1: 0,
+              cookedWeight1: 0,
+              notes: coef !== 1 ? `Hệ số nở/hao: ${coef}` : undefined,
+            });
+          }
+          const item = ingMap.get(key)!;
+          item.netWeight1 += net;
+          const raw = edible > 0 ? net / (edible / 100) : net;
+          item.rawWeight1 += raw;
+          item.lossWeight1 += raw - net;
+          item.cookedWeight1 = (item.cookedWeight1 || 0) + net * coef;
+        }
+      }
+    }
+
+    // Tính toán năng lượng P:L:G cho menu
+    const dayGroups = this.groupMenuDetailsByDay(filteredDetails);
+    const dayCount = dayGroups.size > 0 ? dayGroups.size : 1;
+    let totalE = 0;
+    let totalP = 0;
+    let totalF = 0;
+    let totalC = 0;
+    for (const [, dList] of dayGroups.entries()) {
+      const dTotals = this.calculateDayNutrientTotals(dList);
+      const p = dTotals['protein'] || 0;
+      const f = dTotals['fat'] || 0;
+      const c = dTotals['carbohydrate'] || 0;
+      totalE += dTotals['energy'] || (p * 4 + f * 9 + c * 4);
+      totalP += p;
+      totalF += f;
+      totalC += c;
+    }
+    const avgE = Math.round(totalE / dayCount);
+    const eP = Math.round((totalP / dayCount) * 4);
+    const eF = Math.round((totalF / dayCount) * 9);
+    const eC = Math.round((totalC / dayCount) * 4);
+    const eSum = eP + eF + eC > 0 ? eP + eF + eC : (avgE > 0 ? avgE : 1);
+
+    const patient = menu.benh_nhan || menu.patient;
+    const diseaseGroup = menu.nhom_benh_mo_rong || menu.diseaseGroup;
+
+    let cycleText = 'Toàn bộ chu kỳ thực đơn';
+    if (options.week && options.day) {
+      cycleText = `Tuần ${options.week} - Thứ ${options.day}`;
+    } else if (options.week) {
+      cycleText = `Tuần ${options.week}`;
+    } else if (options.day) {
+      cycleText = `Thứ ${options.day}`;
+    }
+
+    const context: MarketPlanMenuContext = {
+      id: menu.id,
+      menuName: menu.ten_thuc_don || menu.menuName || 'Thực đơn',
+      menuType: menu.loai_thuc_don || menu.menuType,
+      servings,
+      cycleText,
+      createdDate: menu.ngay_tao ? new Date(menu.ngay_tao).toLocaleDateString('vi-VN') : undefined,
+      diseaseGroupName: diseaseGroup?.ten_hien_thi || diseaseGroup?.displayName || diseaseGroup?.ten_nhom,
+      patient: patient
+        ? {
+            fullName: patient.ho_ten || patient.fullName,
+            patientCode: patient.ma_benh_nhan_bv || patient.patientCode,
+            gender: String(patient.gioi_tinh ?? patient.gender).toUpperCase() === 'NAM' ? 'Nam' : 'Nữ',
+            weight: Number(patient.can_nang ?? patient.weight ?? 0),
+            height: Number(patient.chieu_cao ?? patient.height ?? 0),
+          }
+        : undefined,
+      energyKcal: avgE,
+      proteinGrams: Math.round((totalP / dayCount) * 10) / 10,
+      lipidGrams: Math.round((totalF / dayCount) * 10) / 10,
+      glucidGrams: Math.round((totalC / dayCount) * 10) / 10,
+      pRatio: Math.round((eP / eSum) * 1000) / 10,
+      lRatio: Math.round((eF / eSum) * 1000) / 10,
+      gRatio: Math.round((eC / eSum) * 1000) / 10,
+    };
+
+    const streamer = new MenuMarketPlanStreamer(outputStream);
+    await streamer.streamMarketPlan(context, Array.from(ingMap.values()));
   }
 
   /**
@@ -253,6 +479,10 @@ export class MenuExcelService {
 
     // Tự động căn chỉnh độ rộng cột chuẩn mực
     this.autoFitColumnWidths(sheet, exportType, columns);
+
+    if (typeof (sheet as any).commit === 'function') {
+      await (sheet as any).commit();
+    }
   }
 
   /**
@@ -361,6 +591,56 @@ export class MenuExcelService {
         );
       }
     }
+
+    // Khối Cơ cấu năng lượng P:L:G (13-20% : 20-25% : 55-65%) hiển thị rõ ràng trên Header chuẩn Bộ Y Tế
+    const details = menu.chi_tiet_thuc_don || menu.menuDetails || [];
+    const dayGroups = this.groupMenuDetailsByDay(details);
+    const dayCount = dayGroups.size > 0 ? dayGroups.size : 1;
+
+    let sumE = 0;
+    let sumP = 0;
+    let sumF = 0;
+    let sumC = 0;
+
+    for (const [, dayDetails] of dayGroups.entries()) {
+      const dayTotals = this.calculateDayNutrientTotals(dayDetails);
+      const p = dayTotals['protein'] || 0;
+      const f = dayTotals['fat'] || 0;
+      const c = dayTotals['carbohydrate'] || 0;
+      const e = dayTotals['energy'] || (p * 4 + f * 9 + c * 4);
+      sumE += e;
+      sumP += p;
+      sumF += f;
+      sumC += c;
+    }
+
+    const avgE = Math.round(sumE / dayCount);
+    const avgP = this.round2(sumP / dayCount);
+    const avgF = this.round2(sumF / dayCount);
+    const avgC = this.round2(sumC / dayCount);
+
+    const eP = Math.round(avgP * 4);
+    const eF = Math.round(avgF * 9);
+    const eC = Math.round(avgC * 4);
+    const eSum = eP + eF + eC > 0 ? eP + eF + eC : (avgE > 0 ? avgE : 1);
+
+    const ratioP = Math.round((eP / eSum) * 1000) / 10;
+    const ratioL = Math.round((eF / eSum) * 1000) / 10;
+    const ratioG = Math.round((eC / eSum) * 1000) / 10;
+
+    r++; // Cách 1 dòng
+    r = this.writeKeyValueRow(
+      sheet,
+      r,
+      'CƠ CẤU NĂNG LƯỢNG (P:L:G):',
+      `${ratioP}% : ${ratioL}% : ${ratioG}% (Khuyến nghị BYT: 13-20% : 20-25% : 55-65%)`,
+    );
+    r = this.writeKeyValueRow(
+      sheet,
+      r,
+      'Năng lượng trung bình/ngày:',
+      `${avgE} kcal (Đạm: ${avgP}g [${ratioP}%] | Béo: ${avgF}g [${ratioL}%] | Glucid: ${avgC}g [${ratioG}%])`,
+    );
 
     return r;
   }
@@ -871,11 +1151,11 @@ export class MenuExcelService {
   /**
    * Tạo Sheet Tổng hợp đi chợ cho CẢ CHU KỲ thực đơn (Tuần / Tháng)
    */
-  private buildRawShoppingSummarySheet(
+  private async buildRawShoppingSummarySheet(
     workbook: ExcelJS.Workbook,
     menu: any,
     servings: number,
-  ): void {
+  ): Promise<void> {
     const sheet = workbook.addWorksheet(MenuExcelService.SHOPPING_SHEET, {
       views: [{ showGridLines: true }],
     });
@@ -1000,16 +1280,20 @@ export class MenuExcelService {
     sheet.getColumn(5).width = 20;
     sheet.getColumn(6).width = 22;
     sheet.getColumn(7).width = 22;
+
+    if (typeof (sheet as any).commit === 'function') {
+      await (sheet as any).commit();
+    }
   }
 
   /**
    * Tạo Sheet Hướng dẫn định lượng nhà bếp (COOKED mode)
    */
-  private buildCookedKitchenSummarySheet(
+  private async buildCookedKitchenSummarySheet(
     workbook: ExcelJS.Workbook,
     menu: any,
     servings: number,
-  ): void {
+  ): Promise<void> {
     const sheet = workbook.addWorksheet(MenuExcelService.COOKING_SHEET, {
       views: [{ showGridLines: true }],
     });
@@ -1107,6 +1391,10 @@ export class MenuExcelService {
     sheet.getColumn(5).width = 24;
     sheet.getColumn(6).width = 28;
     sheet.getColumn(7).width = 30;
+
+    if (typeof (sheet as any).commit === 'function') {
+      await (sheet as any).commit();
+    }
   }
 
   // ==========================================

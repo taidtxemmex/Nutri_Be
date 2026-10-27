@@ -18,7 +18,9 @@ import { AnthropometryEngine } from './anthropometry.service';
 import { PatientCodeAllocatorService } from './patient-code-allocator.service';
 import {
   CACHE_TAG_PATIENTS,
+  CACHE_TTL_PERPETUAL,
   buildPatientCacheTag,
+  buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 
 const ERR_PATIENT_NOT_FOUND = 'Không tìm thấy thông tin bệnh nhân';
@@ -38,14 +40,36 @@ export class PatientsService {
     return user?.role === UserRole.ADMIN || user?.role === UserRole.SUPERADMIN;
   }
 
+  /**
+   * Tái sử dụng Cache thực thể Bệnh nhân (Identity Map Pattern)
+   * Cho phép MenusService, DailyIntakesService truy vấn 0ms không qua CSDL
+   */
+  async getPatientEntity(id: bigint | string | number): Promise<any> {
+    const patientId = BigInt(id);
+    const fetchPatient = async () => {
+      return this.prisma.benh_nhan.findFirst({
+        where: { id: patientId, deleted_at: null },
+      });
+    };
+
+    if (this.cacheService) {
+      return this.cacheService.getOrSet(
+        buildPatientDetailCacheKey(patientId),
+        CACHE_TTL_PERPETUAL,
+        fetchPatient,
+        [CACHE_TAG_PATIENTS, buildPatientCacheTag(patientId)],
+      );
+    }
+
+    return fetchPatient();
+  }
+
   private async findPatientOrThrow(
     id: bigint,
     currentUser: { id: string; role?: string },
     forbiddenMessage = ERR_PATIENT_FORBIDDEN,
   ) {
-    const patient = await this.prisma.benh_nhan.findFirst({
-      where: { id, deleted_at: null },
-    });
+    const patient = await this.getPatientEntity(id);
 
     if (!patient) {
       throw new HttpException(
@@ -184,6 +208,25 @@ export class PatientsService {
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
     const skip = (page - 1) * limit;
 
+    const cacheKey = this.cacheService?.generateKey('patients:list', {
+      page,
+      limit,
+      search: query.search || (query as any).keyword,
+      userId: this.isAdmin(currentUser) ? 'admin' : currentUser.id,
+    });
+
+    if (this.cacheService && cacheKey) {
+      const cached = await this.cacheService.get<{
+        items: PatientResponseDto[];
+        total: number;
+        page: number;
+        limit: number;
+      }>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
     const where: any = {
       deleted_at: null,
     };
@@ -212,12 +255,18 @@ export class PatientsService {
       }),
     ]);
 
-    return {
+    const result = {
       items: items.map((p) => this.mapToResponse(p)),
       total: totalItems,
       page,
       limit,
     };
+
+    if (this.cacheService && cacheKey) {
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, CACHE_TAG_PATIENTS);
+    }
+
+    return result;
   }
 
   /**
@@ -297,7 +346,10 @@ export class PatientsService {
     });
 
     if (this.cacheService) {
-      await this.cacheService.invalidateTag(CACHE_TAG_PATIENTS);
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_PATIENTS,
+        buildPatientCacheTag(patient.id),
+      ]);
     }
 
     return this.mapToResponse(patient);
@@ -312,7 +364,30 @@ export class PatientsService {
     currentUser: { id: string; role?: string },
   ): Promise<PatientResponseDto> {
     const patientId = BigInt(id);
-    await this.findPatientOrThrow(patientId, currentUser, 'Bạn không có quyền chỉnh sửa hồ sơ này');
+    const existingPatient = await this.findPatientOrThrow(
+      patientId,
+      currentUser,
+      'Bạn không có quyền chỉnh sửa hồ sơ này',
+    );
+
+    if (dto.patientCode && dto.patientCode.trim()) {
+      const codeTrimmed = dto.patientCode.trim();
+      const duplicateCode = await this.prisma.benh_nhan.findFirst({
+        where: {
+          nguoi_dung_id: existingPatient.nguoi_dung_id,
+          ma_benh_nhan_bv: codeTrimmed,
+          id: { not: patientId },
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+      if (duplicateCode) {
+        throw new HttpException(
+          { code: 'PAT_002', message: 'Mã bệnh nhân đã tồn tại trong danh sách của bạn' },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
 
     const rawDob = dto.dob !== undefined ? dto.dob : dto.dateOfBirth;
     let birthDate: Date | null | undefined = undefined;
@@ -359,8 +434,10 @@ export class PatientsService {
     });
 
     if (this.cacheService) {
-      await this.cacheService.invalidateTag(CACHE_TAG_PATIENTS);
-      await this.cacheService.invalidateTag(buildPatientCacheTag(patientId));
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_PATIENTS,
+        buildPatientCacheTag(patientId),
+      ]);
     }
 
     return this.mapToResponse(updated);
@@ -403,8 +480,10 @@ export class PatientsService {
     });
 
     if (this.cacheService) {
-      await this.cacheService.invalidateTag(CACHE_TAG_PATIENTS);
-      await this.cacheService.invalidateTag(buildPatientCacheTag(patientId));
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_PATIENTS,
+        buildPatientCacheTag(patientId),
+      ]);
     }
 
     return { success: true, message: 'Xóa hồ sơ bệnh nhân thành công' };
@@ -555,8 +634,10 @@ export class PatientsService {
     });
 
     if (this.cacheService) {
-      await this.cacheService.invalidateTag(CACHE_TAG_PATIENTS);
-      await this.cacheService.invalidateTag(buildPatientCacheTag(patientId));
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_PATIENTS,
+        buildPatientCacheTag(patientId),
+      ]);
     }
 
     return this.mapAnthropometryToResponse(created);
@@ -705,8 +786,10 @@ export class PatientsService {
     });
 
     if (this.cacheService) {
-      await this.cacheService.invalidateTag(CACHE_TAG_PATIENTS);
-      await this.cacheService.invalidateTag(buildPatientCacheTag(patientId));
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_PATIENTS,
+        buildPatientCacheTag(patientId),
+      ]);
     }
 
     return this.mapMedicalRecordToResponse(record);

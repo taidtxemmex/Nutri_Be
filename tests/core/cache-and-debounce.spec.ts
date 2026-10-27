@@ -1,12 +1,20 @@
 import { CacheService } from '../../src/core/cache/cache.service';
 import { UsersService } from '../../src/modules/users/services/users.service';
 import { ProfilesService } from '../../src/modules/profiles/services/profiles.service';
+import { JwtStrategy } from '../../src/modules/auth/strategies/jwt.strategy';
+import { ConfigService } from '@nestjs/config';
 import { IdorDefenseService } from '../../src/security/idor/idor-defense.service';
 import { UserRole } from '../../src/config/enums/role.enum';
 import {
   CACHE_TAG_PROFILES,
   CACHE_TAG_USERS,
+  CACHE_TAG_CATEGORIES,
+  CACHE_TTL_PERPETUAL,
   buildUserCacheTag,
+  buildUserAuthCacheKey,
+  buildUserDetailCacheKey,
+  buildCategoryCacheTag,
+  buildCategoryDetailCacheKey,
 } from '../../src/config/constants/cache.constants';
 
 describe('Intelligent Cache, Query Normalization & Debounced Mutation Invalidation', () => {
@@ -212,6 +220,177 @@ describe('Intelligent Cache, Query Normalization & Debounced Mutation Invalidati
       expect(cacheService.getPendingTagsCount()).toBe(0);
 
       jest.useRealTimers();
+    });
+  });
+
+  describe('Perpetual Cache & Multi-Tags Identity Map (Rule 23)', () => {
+    it('should store perpetual cache with ttl=0 and multiple tags, and invalidate on any tag', async () => {
+      const categoryId = 42;
+      const cacheKey = buildCategoryDetailCacheKey(categoryId);
+      const tags = [CACHE_TAG_CATEGORIES, buildCategoryCacheTag(categoryId)];
+
+      await cacheService.set(cacheKey, { id: categoryId, name: 'Sữa chua' }, CACHE_TTL_PERPETUAL, tags);
+
+      // Verify in-memory hit
+      const hit = await cacheService.get(cacheKey);
+      expect(hit).toEqual({ id: categoryId, name: 'Sữa chua' });
+
+      // Verify Prisma upsert called with year 2099
+      expect(mockPrisma.systemCache.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            key: cacheKey,
+            tag: CACHE_TAG_CATEGORIES,
+            expiresAt: expect.any(Date),
+          }),
+        }),
+      );
+
+      // Invalidate by specific detail tag: category:42
+      await cacheService.invalidateTags([buildCategoryCacheTag(categoryId)]);
+
+      // Now cache should be cleared
+      const missed = await cacheService.get(cacheKey);
+      expect(missed).toBeNull();
+    });
+  });
+
+  describe('Timestamp Versioning Fence & Anti-Poisoning Race Condition (Rule 25)', () => {
+    it('should refuse to write stale query result if mutation invalidated tag during async DB query', async () => {
+      const userId = 'uuid-race-user';
+      const cacheKey = buildUserDetailCacheKey(userId);
+      const tags = [CACHE_TAG_USERS, buildUserCacheTag(userId)];
+
+      // 1. Reader starts DB query at t = 1000
+      const queryStartTime = 1000;
+
+      // 2. Writer mutates at t = 1500 and invalidates tag
+      jest.spyOn(Date, 'now').mockReturnValue(1500);
+      await cacheService.debouncedInvalidateTags(tags);
+      expect(cacheService.getTagVersion(buildUserCacheTag(userId))).toBe(1500);
+
+      // 3. Reader's slow DB query returns stale data at t = 2000, tries to write to cache with queryStartTime = 1000
+      jest.spyOn(Date, 'now').mockReturnValue(2000);
+      await cacheService.set(
+        cacheKey,
+        { id: userId, username: 'old_stale_name' },
+        CACHE_TTL_PERPETUAL,
+        tags,
+        queryStartTime,
+      );
+
+      // 4. Cache must NOT be poisoned! Invalidation Fence refused the stale write.
+      const cached = await cacheService.get(cacheKey);
+      expect(cached).toBeNull();
+
+      (Date.now as any).mockRestore?.();
+    });
+
+    it('should purge stale cache entry in get() if tag was invalidated after entry createdAt', async () => {
+      const tag = 'test-tag';
+      const key = 'test:fence:key';
+
+      // Entry created at t = 1000
+      jest.spyOn(Date, 'now').mockReturnValue(1000);
+      await cacheService.set(key, { data: 'initial' }, CACHE_TTL_PERPETUAL, [tag], 1000);
+      expect(await cacheService.get(key)).toEqual({ data: 'initial' });
+
+      // Invalidate tag at t = 2000
+      jest.spyOn(Date, 'now').mockReturnValue(2000);
+      await cacheService.debouncedInvalidateTags([tag]);
+
+      // Manually set memory entry with older createdAt to test fence check in get()
+      (cacheService as any).memoryStore.set(key, {
+        value: { data: 'stale' },
+        expiresAt: 0,
+        createdAt: 1000,
+        tag,
+        tags: [tag],
+      });
+
+      // get() should detect tagVersion (2000) > createdAt (1000) and purge it
+      const result = await cacheService.get(key);
+      expect(result).toBeNull();
+      expect((cacheService as any).memoryStore.get(key)).toBeUndefined();
+
+      (Date.now as any).mockRestore?.();
+    });
+  });
+
+  describe('Shared Entity Cache / Identity Map in JwtStrategy (Rule 23)', () => {
+    it('should reuse cached user detail from buildUserDetailCacheKey without querying DB', async () => {
+      const configService = {
+        get: jest.fn().mockReturnValue('test-jwt-secret-key-1234567890'),
+      } as unknown as ConfigService;
+
+      const jwtStrategy = new JwtStrategy(configService, mockPrisma, cacheService);
+
+      const userId = 'uuid-shared-entity-user';
+      // Pre-warm the user detail cache (e.g. from /users/me or profile lookup)
+      await cacheService.set(
+        buildUserDetailCacheKey(userId),
+        {
+          id: userId,
+          ten_dang_nhap: 'doctor_lan',
+          vai_tro: 'DOCTOR',
+          active: true,
+        },
+        CACHE_TTL_PERPETUAL,
+        [CACHE_TAG_USERS, buildUserCacheTag(userId)],
+      );
+
+      // Validate JWT payload
+      const user = await jwtStrategy.validate({
+        sub: userId,
+        username: 'doctor_lan',
+        role: 'DOCTOR',
+      });
+
+      expect(user).toEqual({
+        id: userId,
+        sub: userId,
+        username: 'doctor_lan',
+        role: 'DOCTOR',
+        keycloakUserId: undefined,
+      });
+
+      // Database findUnique was NOT called because shared detail cache was reused!
+      expect(mockPrisma.nguoi_dung.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('should fallback to DB and store auth cache with perpetual TTL when detail cache is absent', async () => {
+      const configService = {
+        get: jest.fn().mockReturnValue('test-jwt-secret-key-1234567890'),
+      } as unknown as ConfigService;
+
+      mockPrisma.nguoi_dung.findUnique.mockResolvedValueOnce({
+        id: 'uuid-no-detail-user',
+        ten_dang_nhap: 'bs_mai',
+        vai_tro: 'USER',
+        active: true,
+      });
+
+      const jwtStrategy = new JwtStrategy(configService, mockPrisma, cacheService);
+
+      const userId = 'uuid-no-detail-user';
+      const user = await jwtStrategy.validate({
+        sub: userId,
+        username: 'bs_mai',
+        role: 'USER',
+      });
+
+      expect(user.id).toBe(userId);
+      expect(user.role).toBe('USER');
+      expect(mockPrisma.nguoi_dung.findUnique).toHaveBeenCalledTimes(1);
+
+      // Subsequent call should hit the auth cache
+      const cachedAuth = await cacheService.get(buildUserAuthCacheKey(userId));
+      expect(cachedAuth).toEqual({
+        id: userId,
+        ten_dang_nhap: 'bs_mai',
+        vai_tro: 'USER',
+        active: true,
+      });
     });
   });
 });

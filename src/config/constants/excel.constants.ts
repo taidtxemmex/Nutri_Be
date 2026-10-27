@@ -44,6 +44,15 @@ export const EXCEL_LIMITS = {
   MIN_WEIGHT_GRAMS: 0.1,
 } as const;
 
+export const EXCEL_UPLOAD_CONFIG = {
+  MAX_FILE_SIZE: 10 * 1024 * 1024, // 10MB
+  ZIP_MAGIC_BYTES: [0x50, 0x4b, 0x03, 0x04], // PK\x03\x04
+  OLE2_MAGIC_BYTES: [0xd0, 0xcf, 0x11, 0xe0], // Legacy .xls
+  OLE2_FULL_SIGNATURE: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
+  DANGEROUS_PREFIXES: ['=', '+', '-', '@', '\t', '\r', '%', '|'],
+  MAX_CELL_LENGTH: 1000,
+} as const;
+
 export interface RdaReferenceItem {
   code: string;
   nameVi: string;
@@ -325,3 +334,92 @@ export const ENERGY_DISTRIBUTION_RECOMMENDED = {
   MEAL_SNACK_MIN: 5,
   MEAL_SNACK_MAX: 10,
 } as const;
+
+export interface ExportNutritionColumnDef {
+  field: string;
+  header: string;
+}
+
+/**
+ * 77 Chỉ tiêu dinh dưỡng chuẩn đối chiếu Java POI cho xuất khẩu phần đa bệnh nhân
+ */
+export const DAILY_INTAKE_EXPORT_COLUMNS: ExportNutritionColumnDef[] = [
+  { field: 'energy', header: 'Energy (Kcal)' },
+  { field: 'water', header: 'Water (g)' },
+  { field: 'carbohydrate', header: 'Carbohydrate (g)' },
+  { field: 'fiber', header: 'Fiber (g)' },
+  { field: 'ash', header: 'Ash (g)' },
+  { field: 'calci', header: 'Calci (mg)' },
+  { field: 'phosphorous', header: 'Phosphorous (mg)' },
+  { field: 'iron', header: 'Iron (mg)' },
+  { field: 'zinc', header: 'Zinc (mg)' },
+  { field: 'sodium', header: 'Sodium (mg)' },
+  { field: 'potassium', header: 'Potassium (mg)' },
+  { field: 'magnesium', header: 'Magnesium (mg)' },
+  { field: 'manganese', header: 'Manganese (mg)' },
+  { field: 'copper', header: 'Copper (µg)' },
+  { field: 'selenium', header: 'Selenium (µg)' },
+  { field: 'vitaminC', header: 'Vitamin C (mg)' },
+  { field: 'thiamine', header: 'Thiamine (mg)' },
+  { field: 'riboflavin', header: 'Riboflavin (mg)' },
+  { field: 'niacin', header: 'Niacin (mg)' },
+  { field: 'pantothenicAcid', header: 'Pantothenic acid (mg)' },
+  { field: 'vitaminB6', header: 'Vitamin B6 (mg)' },
+  { field: 'folate', header: 'Folate (µg)' },
+  { field: 'folicAcid', header: 'Folic acid (µg)' },
+  { field: 'biotin', header: 'Biotin (µg)' },
+  { field: 'vitaminB12', header: 'Vitamin B12 (µg)' },
+  { field: 'retinol', header: 'Retinol (µg)' },
+  { field: 'vitaminARae', header: 'Vitamin A - RAE (µg)' },
+  { field: 'vitaminD', header: 'Vitamin D (µg)' },
+  { field: 'vitaminE', header: 'Vitamin E (mg)' },
+  { field: 'vitaminK', header: 'Vitamin K (µg)' },
+  { field: 'betaCarotene', header: 'β-carotene (µg)' },
+  { field: 'alphaCarotene', header: 'α-carotene (µg)' },
+  { field: 'betaCryptoxanthin', header: 'β-cryptoxanthin (µg)' },
+  { field: 'lycopene', header: 'Lycopene (µg)' },
+  { field: 'luteinZeaxanthin', header: 'Lutein + zeaxanthin (µg)' },
+  { field: 'isoflavoneTongSo', header: 'Isoflavone tổng số (mg)' },
+  { field: 'daidzein', header: 'Daidzein (mg)' },
+  { field: 'genistein', header: 'Genistein (mg)' },
+  { field: 'glycetin', header: 'Glycetin (mg)' },
+  { field: 'purine', header: 'Purine (mg)' },
+  { field: 'tsAxitBeoNo', header: 'TS Axit béo no (g)' },
+  { field: 'palmitic', header: 'Palmitic (C16:0) (g)' },
+  { field: 'margaric', header: 'Margaric (C17:0) (g)' },
+  { field: 'stearic', header: 'Stearic (C18:0) (g)' },
+  { field: 'arachidic', header: 'Arachidic (C20:0) (g)' },
+  { field: 'behenic', header: 'Behenic (C22:0) (g)' },
+  { field: 'lignoceric', header: 'Lignoceric (C24:0) (g)' },
+  { field: 'tsAxitBeoKhongNo1NoiDoi', header: 'TS acid béo không no 1 nối đôi (g)' },
+  { field: 'myristoleic', header: 'Myristoleic (C14:1) (g)' },
+  { field: 'palmitoleic', header: 'Palmitoleic (C16:1) (g)' },
+  { field: 'oleic', header: 'Oleic (C18:1) (g)' },
+  { field: 'tsAxitBeoKhongNoNhieuNoiDoi', header: 'TS acid béo không no nhiều nối đôi (g)' },
+  { field: 'linoleic', header: 'Linoleic (g)' },
+  { field: 'linolenic', header: 'Linolenic (g)' },
+  { field: 'arachidonic', header: 'Arachidonic (C20:4) (g)' },
+  { field: 'epa', header: 'EPA (C20:5 n3) (g)' },
+  { field: 'dha', header: 'DHA (C22:6 n3) (g)' },
+  { field: 'tsAxitBeoTrans', header: 'TS acid béo trans (g)' },
+  { field: 'cholesterol', header: 'Cholesterol (mg)' },
+  { field: 'phytosterol', header: 'Phytosterol (mg)' },
+  { field: 'lysin', header: 'Lysine (mg)' },
+  { field: 'methionin', header: 'Methionine (mg)' },
+  { field: 'tryptophan', header: 'Tryptophan (mg)' },
+  { field: 'phenylalanin', header: 'Phenylalanine (mg)' },
+  { field: 'threonin', header: 'Threonine (mg)' },
+  { field: 'valine', header: 'Valine (mg)' },
+  { field: 'leucine', header: 'Leucine (mg)' },
+  { field: 'isoleucine', header: 'Isoleucine (mg)' },
+  { field: 'arginine', header: 'Arginine (mg)' },
+  { field: 'histidine', header: 'Histidine (mg)' },
+  { field: 'cystine', header: 'Cystine (mg)' },
+  { field: 'tyrosine', header: 'Tyrosine (mg)' },
+  { field: 'alanine', header: 'Alanine (mg)' },
+  { field: 'asparticAcid', header: 'Aspartic acid (mg)' },
+  { field: 'glutamicAcid', header: 'Glutamic acid (mg)' },
+  { field: 'glycine', header: 'Glycine (mg)' },
+  { field: 'proline', header: 'Proline (mg)' },
+  { field: 'serine', header: 'Serine (mg)' },
+];

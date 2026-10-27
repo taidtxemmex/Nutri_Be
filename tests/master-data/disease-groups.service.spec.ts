@@ -95,7 +95,10 @@ describe('DiseaseGroupsService', () => {
       const result = await service.delete(1);
 
       expect(result.success).toBe(true);
-      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['disease_groups']);
+      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith([
+        'disease_groups',
+        'disease_group:1',
+      ]);
     });
   });
 });

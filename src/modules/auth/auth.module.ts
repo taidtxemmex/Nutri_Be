@@ -17,15 +17,19 @@ import { ACCESS_TOKEN_EXPIRES_IN } from '../../config/constants/auth.constants';
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        secret:
-          configService.get<string>('JWT_SECRET') ||
-          process.env.JWT_SECRET ||
-          'truenutri_super_secret_jwt_key_2026_clinical_nutrition_protect_token',
-        signOptions: {
-          expiresIn: ACCESS_TOKEN_EXPIRES_IN,
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const secret =
+          configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
+        if (!secret && process.env.NODE_ENV === 'production') {
+          throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production!');
+        }
+        return {
+          secret: secret || 'dev_temporary_jwt_secret_key_minimum_32_chars_12345',
+          signOptions: {
+            expiresIn: ACCESS_TOKEN_EXPIRES_IN,
+          },
+        };
+      },
     }),
   ],
   controllers: [AuthController],

@@ -13,6 +13,7 @@ import {
   MenuMutationResponseDto,
   ResolveDishDto,
   ExportMenuDto,
+  ExportMarketPlanDto,
 } from '../dto';
 import {
   ApiController,
@@ -23,7 +24,7 @@ import {
 } from '../../../common/decorators';
 import { MenuExportType } from '../../../config/enums/domain.enum';
 
-@ApiController('Menus', ['menu', 'menus'])
+@ApiController('Menus', ['menus', 'menu'])
 export class MenusController {
   constructor(
     private readonly menusService: MenusService,
@@ -155,12 +156,71 @@ export class MenusController {
     return this.menusService.resolveDishForMenu(dto, user);
   }
 
+  @Post(':id/export/market-plan')
+  @Get(':id/export/market-plan')
+  @Auth()
+  @SkipTransform()
+  @ApiOperation({
+    summary: 'Xuất kế hoạch đi chợ chuẩn 14 nhóm thực phẩm Bộ Y Tế dạng Stream O(1) RAM',
+  })
+  @ApiParam({ name: 'id', description: 'ID thực đơn' })
+  @ApiBody({ type: ExportMarketPlanDto, required: false })
+  async exportMarketPlan(
+    @Param('id') id: string,
+    @Body() bodyDto: ExportMarketPlanDto,
+    @Query() queryDto: ExportMarketPlanDto,
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    const servings = bodyDto?.servings || queryDto?.servings || 1;
+    const cycle = bodyDto?.cycle || queryDto?.cycle || 'ALL';
+    const week = bodyDto?.week || queryDto?.week;
+    const day = bodyDto?.day || queryDto?.day;
+
+    await this.menuExcelService.streamMarketPlanExcel(BigInt(id), res, {
+      servings: Number(servings),
+      cycle,
+      week: week ? Number(week) : undefined,
+      day: day ? Number(day) : undefined,
+      userId: user?.id,
+    });
+  }
+
+  @Post(':id/export/weekly')
+  @Get(':id/export/weekly')
+  @Auth()
+  @SkipTransform()
+  @ApiOperation({
+    summary: 'Xuất thực đơn tuần / chuyên sâu đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED)',
+  })
+  @ApiParam({ name: 'id', description: 'ID thực đơn' })
+  @ApiBody({ type: ExportMenuDto, required: false })
+  async exportMenuWeekly(
+    @Param('id') id: string,
+    @Body() bodyDto: ExportMenuDto,
+    @Query('exportType') qExportType: MenuExportType,
+    @Query('servings') qServings: number,
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    const exportType = bodyDto?.exportType || qExportType || MenuExportType.FULL;
+    const servings = bodyDto?.servings || (qServings ? Number(qServings) : 1);
+    const columns = bodyDto?.columns;
+
+    await this.menuExcelService.streamMenuExcel(BigInt(id), res, {
+      exportType,
+      servings,
+      columns,
+      userId: user?.id,
+    });
+  }
+
   @Post(':id/export')
   @Get(':id/export')
   @Auth()
   @SkipTransform()
   @ApiOperation({
-    summary: 'Xuất file Excel thực đơn lâm sàng đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED)',
+    summary: 'Xuất file Excel thực đơn lâm sàng đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED) dạng Stream O(1) RAM',
   })
   @ApiParam({ name: 'id', description: 'ID thực đơn' })
   @ApiBody({ type: ExportMenuDto, required: false })
@@ -176,19 +236,11 @@ export class MenusController {
     const servings = bodyDto?.servings || (qServings ? Number(qServings) : 1);
     const columns = bodyDto?.columns;
 
-    const buffer = await this.menuExcelService.exportMenuExcel(BigInt(id), {
+    await this.menuExcelService.streamMenuExcel(BigInt(id), res, {
       exportType,
       servings,
       columns,
       userId: user?.id,
     });
-
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="thuc_don_${id}_${exportType.toLowerCase()}.xlsx"`,
-      'Content-Length': buffer.length,
-    });
-
-    res.end(buffer);
   }
 }

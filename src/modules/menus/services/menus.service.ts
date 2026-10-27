@@ -22,6 +22,16 @@ import {
 } from '../dto';
 import { MenuType, TargetType, DishStatus } from '../../../config/enums/domain.enum';
 import { UserRole } from '../../../config/enums/role.enum';
+import {
+  CACHE_TAG_MENUS,
+  CACHE_TAG_PATIENTS,
+  CACHE_TTL_PERPETUAL,
+  buildMenuCacheTag,
+  buildPatientCacheTag,
+  buildPatientDetailCacheKey,
+} from '../../../config/constants/cache.constants';
+import { PatientsService } from '../../patients/services/patients.service';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class MenusService {
@@ -32,6 +42,7 @@ export class MenusService {
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly nutritionCalculator: NutritionCalculatorService,
+    @Optional() private readonly patientsService?: PatientsService,
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
@@ -661,13 +672,32 @@ export class MenusService {
     dto: CreateMenuDto,
     currentUser: { id: string; role?: string },
   ): Promise<MenuMutationResponseDto> {
-    // Kiểm tra bệnh nhân thuộc user (nếu có)
+    // Kiểm tra bệnh nhân thuộc user (nếu có) - Tái sử dụng Cache thực thể 0ms
     if (dto.patientId) {
-      const patient = await this.prisma.benh_nhan.findFirst({
-        where: { id: BigInt(dto.patientId), nguoi_dung_id: currentUser.id, deleted_at: null },
-        select: { id: true },
-      });
-      if (!patient) {
+      let patient: any;
+      if (this.patientsService) {
+        patient = await this.patientsService.getPatientEntity(dto.patientId);
+      } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+        patient = await this.cacheService.getOrSet(
+          buildPatientDetailCacheKey(dto.patientId),
+          CACHE_TTL_PERPETUAL,
+          async () =>
+            this.prisma.benh_nhan.findFirst({
+              where: { id: BigInt(dto.patientId), deleted_at: null },
+            }),
+          [CACHE_TAG_PATIENTS, buildPatientCacheTag(dto.patientId)],
+        );
+      } else {
+        patient = await this.prisma.benh_nhan.findFirst({
+          where: { id: BigInt(dto.patientId), deleted_at: null },
+        });
+      }
+
+      if (
+        !patient ||
+        patient.deleted_at ||
+        (patient.nguoi_dung_id !== currentUser.id && !this.isAdmin(currentUser))
+      ) {
         throw new HttpException(
           { code: 'PATIENT_NOT_FOUND', message: 'Không tìm thấy bệnh nhân' },
           HttpStatus.NOT_FOUND,

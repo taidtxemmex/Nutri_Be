@@ -54,9 +54,11 @@ export class CreatePatientDto {
   @Max(300)
   height?: number;
 
-  @ApiPropertyOptional({ example: 1.4, description: 'Hệ số hoạt động thể lực PAL' })
+  @ApiPropertyOptional({ example: 1.4, description: 'Hệ số hoạt động thể lực PAL (1.0 - 2.5)' })
   @IsOptional()
   @IsNumber()
+  @Min(1.0)
+  @Max(2.5)
   activityFactor?: number;
 
   @ApiPropertyOptional({

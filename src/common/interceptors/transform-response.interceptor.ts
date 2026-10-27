@@ -2,6 +2,7 @@ import { Injectable, NestInterceptor, ExecutionContext, CallHandler } from '@nes
 import { Reflector } from '@nestjs/core';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
+import * as crypto from 'crypto';
 import { SKIP_TRANSFORM_KEY } from '../decorators/skip-transform.decorator';
 
 export interface StandardResponse<T> {
@@ -28,15 +29,27 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
 
     const request = context.switchToHttp().getRequest();
     const httpResponse = context.switchToHttp().getResponse();
-    const traceId = request.headers['x-trace-id'] || 'trace-local';
+    const traceId =
+      (request.headers['x-trace-id'] as string) ||
+      (request as any).id ||
+      crypto.randomUUID();
+    if (httpResponse && typeof httpResponse.setHeader === 'function') {
+      httpResponse.setHeader('X-Trace-Id', traceId);
+    }
 
     return next.handle().pipe(
       map((response) => {
         const timestamp = new Date().toISOString();
         const statusCode = httpResponse?.statusCode || 200;
 
-        // 1. Stream file (Excel, PDF)
-        if (response && response.isStream) {
+        // 1. Stream file (Excel, PDF, StreamableFile, Writable/Readable)
+        if (
+          response &&
+          (response.isStream ||
+            typeof response.pipe === 'function' ||
+            typeof response.getStream === 'function' ||
+            response.constructor?.name === 'StreamableFile')
+        ) {
           return response;
         }
 

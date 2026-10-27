@@ -3,7 +3,9 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import {
   CACHE_TAG_EXTENDED_DISEASE_GROUPS,
-  CACHE_TTL_LIST_SECONDS,
+  CACHE_TTL_PERPETUAL,
+  buildExtendedDiseaseGroupCacheTag,
+  buildExtendedDiseaseGroupDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import {
   DEFAULT_PAGE,
@@ -133,7 +135,7 @@ export class ExtendedDiseaseGroupsService {
       await this.cacheService.set(
         cacheKey,
         result,
-        CACHE_TTL_LIST_SECONDS,
+        CACHE_TTL_PERPETUAL,
         CACHE_TAG_EXTENDED_DISEASE_GROUPS,
       );
     }
@@ -145,6 +147,14 @@ export class ExtendedDiseaseGroupsService {
    * Lấy chi tiết nhóm bệnh mở rộng theo ID (chỉ của chính user)
    */
   async findById(id: number, userId: string): Promise<ExtendedDiseaseGroupResponseDto> {
+    const cacheKey = buildExtendedDiseaseGroupDetailCacheKey(id);
+    if (this.cacheService) {
+      const cached = await this.cacheService.get<ExtendedDiseaseGroupResponseDto>(cacheKey);
+      if (cached && cached.userId === userId) {
+        return cached;
+      }
+    }
+
     const record = await this.prisma.nhom_benh_mo_rong.findFirst({
       where: {
         id,
@@ -174,7 +184,7 @@ export class ExtendedDiseaseGroupsService {
     }
 
     const parentCode = record.nhom_benh?.ma_nhom ? `${record.nhom_benh.ma_nhom} - ` : '';
-    return {
+    const response: ExtendedDiseaseGroupResponseDto = {
       id: record.id,
       extendedCode: record.ma_nhom_mo_rong || '',
       displayName: record.ten_hien_thi || '',
@@ -183,6 +193,17 @@ export class ExtendedDiseaseGroupsService {
       parentName: record.nhom_benh?.ten_nhom || '',
       fullCode: parentCode + (record.ma_nhom_mo_rong || ''),
     };
+
+    if (this.cacheService) {
+      await this.cacheService.set(
+        cacheKey,
+        response,
+        CACHE_TTL_PERPETUAL,
+        [CACHE_TAG_EXTENDED_DISEASE_GROUPS, buildExtendedDiseaseGroupCacheTag(id)],
+      );
+    }
+
+    return response;
   }
 
   /**
@@ -223,7 +244,7 @@ export class ExtendedDiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache();
+    await this.invalidateCache(created.id);
 
     const parentCode = parent.ma_nhom ? `${parent.ma_nhom} - ` : '';
     return {
@@ -298,7 +319,7 @@ export class ExtendedDiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache();
+    await this.invalidateCache(updated.id);
 
     const parentCode = updated.nhom_benh?.ma_nhom ? `${updated.nhom_benh.ma_nhom} - ` : '';
     return {
@@ -354,7 +375,7 @@ export class ExtendedDiseaseGroupsService {
       where: { id },
     });
 
-    await this.invalidateCache();
+    await this.invalidateCache(id);
 
     return {
       success: true,
@@ -362,9 +383,13 @@ export class ExtendedDiseaseGroupsService {
     };
   }
 
-  private async invalidateCache(): Promise<void> {
+  private async invalidateCache(id?: number): Promise<void> {
     if (this.cacheService) {
-      await this.cacheService.debouncedInvalidateTags([CACHE_TAG_EXTENDED_DISEASE_GROUPS]);
+      const tags = [CACHE_TAG_EXTENDED_DISEASE_GROUPS];
+      if (id) {
+        tags.push(buildExtendedDiseaseGroupCacheTag(id));
+      }
+      await this.cacheService.debouncedInvalidateTags(tags);
     }
   }
 }

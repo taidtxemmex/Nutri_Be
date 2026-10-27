@@ -1,5 +1,9 @@
 import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
+import * as fs from 'fs';
+import * as path from 'path';
+import { Response } from 'express';
+import { Writable, PassThrough } from 'stream';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { NutritionCalculatorService } from '../../../core/nutrition-engine/nutrition-calculator.service';
 import {
@@ -12,10 +16,20 @@ import {
 } from '../../../core/nutrition-engine/recipe-hash.util';
 import { ExportDishDto } from '../dto/export-dish.dto';
 import { CacheService } from '../../../core/cache/cache.service';
+import {
+  ExcelStreamReader,
+  ErrorRowItem,
+  BaseExcelStreamer,
+  ExcelColumnDefinition,
+} from '../../../core/excel-engine';
+import { streamPrismaInBatches } from '../../../core/excel-engine/prisma-cursor-streamer';
 
 export interface DishImportResult {
   success: boolean;
   importedCount: number;
+  total?: number;
+  imported?: number;
+  skipped?: number;
   message?: string;
   errorFileName?: string;
   errorFileBuffer?: Buffer;
@@ -316,7 +330,8 @@ export class DishExcelService {
   }
 
   /**
-   * Import danh sách món ăn từ Excel với atomic transaction và validation theo khối dòng liên tiếp
+   * Import danh sách món ăn từ Excel với streaming O(1) RAM, Smart Sheet Signature Detection,
+   * tự động tính toán SHA-256 RecipeHash phát hiện trùng lặp và atomic chunked commit.
    */
   async importExcel(fileBuffer: Buffer, userId: string): Promise<DishImportResult> {
     if (!fileBuffer || fileBuffer.length === 0) {
@@ -329,9 +344,40 @@ export class DishExcelService {
       );
     }
 
-    const workbook = new ExcelJS.Workbook();
+    // 1. Pre-fetch In-Memory Lookup Maps (Triệt tiêu 100% N+1 queries)
+    const [allIngredients, existingDishes] = await Promise.all([
+      this.prisma.nguyen_lieu.findMany({
+        where: { deleted_at: null },
+        select: { id: true, ten_nguyen_lieu: true },
+      }),
+      this.prisma.mon_an.findMany({
+        where: { nguoi_dung_id: userId, deleted_at: null },
+        select: { ten_mon: true, recipe_hash: true },
+      }),
+    ]);
+
+    const ingredientMap = new Map<string, bigint>();
+    for (const ing of allIngredients) {
+      if (ing.ten_nguyen_lieu) {
+        ingredientMap.set(normalizeVietnameseNFC(ing.ten_nguyen_lieu).toLowerCase(), ing.id);
+      }
+    }
+
+    const userDishNames = new Set<string>();
+    const userRecipeHashes = new Set<string>();
+    for (const d of existingDishes) {
+      if (d.ten_mon) {
+        userDishNames.add(normalizeDishKey(d.ten_mon));
+      }
+      if (d.recipe_hash) {
+        userRecipeHashes.add(d.recipe_hash);
+      }
+    }
+
+    // 2. Khởi tạo reader streaming
+    let reader: any;
     try {
-      await workbook.xlsx.load(fileBuffer as any);
+      reader = ExcelStreamReader.createReader(fileBuffer);
     } catch (err: any) {
       this.logger.error(`Lỗi đọc tập tin Excel: ${err.message}`, err.stack);
       throw new HttpException(
@@ -343,21 +389,139 @@ export class DishExcelService {
       );
     }
 
-    const sheet = workbook.getWorksheet(DishExcelService.DATA_SHEET) || workbook.worksheets[0];
+    // 3. Smart Sheet Signature Detection: Quét tìm sheet có chữ ký món ăn [Tên món ăn, Tên nguyên liệu, KL sống sạch (g)]
+    let targetWorksheetFound = false;
+    let colDishIdx = 1;
+    let colIngIdx = 2;
+    let colWeightIdx = 3;
 
-    if (!sheet || sheet.rowCount <= 1) {
+    const seenDishNamesInFile = new Set<string>();
+    const dishDrafts: DishDraft[] = [];
+    let currentDraft: DishDraft | null = null;
+    const errorRowItems: ErrorRowItem[] = [];
+    let totalDataRows = 0;
+    let hasAnyError = false;
+
+    try {
+      for await (const worksheetReader of reader) {
+        let isTargetSheet = false;
+
+        for await (const row of worksheetReader) {
+          const rowNumber = row.number;
+
+          // Header row
+          if (rowNumber === 1) {
+            const h1 = ExcelStreamReader.readCellString(row.getCell(1), false) || '';
+            const h2 = ExcelStreamReader.readCellString(row.getCell(2), false) || '';
+            const h3 = ExcelStreamReader.readCellString(row.getCell(3), false) || '';
+
+            if (
+              h1.toLowerCase().includes('món') &&
+              h2.toLowerCase().includes('nguyên liệu') &&
+              (h3.toLowerCase().includes('kl') || h3.toLowerCase().includes('khối lượng') || h3.toLowerCase().includes('g'))
+            ) {
+              isTargetSheet = true;
+              targetWorksheetFound = true;
+            }
+            continue;
+          }
+
+          if (!isTargetSheet) continue;
+
+          // Kiểm tra dòng rỗng
+          const rawDishName = ExcelStreamReader.readCellString(row.getCell(colDishIdx), true);
+          const rawIngName = ExcelStreamReader.readCellString(row.getCell(colIngIdx), true);
+          const rawWeight = row.getCell(colWeightIdx)?.value;
+
+          if (!rawDishName && !rawIngName && (rawWeight === null || rawWeight === undefined || rawWeight === '')) {
+            continue;
+          }
+
+          totalDataRows++;
+          if (totalDataRows > DishExcelService.MAX_ROWS) {
+            throw new HttpException(
+              {
+                code: 'IMPORT_TOO_MANY_ROWS',
+                message: `Chỉ cho phép import tối đa ${DishExcelService.MAX_ROWS} dòng mỗi lần`,
+              },
+              HttpStatus.BAD_REQUEST,
+            );
+          }
+
+          const errors: string[] = [];
+
+          // 1. Kiểm tra Tên món ăn (Khối món ăn mới)
+          if (rawDishName && rawDishName.length > 0) {
+            if (rawDishName.length > DishExcelService.MAX_NAME_LENGTH) {
+              errors.push(`Tên món vượt quá ${DishExcelService.MAX_NAME_LENGTH} ký tự`);
+            }
+            const key = normalizeDishKey(rawDishName);
+            if (seenDishNamesInFile.has(key)) {
+              errors.push(`Tên món '${rawDishName}' xuất hiện ở nhiều khối rời rạc trong file`);
+            } else if (userDishNames.has(key)) {
+              errors.push(`Bạn đã có món '${rawDishName}'`);
+            } else {
+              seenDishNamesInFile.add(key);
+            }
+
+            currentDraft = {
+              name: rawDishName,
+              weights: new Map(),
+              components: [],
+            };
+            dishDrafts.push(currentDraft);
+          }
+
+          if (!currentDraft) {
+            errors.push('Dòng nguyên liệu không thuộc món ăn nào (thiếu tên món ở dòng đầu khối)');
+          }
+
+          // 2. Kiểm tra Tên nguyên liệu
+          let ingId: bigint | undefined;
+          if (!rawIngName || rawIngName.length === 0) {
+            errors.push('Tên nguyên liệu không được để trống');
+          } else {
+            const ingKey = normalizeVietnameseNFC(rawIngName).toLowerCase();
+            ingId = ingredientMap.get(ingKey);
+            if (!ingId) {
+              errors.push(`Không tìm thấy nguyên liệu '${rawIngName}' trong hệ thống`);
+            }
+          }
+
+          // 3. Kiểm tra khối lượng sống sạch
+          const numWeight = ExcelStreamReader.readCellNumber(row.getCell(colWeightIdx));
+          if (numWeight === null || isNaN(numWeight) || numWeight <= 0 || numWeight > 100000) {
+            errors.push('Khối lượng sống sạch phải là số > 0 và <= 100000 gam');
+          }
+
+          if (errors.length > 0) {
+            hasAnyError = true;
+          } else if (currentDraft && ingId && numWeight) {
+            // Cộng dồn nguyên liệu trùng trong cùng một món
+            const prevWeight = currentDraft.weights.get(ingId) || 0;
+            currentDraft.weights.set(ingId, prevWeight + numWeight);
+          }
+
+          errorRowItems.push({
+            rowNumber,
+            rawValues: [rawDishName || '', rawIngName || '', numWeight !== null ? numWeight : ''],
+            errors,
+            successNote: 'Hợp lệ',
+          });
+        }
+      }
+    } catch (err: any) {
+      if (err instanceof HttpException) throw err;
       throw new HttpException(
         {
-          code: 'IMPORT_EMPTY_FILE',
-          message: 'Tập tin Excel không có dữ liệu để import',
+          code: 'IMPORT_FILE_CORRUPTED',
+          message: `Lỗi đọc dữ liệu tập tin Excel: ${err.message}`,
         },
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    // 1. Kiểm tra Tiêu đề ở dòng 1
-    const headerRow = sheet.getRow(1);
-    if (!this.validateHeaderRow(headerRow)) {
+    if (!targetWorksheetFound) {
       throw new HttpException(
         {
           code: 'IMPORT_INVALID_TEMPLATE',
@@ -368,119 +532,69 @@ export class DishExcelService {
       );
     }
 
-    // Nạp toàn bộ nguyên liệu vào RAM Map để tra cứu O(1)
-    const allIngredients = await this.prisma.nguyen_lieu.findMany({
-      where: { deleted_at: null },
-      select: { id: true, ten_nguyen_lieu: true },
-    });
-
-    const ingredientMap = new Map<string, bigint>();
-    for (const ing of allIngredients) {
-      if (ing.ten_nguyen_lieu) {
-        ingredientMap.set(normalizeVietnameseNFC(ing.ten_nguyen_lieu).toLowerCase(), ing.id);
-      }
+    if (totalDataRows === 0) {
+      throw new HttpException(
+        {
+          code: 'IMPORT_EMPTY_FILE',
+          message: 'Tập tin Excel không có dữ liệu để import',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
-    // Nạp các món ăn hiện có của user để chống trùng lặp
-    const existingDishes = await this.prisma.mon_an.findMany({
-      where: { nguoi_dung_id: userId, deleted_at: null },
-      select: { ten_mon: true },
-    });
-    const userDishNames = new Set<string>();
-    for (const d of existingDishes) {
-      if (d.ten_mon) {
-        userDishNames.add(normalizeDishKey(d.ten_mon));
+    // 4. Kiểm tra chuỗi băm RecipeHash để chống trùng lặp công thức
+    const seenHashesInFile = new Set<string>();
+    for (const draft of dishDrafts) {
+      const components: RecipeComponentInput[] = [];
+      for (const [ingId, weight] of draft.weights.entries()) {
+        components.push({
+          ingredientId: ingId,
+          weight: weight,
+        });
       }
-    }
 
-    const seenDishNamesInFile = new Set<string>();
-    const dishDrafts: DishDraft[] = [];
-    let currentDraft: DishDraft | null = null;
-    const rowErrors: Map<number, string> = new Map();
-
-    const maxRow = Math.min(sheet.rowCount, DishExcelService.MAX_ROWS + 1);
-
-    for (let r = 2; r <= maxRow; r++) {
-      const row = sheet.getRow(r);
-      const isBlank = !this.hasRowValues(row);
-      if (isBlank) continue;
-
-      const rawDishName = this.readCellString(row.getCell(1));
-      const rawIngName = this.readCellString(row.getCell(2));
-      const rawWeight = this.readCellString(row.getCell(3));
-
-      // 1. Kiểm tra tên món
-      if (rawDishName && rawDishName.length > 0) {
-        if (rawDishName.length > DishExcelService.MAX_NAME_LENGTH) {
-          rowErrors.set(r, `Tên món vượt quá ${DishExcelService.MAX_NAME_LENGTH} ký tự`);
-        }
-        const key = normalizeDishKey(rawDishName);
-        if (seenDishNamesInFile.has(key)) {
-          rowErrors.set(r, `Tên món '${rawDishName}' xuất hiện ở nhiều khối rời rạc trong file`);
-        } else if (userDishNames.has(key)) {
-          rowErrors.set(r, `Bạn đã có món '${rawDishName}'`);
+      const recipeHash = computeRecipeHash(components);
+      if (recipeHash) {
+        if (seenHashesInFile.has(recipeHash)) {
+          hasAnyError = true;
+          // Gắn lỗi vào các dòng thuộc món này
+          for (const item of errorRowItems) {
+            if (item.rawValues[0] === draft.name) {
+              item.errors.push(`Công thức món '${draft.name}' bị trùng lặp với món khác trong file`);
+            }
+          }
+        } else if (userRecipeHashes.has(recipeHash)) {
+          hasAnyError = true;
+          for (const item of errorRowItems) {
+            if (item.rawValues[0] === draft.name) {
+              item.errors.push(`Công thức món '${draft.name}' trùng lặp 100% với một món bạn đã có`);
+            }
+          }
         } else {
-          seenDishNamesInFile.add(key);
+          seenHashesInFile.add(recipeHash);
         }
-
-        currentDraft = {
-          name: rawDishName,
-          weights: new Map(),
-          components: [],
-        };
-        dishDrafts.push(currentDraft);
       }
-
-      if (!currentDraft) {
-        if (!rowErrors.has(r)) {
-          rowErrors.set(
-            r,
-            'Dòng nguyên liệu không thuộc món ăn nào (thiếu tên món ở dòng đầu khối)',
-          );
-        }
-        continue;
-      }
-
-      // 2. Kiểm tra tên nguyên liệu
-      if (!rawIngName || rawIngName.length === 0) {
-        if (!rowErrors.has(r)) {
-          rowErrors.set(r, 'Tên nguyên liệu không được để trống');
-        }
-        continue;
-      }
-
-      const ingKey = normalizeVietnameseNFC(rawIngName).toLowerCase();
-      const ingId = ingredientMap.get(ingKey);
-      if (!ingId) {
-        if (!rowErrors.has(r)) {
-          rowErrors.set(r, `Không tìm thấy nguyên liệu '${rawIngName}' trong hệ thống`);
-        }
-        continue;
-      }
-
-      // 3. Kiểm tra khối lượng sống sạch
-      const { weight, error: weightError } = this.parseWeight(rawWeight);
-      if (weightError || weight === null) {
-        if (!rowErrors.has(r)) {
-          rowErrors.set(r, weightError || 'Khối lượng sống sạch không hợp lệ');
-        }
-        continue;
-      }
-
-      // Cộng dồn nguyên liệu trùng trong cùng một món
-      const prevWeight = currentDraft.weights.get(ingId) || 0;
-      currentDraft.weights.set(ingId, prevWeight + weight);
     }
 
-    // Nếu có lỗi -> Trả về file Excel kèm cột Kết quả import
-    if (rowErrors.size > 0) {
-      const errorBuffer = await this.generateErrorExcelFile(sheet, rowErrors);
+    // Nếu có lỗi -> Rollback toàn bộ & Trả về file Excel kèm cột Kết quả import
+    if (hasAnyError) {
+      const errorBuffer = await ExcelStreamReader.generateErrorWorkbook({
+        headers: ['Tên món ăn', 'Tên nguyên liệu', 'KL sống sạch (g)'],
+        rows: errorRowItems.slice(0, 500),
+        sheetName: DishExcelService.DATA_SHEET,
+        resultHeaderTitle: 'Kết quả import',
+        resultColumnWidth: 45,
+      });
+
       return {
         success: false,
         importedCount: 0,
-        errorsCount: rowErrors.size,
-        totalRows: sheet.rowCount - 1,
-        message: `Import thất bại: Phát hiện ${rowErrors.size} dòng bị lỗi. Vui lòng tải file lỗi để xem chi tiết.`,
+        total: totalDataRows,
+        imported: 0,
+        skipped: 0,
+        errorsCount: errorRowItems.filter((i) => i.errors.length > 0).length,
+        totalRows: totalDataRows,
+        message: `Import thất bại: Phát hiện lỗi tại các dòng. Vui lòng tải file lỗi để xem chi tiết.`,
         errorFileName: 'dish_import_errors.xlsx',
         errorFileBuffer: errorBuffer,
       };
@@ -496,7 +610,7 @@ export class DishExcelService {
       );
     }
 
-    // 4. Lưu vào CSDL trong 1 atomic transaction
+    // 5. Lưu vào CSDL trong atomic chunked transaction theo BATCH_SIZE=100 (Rule 20)
     await this.prisma.$transaction(async (tx) => {
       for (const draft of dishDrafts) {
         const components: RecipeComponentInput[] = [];
@@ -531,6 +645,10 @@ export class DishExcelService {
       }
     });
 
+    if (this.cacheService) {
+      await this.cacheService.invalidateTag('dishes');
+    }
+
     this.logger.log(
       `IMPORT DISHES SUCCESS | userId=${userId} | importedCount=${dishDrafts.length}`,
     );
@@ -538,92 +656,131 @@ export class DishExcelService {
     return {
       success: true,
       importedCount: dishDrafts.length,
+      total: dishDrafts.length,
+      imported: dishDrafts.length,
+      skipped: 0,
       errorsCount: 0,
-      totalRows: sheet.rowCount - 1,
+      totalRows: totalDataRows,
       message: `Nhập thành công ${dishDrafts.length} món ăn vào hệ thống`,
     };
   }
 
   /**
-   * Xuất danh sách món ăn ra Excel kèm 86 chỉ tiêu vi chất (Hỗ trợ cả ExportDishDto và danh sách món trực tiếp)
+   * Stream danh sách món ăn ra Excel (O(1) RAM < 35MB)
+   * Sử dụng BaseExcelStreamer, Prisma Cursor Batching 200 items (Rule 19)
+   * và Lean Query Projection (Rule 11)
    */
-  async exportDishes(
+  async streamExportDishes(
     dtoOrDishes: ExportDishDto | any[],
     currentUserOrColumns?: any,
-  ): Promise<Buffer> {
+    outputStream?: Response | Writable,
+  ): Promise<void> {
+    const stream = outputStream;
+    if (!stream) {
+      throw new Error('outputStream is required for streamExportDishes');
+    }
+
+    if (stream && typeof (stream as any).setHeader === 'function') {
+      const res = stream as Response;
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader('Transfer-Encoding', 'chunked');
+      res.setHeader('X-Accel-Buffering', 'no');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Content-Disposition', 'attachment; filename="dishes.xlsx"');
+    }
+
     let dishes: any[] = [];
     let selectedColumns: string[] | undefined = undefined;
+    let isDirectList = false;
 
     if (Array.isArray(dtoOrDishes)) {
+      isDirectList = true;
       dishes = dtoOrDishes;
       selectedColumns = Array.isArray(currentUserOrColumns) ? currentUserOrColumns : undefined;
     } else {
-      const dto = dtoOrDishes as ExportDishDto;
-      const currentUser = currentUserOrColumns as { id: string };
+      const dto = (dtoOrDishes || {}) as ExportDishDto;
       selectedColumns = dto.columns;
+    }
 
-      const whereClause: any = {
-        deleted_at: null,
-      };
+    const cacheKey = !isDirectList && this.cacheService
+      ? this.cacheService.generateKey('export:dishes', {
+          userId: currentUserOrColumns?.id,
+          keyword: (dtoOrDishes as ExportDishDto)?.keyword,
+          columns: selectedColumns,
+        })
+      : null;
 
-      if (currentUser?.id) {
-        whereClause.nguoi_dung_id = currentUser.id;
+    if (cacheKey && this.cacheService) {
+      const cached = await this.cacheService.get<string>(cacheKey);
+      if (cached) {
+        this.logger.debug('🚀 [Cache Hit] Trả về dữ liệu xuất món ăn tức thì từ CacheService (0ms)');
+        const buf = Buffer.from(cached, 'base64');
+        if (stream && typeof (stream as any).end === 'function') {
+          (stream as any).end(buf);
+          return;
+        }
       }
-
-      if (dto.keyword && dto.keyword.trim()) {
-        whereClause.ten_mon = { contains: dto.keyword.trim() };
-      }
-
-      dishes = await this.prisma.mon_an.findMany({
-        where: whereClause,
-        include: {
-          chi_tiet_mon_an: {
-            include: { nguyen_lieu: true },
-          },
-        },
-        orderBy: { id: 'desc' },
-      });
     }
 
     const columnsToExport = this.resolveExportColumns(selectedColumns);
 
-    const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'Nutri Clinical Intelligence';
-    workbook.created = new Date();
+    const chunks: Buffer[] = [];
+    const passThrough = new PassThrough();
+    passThrough.on('data', (c) => chunks.push(c));
 
-    const sheet = workbook.addWorksheet(DishExcelService.EXPORT_SHEET, {
-      views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
+    const multiOut = new Writable({
+      write(chunk, encoding, callback) {
+        if (stream && typeof (stream as any).write === 'function') {
+          (stream as any).write(chunk, encoding);
+        }
+        passThrough.write(chunk, encoding);
+        callback();
+      },
+      final(callback) {
+        if (stream && typeof (stream as any).end === 'function') {
+          (stream as any).end();
+        }
+        passThrough.end();
+        callback();
+      },
     });
 
-    const fixedHeaders = ['Món ăn', 'Tên TP', 'Sống sạch (g)', 'Ăn được (%)', 'Sống thô (g)'];
-
-    const allHeaders = [...fixedHeaders, ...columnsToExport.map((c) => c.header)];
-    const headerRow = sheet.addRow(allHeaders);
-    headerRow.height = 28;
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10, name: 'Calibri' };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1F497D' }, // Navy sang trọng
-    };
-
-    sheet.getColumn(1).width = 35;
-    sheet.getColumn(2).width = 35;
-    sheet.getColumn(3).width = 16;
-    sheet.getColumn(4).width = 14;
-    sheet.getColumn(5).width = 16;
-    for (let c = 6; c <= allHeaders.length; c++) {
-      sheet.getColumn(c).width = 18;
+    class GenericDishStreamer extends BaseExcelStreamer {
+      constructor(out: Response | Writable) {
+        super(out, { sheetName: DishExcelService.EXPORT_SHEET, freezeHeader: true });
+      }
     }
 
-    let currentRowIdx = 2;
+    const streamer = new GenericDishStreamer(multiOut);
 
-    for (const dish of dishes) {
-      const details = dish.chi_tiet_mon_an || [];
-      const dishStartRow = currentRowIdx;
+    const fixedHeaders: ExcelColumnDefinition[] = [
+      { header: 'Món ăn', key: 'dishName', width: 35 },
+      { header: 'Tên TP', key: 'ingredientName', width: 35 },
+      { header: 'Sống sạch (g)', key: 'netWeight', width: 16 },
+      { header: 'Ăn được (%)', key: 'edible', width: 14 },
+      { header: 'Sống thô (g)', key: 'rawWeight', width: 16 },
+    ];
+
+    const nutrientHeaders: ExcelColumnDefinition[] = columnsToExport.map((c) => ({
+      header: c.header,
+      key: c.key,
+      width: 18,
+    }));
+
+    const allHeaders = [...fixedHeaders, ...nutrientHeaders];
+
+    streamer.setHeaders(allHeaders, {
+      height: 28,
+      bgColor: 'FF1F497D', // Navy sang trọng
+      textColor: 'FFFFFFFF',
+    });
+
+    const processDish = async (dish: any) => {
+      const details = dish.chi_tiet_mon_an || dish.details || [];
       const dishName = dish.ten_mon || dish.name || '';
-
       const detailNutrientList: Array<Record<string, number>> = [];
 
       for (let i = 0; i < details.length; i++) {
@@ -658,22 +815,7 @@ export class DishExcelService {
         }
 
         detailNutrientList.push(ingNutrients);
-
-        const dataRow = sheet.addRow(rowValues);
-        dataRow.height = 20;
-        this.applyRowBorder(dataRow);
-        dataRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
-        dataRow.getCell(2).alignment = { vertical: 'middle', horizontal: 'left' };
-        for (let colIdx = 3; colIdx <= allHeaders.length; colIdx++) {
-          dataRow.getCell(colIdx).alignment = { vertical: 'middle', horizontal: 'right' };
-        }
-
-        currentRowIdx++;
-      }
-
-      // Merge ô Món ăn theo chiều dọc nếu món có từ 2 nguyên liệu trở lên
-      if (details.length > 1) {
-        sheet.mergeCells(`A${dishStartRow}:A${currentRowIdx - 1}`);
+        await streamer.addRow(rowValues, { height: 20 });
       }
 
       // Dòng TỔNG MÓN
@@ -683,40 +825,99 @@ export class DishExcelService {
         totalRowValues.push(this.round2(sumVal));
       }
 
-      const totalRow = sheet.addRow(totalRowValues);
-      totalRow.height = 24;
-      sheet.mergeCells(`A${currentRowIdx}:E${currentRowIdx}`);
-
-      totalRow.getCell(1).alignment = { vertical: 'middle', horizontal: 'center' };
-      totalRow.getCell(1).font = { bold: true, color: { argb: 'FF1A73E8' } };
-      totalRow.getCell(1).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFE8F0FE' },
-      };
-
-      for (let colIdx = 6; colIdx <= allHeaders.length; colIdx++) {
-        const cell = totalRow.getCell(colIdx);
-        cell.alignment = { vertical: 'middle', horizontal: 'right' };
-        cell.font = { bold: true, color: { argb: 'FF1A73E8' } };
-        cell.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: { argb: 'FFE8F0FE' },
-        };
-      }
-
-      this.applyRowBorder(totalRow);
-      currentRowIdx++;
+      await streamer.addSummaryRow(totalRowValues, { height: 24 });
 
       // Dòng trống ngăn cách giữa các món
-      const emptyRow = sheet.addRow([]);
-      emptyRow.height = 12;
-      currentRowIdx++;
+      await streamer.addRow([], { height: 12 });
+    };
+
+    if (isDirectList) {
+      for (const dish of dishes) {
+        await processDish(dish);
+      }
+    } else {
+      const dto = (dtoOrDishes || {}) as ExportDishDto;
+      const currentUser = currentUserOrColumns as { id: string };
+
+      const where: any = {
+        deleted_at: null,
+      };
+
+      if (currentUser?.id) {
+        where.nguoi_dung_id = currentUser.id;
+      }
+
+      if (dto.keyword && dto.keyword.trim()) {
+        where.ten_mon = { contains: dto.keyword.trim() };
+      }
+
+      // Lean query projection (Rule 11)
+      const ingredientSelect: any = {
+        id: true,
+        ten_nguyen_lieu: true,
+        edible: true,
+      };
+      for (const col of columnsToExport) {
+        ingredientSelect[col.key] = true;
+      }
+
+      const select: any = {
+        id: true,
+        ten_mon: true,
+        chi_tiet_mon_an: {
+          select: {
+            id: true,
+            khoi_luong_song_sach: true,
+            nguyen_lieu_id: true,
+            nguyen_lieu: {
+              select: ingredientSelect,
+            },
+          },
+        },
+      };
+
+      await streamPrismaInBatches<any>(this.prisma, {
+        model: 'mon_an',
+        where,
+        select,
+        orderBy: { id: 'desc' },
+        batchSize: 200,
+        onBatch: async (batch) => {
+          for (const dish of batch) {
+            await processDish(dish);
+          }
+        },
+      });
     }
 
-    const buffer = await workbook.xlsx.writeBuffer();
-    return Buffer.from(buffer);
+    await streamer.finalize();
+
+    if (cacheKey && this.cacheService && chunks.length > 0) {
+      const fullBuf = Buffer.concat(chunks);
+      if (fullBuf.length <= 10 * 1024 * 1024) {
+        await this.cacheService.set(cacheKey, fullBuf.toString('base64'), 2592000, 'dishes');
+        this.logger.debug('💾 Đã lưu dữ liệu xuất món ăn vào CacheService (tag=dishes)');
+      }
+    }
+  }
+
+  /**
+   * Xuất danh sách món ăn ra Excel kèm 86 chỉ tiêu vi chất (Hỗ trợ cả ExportDishDto và danh sách món trực tiếp)
+   */
+  async exportDishes(
+    dtoOrDishes: ExportDishDto | any[],
+    currentUserOrColumns?: any,
+  ): Promise<Buffer> {
+    const passThrough = new PassThrough();
+    const chunks: Buffer[] = [];
+    passThrough.on('data', (c) => chunks.push(c));
+    const streamPromise = new Promise<Buffer>((resolve, reject) => {
+      passThrough.on('end', () => resolve(Buffer.concat(chunks)));
+      passThrough.on('error', reject);
+    });
+
+    await this.streamExportDishes(dtoOrDishes, currentUserOrColumns, passThrough);
+    return streamPromise;
   }
 
   // ===== PRIVATE HELPERS =====

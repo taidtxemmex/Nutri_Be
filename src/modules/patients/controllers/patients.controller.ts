@@ -15,6 +15,8 @@ import {
 import { ApiOperation, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PatientsService } from '../services/patients.service';
 import { PatientExcelService } from '../services/patient-excel.service';
 import {
@@ -40,7 +42,7 @@ import { ParseBigIntPipe } from '../../../common/pipes/parse-bigint.pipe';
 
 const PATIENT_ID_PARAM = { name: 'id', description: 'ID bệnh nhân' };
 
-@ApiController('Patients', ['patients'], { auth: true })
+@ApiController('Patients', ['patients', 'patient'], { auth: true })
 export class PatientsController {
   constructor(
     private readonly patientsService: PatientsService,
@@ -72,12 +74,20 @@ export class PatientsController {
   @Get('import-template')
   @ApiOperation({ summary: 'Tải file mẫu Excel import bệnh nhân' })
   async downloadTemplate(@Res() res: Response) {
-    const buffer = await this.patientExcelService.getTemplateBuffer();
+    const safeFileName = path.basename('Template_import_benh_nhan.xlsx');
+    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
+
     res.setHeader(
       'Content-Type',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     );
-    res.setHeader('Content-Disposition', 'attachment; filename=Template_import_benh_nhan.xlsx');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"`);
+
+    if (fs.existsSync(filePath)) {
+      return fs.createReadStream(filePath).pipe(res);
+    }
+
+    const buffer = await this.patientExcelService.getTemplateBuffer();
     return res.end(buffer);
   }
 
@@ -118,7 +128,16 @@ export class PatientsController {
       message: result.message,
       success: true,
       count: result.count,
-      data: { success: true, count: result.count },
+      data: {
+        total: result.total ?? result.count ?? 0,
+        imported: result.imported ?? result.count ?? 0,
+        skipped: result.skipped ?? 0,
+        success: true,
+        count: result.count,
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 

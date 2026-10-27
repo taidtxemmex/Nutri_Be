@@ -9,7 +9,11 @@ export class EvidenceStorageService {
   private readonly baseUrl: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.secretKey = this.configService.get<string>('JWT_SECRET', 'evidence-secret-key-12345');
+    const secret = this.configService.get<string>('JWT_SECRET');
+    if (!secret && process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing for Evidence Storage HMAC!');
+    }
+    this.secretKey = secret || 'dev_temporary_evidence_secret_hmac_key_12345';
     const port = this.configService.get<string>('PORT', '8080');
     this.baseUrl = this.configService.get<string>('APP_URL', `http://localhost:${port}`);
   }

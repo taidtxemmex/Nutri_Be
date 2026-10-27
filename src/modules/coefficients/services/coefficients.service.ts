@@ -1,6 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
+import { CACHE_TTL_PERPETUAL } from '../../../config/constants/cache.constants';
 import { CreateCoefficientDto, UpdateCoefficientDto, CoefficientResponseDto } from '../dto';
 import { UserRole } from '../../../config/enums/role.enum';
 
@@ -153,57 +154,81 @@ export class CoefficientsService {
   }
 
   async findPublic(): Promise<CoefficientResponseDto[]> {
-    const items = await this.prisma.he_so_song_chin.findMany({
-      where: { is_public: true },
-      select: {
-        id: true,
-        nguyen_lieu_id: true,
-        phuong_phap_che_bien: true,
-        he_so: true,
-        is_public: true,
-        nguoi_dung_id: true,
-        nguyen_lieu: { select: { ten_nguyen_lieu: true } },
-      },
-      orderBy: { id: 'desc' },
-    });
+    const cacheKey = `${this.CACHE_TAG}:public`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      CACHE_TTL_PERPETUAL,
+      async () => {
+        const items = await this.prisma.he_so_song_chin.findMany({
+          where: { is_public: true },
+          select: {
+            id: true,
+            nguyen_lieu_id: true,
+            phuong_phap_che_bien: true,
+            he_so: true,
+            is_public: true,
+            nguoi_dung_id: true,
+            nguyen_lieu: { select: { ten_nguyen_lieu: true } },
+          },
+          orderBy: { id: 'desc' },
+        });
 
-    return items.map((item) => this.mapToDto(item));
+        return items.map((item) => this.mapToDto(item));
+      },
+      this.CACHE_TAG,
+    );
   }
 
   async findMy(currentUser: { id: string }): Promise<CoefficientResponseDto[]> {
-    const items = await this.prisma.he_so_song_chin.findMany({
-      where: { nguoi_dung_id: currentUser.id },
-      select: {
-        id: true,
-        nguyen_lieu_id: true,
-        phuong_phap_che_bien: true,
-        he_so: true,
-        is_public: true,
-        nguoi_dung_id: true,
-        nguyen_lieu: { select: { ten_nguyen_lieu: true } },
-      },
-      orderBy: { id: 'desc' },
-    });
+    const cacheKey = `${this.CACHE_TAG}:my:${currentUser.id}`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      CACHE_TTL_PERPETUAL,
+      async () => {
+        const items = await this.prisma.he_so_song_chin.findMany({
+          where: { nguoi_dung_id: currentUser.id },
+          select: {
+            id: true,
+            nguyen_lieu_id: true,
+            phuong_phap_che_bien: true,
+            he_so: true,
+            is_public: true,
+            nguoi_dung_id: true,
+            nguyen_lieu: { select: { ten_nguyen_lieu: true } },
+          },
+          orderBy: { id: 'desc' },
+        });
 
-    return items.map((item) => this.mapToDto(item));
+        return items.map((item) => this.mapToDto(item));
+      },
+      this.CACHE_TAG,
+    );
   }
 
   async findById(id: string | number): Promise<CoefficientResponseDto> {
-    const item = await this.prisma.he_so_song_chin.findUnique({
-      where: { id: BigInt(id) },
-      include: {
-        nguyen_lieu: { select: { ten_nguyen_lieu: true } },
+    const cacheKey = `${this.CACHE_TAG}:detail:${id}`;
+    return this.cacheService.getOrSet(
+      cacheKey,
+      CACHE_TTL_PERPETUAL,
+      async () => {
+        const item = await this.prisma.he_so_song_chin.findUnique({
+          where: { id: BigInt(id) },
+          include: {
+            nguyen_lieu: { select: { ten_nguyen_lieu: true } },
+          },
+        });
+
+        if (!item) {
+          throw new HttpException(
+            { code: 'COEF_001', message: 'Không tìm thấy hệ số' },
+            HttpStatus.NOT_FOUND,
+          );
+        }
+
+        return this.mapToDto(item);
       },
-    });
-
-    if (!item) {
-      throw new HttpException(
-        { code: 'COEF_001', message: 'Không tìm thấy hệ số' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    return this.mapToDto(item);
+      [this.CACHE_TAG, `${this.CACHE_TAG}:${id}`],
+    );
   }
 
   async update(

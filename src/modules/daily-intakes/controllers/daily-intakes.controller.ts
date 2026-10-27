@@ -11,8 +11,11 @@ import {
   UploadedFile,
   HttpStatus,
   HttpCode,
+  HttpException,
 } from '@nestjs/common';
 import { Response } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { DailyIntakesService } from '../services/daily-intakes.service';
@@ -25,7 +28,9 @@ import {
   DailyIntakeListDto,
   ExportDailyIntakeDto,
   ImportDailyIntakeQueryDto,
+  DailyIntakeExportRequestDto,
 } from '../dto';
+import { DailyIntakeReportStreamService } from '../services/daily-intake-report-stream.service';
 import {
   ApiController,
   ApiStandardResponse,
@@ -36,11 +41,12 @@ import {
 } from '../../../common/decorators';
 import { DailyIntakeClinicalReportType } from '../../../config/enums/domain.enum';
 
-@ApiController('DailyIntakes', 'daily-intakes')
+@ApiController('DailyIntakes', ['daily-intakes', 'daily-intake'])
 export class DailyIntakesController {
   constructor(
     private readonly service: DailyIntakesService,
     private readonly excelService: DailyIntakeExcelService,
+    private readonly reportStreamService: DailyIntakeReportStreamService,
   ) {}
 
   @Get()
@@ -62,16 +68,35 @@ export class DailyIntakesController {
   @Get('import-template')
   @Auth()
   @SkipTransform()
-  @ApiOperation({ summary: 'Tải file Excel mẫu để nhập liệu khẩu phần 24h' })
-  async downloadTemplate(@Res() res: Response): Promise<void> {
-    const buffer = await this.excelService.generateTemplate();
+  @ApiOperation({ summary: 'Tải file Excel mẫu để nhập liệu khẩu phần 24h (theo bữa hoặc theo ngày)' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['BY_MEAL', 'INGREDIENT_ONLY'],
+    description: 'Loại template: BY_MEAL (theo bữa) hoặc INGREDIENT_ONLY (theo ngày)',
+  })
+  async downloadTemplate(
+    @Query('type') type: string | undefined,
+    @Res() res: Response,
+  ): Promise<void> {
+    const normalizedType = type?.toUpperCase() === 'INGREDIENT_ONLY' ? 'INGREDIENT_ONLY' : 'BY_MEAL';
+    const fileName = normalizedType === 'INGREDIENT_ONLY'
+      ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
+      : 'Template_import_khau_phan_24h_theo_bua.xlsx';
+    const safeFileName = path.basename(fileName);
+    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename="Template_nhap_lieu_khau_phan_24h.xlsx"',
-      'Content-Length': buffer.length,
+      'Content-Disposition': `attachment; filename="${safeFileName}"`,
     });
 
+    if (fs.existsSync(filePath)) {
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    }
+
+    const buffer = await this.excelService.generateTemplate(type);
     res.end(buffer);
   }
 
@@ -186,7 +211,14 @@ export class DailyIntakesController {
     @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
-    const result = await this.excelService.importDailyIntakeExcel(file?.buffer, {
+    if (!file || !file.buffer) {
+      throw new HttpException(
+        { code: 'FILE_REQUIRED', message: 'Vui lòng đính kèm file Excel (.xlsx)' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const result = await this.excelService.importDailyIntakeExcel(file.buffer, {
       patientId: query.patientId,
       userId: user.id,
       userRole: user.role,
@@ -195,19 +227,30 @@ export class DailyIntakesController {
     });
 
     if (!result.success && result.errorFileBuffer) {
-      res.set({
-        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': `attachment; filename="${result.errorFileName || 'error_import_intake.xlsx'}"`,
-        'Content-Length': result.errorFileBuffer.length,
-      });
+      res.setHeader(
+        'Content-Type',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${result.errorFileName || 'error_import_intake.xlsx'}"`,
+      );
       res.end(result.errorFileBuffer);
       return;
     }
 
-    res.json({
+    res.status(HttpStatus.OK).json({
       status: HttpStatus.OK,
       message: result.message || 'Import khẩu phần thành công',
-      data: result,
+      data: {
+        total: result.total ?? result.importedCount,
+        imported: result.imported ?? result.importedCount,
+        skipped: result.skipped ?? 0,
+        dailyIntakeId: result.dailyIntakeId ? String(result.dailyIntakeId) : undefined,
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+      },
     });
   }
 
@@ -230,41 +273,48 @@ export class DailyIntakesController {
     const reportType =
       bodyDto?.reportType || qReportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
-    const buffer = await this.excelService.exportClinicalReport(BigInt(id), reportType, user?.id);
-
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'Content-Disposition': `attachment; filename="bao_cao_lam_sang_24h_${id}_${reportType.toLowerCase()}.xlsx"`,
-      'Content-Length': buffer.length,
     });
 
-    res.end(buffer);
+    await this.excelService.streamClinicalReport(BigInt(id), res, reportType, user?.id);
   }
 
   @Post('export')
+  @HttpCode(HttpStatus.OK)
   @Auth()
   @SkipTransform()
-  @ApiOperation({ summary: 'Xuất báo cáo lâm sàng khẩu phần 24h qua POST payload' })
-  async exportClinicalReportPost(
+  @ApiOperation({
+    summary:
+      'Xuất 4 mẫu báo cáo khẩu phần đa bệnh nhân (1: TOTAL_FOOD_GROUP_MULTI_PATIENTS, 2: AVG_GROUP_WEIGHT_PER_PATIENT, 3: DAILY_NUTRIENT_INTAKE_PATIENT, 4: TOTAL_WEIGHT_FOOD_GROUP_MULTI_PATIENTS)',
+  })
+  async exportDailyIntakes(
     @Body() body: any,
     @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
-    const targetId = body.id || body.dailyIntakeId;
-    const reportType = body.reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
+    // 1. Tương thích ngược: Nếu request gửi { id / dailyIntakeId } mà KHÔNG có templateType
+    const targetId = body?.id || body?.dailyIntakeId;
+    if (!body?.templateType && targetId) {
+      const reportType = body.reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
-    const buffer = await this.excelService.exportClinicalReport(
-      BigInt(targetId),
-      reportType,
-      user?.id,
-    );
+      res.set({
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': `attachment; filename="bao_cao_lam_sang_24h_${targetId}_${reportType.toLowerCase()}.xlsx"`,
+      });
 
-    res.set({
-      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="bao_cao_lam_sang_24h_${targetId}_${reportType.toLowerCase()}.xlsx"`,
-      'Content-Length': buffer.length,
-    });
+      await this.excelService.streamClinicalReport(
+        BigInt(targetId),
+        res,
+        reportType,
+        user?.id,
+      );
+      return;
+    }
 
-    res.end(buffer);
+    // 2. Mẫu xuất đa bệnh nhân chuẩn Sprint 6 & đối chiếu Java Spring Boot
+    const dto = Object.assign(new DailyIntakeExportRequestDto(), body);
+    await this.reportStreamService.export(dto, res, user);
   }
 }

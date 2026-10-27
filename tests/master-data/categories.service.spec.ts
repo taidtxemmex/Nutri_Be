@@ -78,7 +78,7 @@ describe('CategoriesService', () => {
 
       expect(result.id).toBe(3);
       expect(result.categoryName).toBe('Rau củ');
-      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['categories']);
+      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['categories', 'category:3']);
     });
   });
 
@@ -133,7 +133,7 @@ describe('CategoriesService', () => {
       const result = await service.delete(1);
 
       expect(result.success).toBe(true);
-      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['categories']);
+      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['categories', 'category:1']);
     });
   });
 });

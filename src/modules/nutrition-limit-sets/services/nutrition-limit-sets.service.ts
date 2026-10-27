@@ -1,6 +1,7 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
+import { CACHE_TTL_PERPETUAL } from '../../../config/constants/cache.constants';
 import {
   CreateNutritionLimitSetDto,
   UpdateNutritionLimitSetDto,
@@ -75,6 +76,7 @@ export class NutritionLimitSetsService {
       },
     });
 
+    await this.cacheService.debouncedInvalidateTags([this.CACHE_TAG]);
     await this.cacheService.invalidateTag(this.CACHE_TAG);
     return this.mapToDto(created);
   }
@@ -114,7 +116,10 @@ export class NutritionLimitSetsService {
       },
     });
 
-    await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.debouncedInvalidateTags([
+      this.CACHE_TAG,
+      `nutrition_limit:${limitId.toString()}`,
+    ]);
     return this.mapToDto(updated);
   }
 
@@ -123,9 +128,17 @@ export class NutritionLimitSetsService {
     currentUser: { id: string; role?: string },
   ): Promise<NutritionLimitSetResponseDto> {
     const limitId = BigInt(id);
-    const existing = await this.prisma.gioi_han_dinh_duong.findUnique({
-      where: { id: limitId },
-    });
+    const cacheKey = `nutrition_limit:detail:${limitId.toString()}`;
+    const existing = await this.cacheService.getOrSet(
+      cacheKey,
+      CACHE_TTL_PERPETUAL,
+      async () => {
+        return this.prisma.gioi_han_dinh_duong.findUnique({
+          where: { id: limitId },
+        });
+      },
+      [this.CACHE_TAG, `nutrition_limit:${limitId.toString()}`],
+    );
 
     if (!existing) {
       throw new HttpException(
@@ -151,26 +164,34 @@ export class NutritionLimitSetsService {
     id: string;
     role?: string;
   }): Promise<NutritionLimitSetResponseDto[]> {
-    const sets = await this.prisma.gioi_han_dinh_duong.findMany({
-      where: {
-        OR: [{ nguoi_dung_id: currentUser.id }, { tai_su_dung: true }],
-      },
-      select: {
-        id: true,
-        ten_gioi_han: true,
-        canh_bao: true,
-        tai_su_dung: true,
-        gioi_han_json: true,
-        ngay_tao: true,
-        ngay_cap_nhat: true,
-      },
-      orderBy: {
-        ngay_cap_nhat: 'desc',
-      },
-      take: 100,
-    });
+    const cacheKey = this.cacheService.generateKey(`${this.CACHE_TAG}:${currentUser.id}`);
+    return this.cacheService.getOrSet(
+      cacheKey,
+      CACHE_TTL_PERPETUAL,
+      async () => {
+        const sets = await this.prisma.gioi_han_dinh_duong.findMany({
+          where: {
+            OR: [{ nguoi_dung_id: currentUser.id }, { tai_su_dung: true }],
+          },
+          select: {
+            id: true,
+            ten_gioi_han: true,
+            canh_bao: true,
+            tai_su_dung: true,
+            gioi_han_json: true,
+            ngay_tao: true,
+            ngay_cap_nhat: true,
+          },
+          orderBy: {
+            ngay_cap_nhat: 'desc',
+          },
+          take: 100,
+        });
 
-    return sets.map((s) => this.mapToDto(s));
+        return sets.map((s) => this.mapToDto(s));
+      },
+      this.CACHE_TAG,
+    );
   }
 
   async delete(
@@ -224,7 +245,10 @@ export class NutritionLimitSetsService {
       where: { id: limitId },
     });
 
-    await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.debouncedInvalidateTags([
+      this.CACHE_TAG,
+      `nutrition_limit:${limitId.toString()}`,
+    ]);
     return { success: true, message: 'Xóa bộ giới hạn dinh dưỡng thành công' };
   }
 }

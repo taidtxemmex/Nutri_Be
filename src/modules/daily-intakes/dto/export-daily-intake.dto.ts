@@ -16,10 +16,11 @@ export class ExportDailyIntakeDto {
 
 export class ImportDailyIntakeQueryDto {
   @ApiPropertyOptional({
-    description: 'ID bệnh nhân sở hữu khẩu phần 24h',
+    description: 'ID bệnh nhân sở hữu khẩu phần 24h (tùy chọn khi dùng file mẫu đa bệnh nhân)',
   })
+  @IsOptional()
   @IsString()
-  patientId: string;
+  patientId?: string;
 
   @ApiPropertyOptional({
     description: 'Ngày ăn (định dạng YYYY-MM-DD)',

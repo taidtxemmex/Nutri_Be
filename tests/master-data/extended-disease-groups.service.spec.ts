@@ -117,7 +117,9 @@ describe('ExtendedDiseaseGroupsService', () => {
       const result = await service.delete(1, 'user-123');
 
       expect(result.success).toBe(true);
-      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['extended_disease_groups']);
+      expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(
+        expect.arrayContaining(['extended_disease_groups']),
+      );
     });
   });
 });

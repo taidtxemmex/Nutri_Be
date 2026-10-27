@@ -43,11 +43,26 @@ describe('IngredientsController', () => {
         id: '1',
         trang_thai: 'DA_DUYET',
       }),
+      rejectPending: jest.fn().mockResolvedValue({
+        id: '1',
+        trang_thai: 'TU_CHOI',
+      }),
     };
 
     mockExcelService = {
       generateTemplate: jest.fn().mockResolvedValue(Buffer.from('fake-template')),
       exportIngredients: jest.fn().mockResolvedValue(Buffer.from('fake-export')),
+      streamExportIngredients: jest.fn().mockImplementation(async (dto, res) => {
+        res.setHeader(
+          'Content-Type',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        res.setHeader(
+          'Content-Disposition',
+          'attachment; filename="danh_sach_nguyen_lieu.xlsx"',
+        );
+        res.end(Buffer.from('fake-export'));
+      }),
       importExcel: jest.fn().mockResolvedValue({
         success: true,
         totalImported: 5,
@@ -127,20 +142,28 @@ describe('IngredientsController', () => {
     });
   });
 
+  describe('rejectPending', () => {
+    it('should call rejectPending on service', async () => {
+      const result = await controller.rejectPending('1');
+      expect(result.trang_thai).toBe('TU_CHOI');
+      expect(mockIngredientsService.rejectPending).toHaveBeenCalledWith('1');
+    });
+  });
+
   describe('downloadTemplate', () => {
     it('should set headers and stream template buffer to response', async () => {
       const res: any = {
         setHeader: jest.fn(),
         end: jest.fn(),
       };
-      await controller.downloadTemplate(undefined, res);
+      await controller.downloadTemplate(['ten_nguyen_lieu'], res);
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
-        'attachment; filename="ingredient_template.xlsx"',
+        'attachment; filename="Template_import_nguyen_lieu.xlsx"',
       );
       expect(res.end).toHaveBeenCalledWith(Buffer.from('fake-template'));
     });

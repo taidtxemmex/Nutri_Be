@@ -10,7 +10,9 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import {
   CACHE_TAG_DISEASE_GROUPS,
-  CACHE_TTL_LIST_SECONDS,
+  CACHE_TTL_PERPETUAL,
+  buildDiseaseGroupCacheTag,
+  buildDiseaseGroupDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import {
   DEFAULT_PAGE,
@@ -42,6 +44,7 @@ export class DiseaseGroupsService {
 
   /**
    * Danh sách nhóm bệnh có phân trang (Anti-OOM, Lean Projection)
+   * Tích hợp Perpetual Cache (Rule 23)
    */
   async findAll(query?: DiseaseGroupQueryDto): Promise<PaginatedDiseaseGroupsResult> {
     const page = Math.max(1, Number(query?.page) || DEFAULT_PAGE);
@@ -56,93 +59,122 @@ export class DiseaseGroupsService {
       sortOrder: query?.sortOrder,
     });
 
-    if (this.cacheService && cacheKey) {
-      const cached = await this.cacheService.get<PaginatedDiseaseGroupsResult>(cacheKey);
-      if (cached) {
-        return cached;
+    const fetchDiseaseGroups = async (): Promise<PaginatedDiseaseGroupsResult> => {
+      const where: any = {};
+      if (query?.search) {
+        const keyword = query.search.trim();
+        where.OR = [{ ma_nhom: { contains: keyword } }, { ten_nhom: { contains: keyword } }];
       }
+
+      const orderBy: any = {};
+      const sortField =
+        query?.sortBy === 'code' ? 'ma_nhom' : query?.sortBy === 'name' ? 'ten_nhom' : 'id';
+      orderBy[sortField] = query?.sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+      const [total, records] = await Promise.all([
+        this.prisma.nhom_benh.count({ where }),
+        this.prisma.nhom_benh.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy,
+          select: {
+            id: true,
+            ma_nhom: true,
+            ten_nhom: true,
+          },
+        }),
+      ]);
+
+      const items: DiseaseGroupResponseDto[] = records.map((r) => ({
+        id: r.id,
+        code: r.ma_nhom || '',
+        name: r.ten_nhom || '',
+        maNhom: r.ma_nhom || '',
+        tenNhom: r.ten_nhom || '',
+      }));
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+      };
+    };
+
+    if (this.cacheService && cacheKey) {
+      if (typeof this.cacheService.getOrSet === 'function') {
+        return this.cacheService.getOrSet(
+          cacheKey,
+          CACHE_TTL_PERPETUAL,
+          fetchDiseaseGroups,
+          CACHE_TAG_DISEASE_GROUPS,
+        );
+      }
+      const cached = await this.cacheService.get<PaginatedDiseaseGroupsResult>(cacheKey);
+      if (cached) return cached;
+      const result = await fetchDiseaseGroups();
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, CACHE_TAG_DISEASE_GROUPS);
+      return result;
     }
 
-    const where: any = {};
-    if (query?.search) {
-      const keyword = query.search.trim();
-      where.OR = [{ ma_nhom: { contains: keyword } }, { ten_nhom: { contains: keyword } }];
-    }
+    return fetchDiseaseGroups();
+  }
 
-    const orderBy: any = {};
-    const sortField =
-      query?.sortBy === 'code' ? 'ma_nhom' : query?.sortBy === 'name' ? 'ten_nhom' : 'id';
-    orderBy[sortField] = query?.sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
-
-    const [total, records] = await Promise.all([
-      this.prisma.nhom_benh.count({ where }),
-      this.prisma.nhom_benh.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy,
+  /**
+   * Lấy chi tiết nhóm bệnh theo ID (Shared Entity Cache / Identity Map)
+   */
+  async findById(id: number): Promise<DiseaseGroupResponseDto> {
+    const fetchDiseaseGroup = async () => {
+      const record = await this.prisma.nhom_benh.findUnique({
+        where: { id },
         select: {
           id: true,
           ma_nhom: true,
           ten_nhom: true,
         },
-      }),
-    ]);
-
-    const items: DiseaseGroupResponseDto[] = records.map((r) => ({
-      id: r.id,
-      code: r.ma_nhom || '',
-      name: r.ten_nhom || '',
-      maNhom: r.ma_nhom || '',
-      tenNhom: r.ten_nhom || '',
-    }));
-
-    const result: PaginatedDiseaseGroupsResult = {
-      items,
-      total,
-      page,
-      limit,
-    };
-
-    if (this.cacheService && cacheKey) {
-      await this.cacheService.set(
-        cacheKey,
-        result,
-        CACHE_TTL_LIST_SECONDS,
-        CACHE_TAG_DISEASE_GROUPS,
-      );
-    }
-
-    return result;
-  }
-
-  /**
-   * Lấy chi tiết nhóm bệnh theo ID
-   */
-  async findById(id: number): Promise<DiseaseGroupResponseDto> {
-    const record = await this.prisma.nhom_benh.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        ma_nhom: true,
-        ten_nhom: true,
-      },
-    });
-
-    if (!record) {
-      throw new NotFoundException({
-        code: 'DG_001',
-        message: 'error.disease_group.not_found',
       });
+
+      if (!record) {
+        throw new NotFoundException({
+          code: 'DG_001',
+          message: 'error.disease_group.not_found',
+        });
+      }
+
+      return {
+        id: record.id,
+        code: record.ma_nhom || '',
+        name: record.ten_nhom || '',
+        maNhom: record.ma_nhom || '',
+        tenNhom: record.ten_nhom || '',
+      };
+    };
+
+    if (this.cacheService) {
+      if (typeof this.cacheService.getOrSet === 'function') {
+        return this.cacheService.getOrSet(
+          buildDiseaseGroupDetailCacheKey(id),
+          CACHE_TTL_PERPETUAL,
+          fetchDiseaseGroup,
+          [CACHE_TAG_DISEASE_GROUPS, buildDiseaseGroupCacheTag(id)],
+        );
+      }
+      const cached = await this.cacheService.get<DiseaseGroupResponseDto>(
+        buildDiseaseGroupDetailCacheKey(id),
+      );
+      if (cached) return cached;
+      const result = await fetchDiseaseGroup();
+      await this.cacheService.set(
+        buildDiseaseGroupDetailCacheKey(id),
+        result,
+        CACHE_TTL_PERPETUAL,
+        [CACHE_TAG_DISEASE_GROUPS, buildDiseaseGroupCacheTag(id)],
+      );
+      return result;
     }
 
-    return {
-      id: record.id,
-      code: record.ma_nhom || '',
-      name: record.ten_nhom || '',
-      maNhom: record.ma_nhom || '',
-      tenNhom: record.ten_nhom || '',
-    };
+    return fetchDiseaseGroup();
   }
 
   /**
@@ -187,7 +219,7 @@ export class DiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache();
+    await this.invalidateCache(created.id);
 
     return {
       id: created.id,
@@ -250,7 +282,7 @@ export class DiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache();
+    await this.invalidateCache(id);
 
     return {
       id: updated.id,
@@ -295,7 +327,7 @@ export class DiseaseGroupsService {
       where: { id },
     });
 
-    await this.invalidateCache();
+    await this.invalidateCache(id);
 
     return {
       success: true,
@@ -303,9 +335,13 @@ export class DiseaseGroupsService {
     };
   }
 
-  private async invalidateCache(): Promise<void> {
+  private async invalidateCache(id?: number): Promise<void> {
     if (this.cacheService) {
-      await this.cacheService.debouncedInvalidateTags([CACHE_TAG_DISEASE_GROUPS]);
+      const tags = [CACHE_TAG_DISEASE_GROUPS];
+      if (id !== undefined) {
+        tags.push(buildDiseaseGroupCacheTag(id));
+      }
+      await this.cacheService.debouncedInvalidateTags(tags);
     }
   }
 }

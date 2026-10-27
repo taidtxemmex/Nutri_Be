@@ -10,8 +10,9 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import {
   CACHE_TAG_CATEGORIES,
-  CACHE_TTL_LIST_SECONDS,
-  CACHE_TTL_LOOKUP_SECONDS,
+  CACHE_TTL_PERPETUAL,
+  buildCategoryCacheTag,
+  buildCategoryDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import {
   DEFAULT_PAGE,
@@ -103,70 +104,100 @@ export class CategoriesService {
     };
 
     if (this.cacheService && cacheKey) {
-      await this.cacheService.set(cacheKey, result, CACHE_TTL_LIST_SECONDS, CACHE_TAG_CATEGORIES);
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, CACHE_TAG_CATEGORIES);
     }
 
     return result;
   }
 
   /**
-   * Public lookup endpoint phục vụ dropdown / combobox với TTL 30 phút (Rule 23)
+   * Public lookup endpoint phục vụ dropdown / combobox với TTL Perpetual (Rule 23)
    */
   async getPublicLookup(): Promise<CategoryResponseDto[]> {
     const cacheKey = 'cache:categories:lookup';
 
+    const fetchCategories = async () => {
+      const records = await this.prisma.danh_muc.findMany({
+        orderBy: { ten_danh_muc: 'asc' },
+        select: {
+          id: true,
+          ten_danh_muc: true,
+        },
+      });
+
+      return records.map((r) => ({
+        id: r.id,
+        categoryName: r.ten_danh_muc || '',
+        tenDanhMuc: r.ten_danh_muc || '',
+      }));
+    };
+
     if (this.cacheService) {
-      const cached = await this.cacheService.get<CategoryResponseDto[]>(cacheKey);
-      if (cached) {
-        return cached;
+      if (typeof this.cacheService.getOrSet === 'function') {
+        return this.cacheService.getOrSet(
+          cacheKey,
+          CACHE_TTL_PERPETUAL,
+          fetchCategories,
+          CACHE_TAG_CATEGORIES,
+        );
       }
+      const cached = await this.cacheService.get<CategoryResponseDto[]>(cacheKey);
+      if (cached) return cached;
+      const items = await fetchCategories();
+      await this.cacheService.set(cacheKey, items, CACHE_TTL_PERPETUAL, CACHE_TAG_CATEGORIES);
+      return items;
     }
 
-    const records = await this.prisma.danh_muc.findMany({
-      orderBy: { ten_danh_muc: 'asc' },
-      select: {
-        id: true,
-        ten_danh_muc: true,
-      },
-    });
-
-    const items: CategoryResponseDto[] = records.map((r) => ({
-      id: r.id,
-      categoryName: r.ten_danh_muc || '',
-      tenDanhMuc: r.ten_danh_muc || '',
-    }));
-
-    if (this.cacheService) {
-      await this.cacheService.set(cacheKey, items, CACHE_TTL_LOOKUP_SECONDS, CACHE_TAG_CATEGORIES);
-    }
-
-    return items;
+    return fetchCategories();
   }
 
   /**
-   * Lấy chi tiết danh mục theo ID
+   * Lấy chi tiết danh mục theo ID (Shared Entity Cache / Identity Map)
    */
   async findById(id: number): Promise<CategoryResponseDto> {
-    const record = await this.prisma.danh_muc.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        ten_danh_muc: true,
-      },
-    });
-
-    if (!record) {
-      throw new NotFoundException({
-        code: 'PROP_007',
-        message: 'error.category.not_found',
+    const fetchCategory = async () => {
+      const record = await this.prisma.danh_muc.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          ten_danh_muc: true,
+        },
       });
+
+      if (!record) {
+        throw new NotFoundException({
+          code: 'PROP_007',
+          message: 'error.category.not_found',
+        });
+      }
+
+      return {
+        id: record.id,
+        categoryName: record.ten_danh_muc || '',
+        tenDanhMuc: record.ten_danh_muc || '',
+      };
+    };
+
+    if (this.cacheService) {
+      if (typeof this.cacheService.getOrSet === 'function') {
+        return this.cacheService.getOrSet(
+          buildCategoryDetailCacheKey(id),
+          CACHE_TTL_PERPETUAL,
+          fetchCategory,
+          [CACHE_TAG_CATEGORIES, buildCategoryCacheTag(id)],
+        );
+      }
+      const cached = await this.cacheService.get<CategoryResponseDto>(buildCategoryDetailCacheKey(id));
+      if (cached) return cached;
+      const result = await fetchCategory();
+      await this.cacheService.set(buildCategoryDetailCacheKey(id), result, CACHE_TTL_PERPETUAL, [
+        CACHE_TAG_CATEGORIES,
+        buildCategoryCacheTag(id),
+      ]);
+      return result;
     }
 
-    return {
-      id: record.id,
-      categoryName: record.ten_danh_muc || '',
-      tenDanhMuc: record.ten_danh_muc || '',
-    };
+    return fetchCategory();
   }
 
   /**
@@ -210,7 +241,7 @@ export class CategoriesService {
       },
     });
 
-    await this.invalidateCategoryCache();
+    await this.invalidateCategoryCache(created.id);
 
     return {
       id: created.id,
@@ -223,7 +254,7 @@ export class CategoriesService {
    * Cập nhật danh mục
    * - Kiểm tra tồn tại (PROP_007, 404)
    * - Check trùng tên khác ID (CAT_001, 400)
-   * - Invalidate Cache tag: categories
+   * - Invalidate Cache tag: categories & category:id
    */
   async update(id: number, dto: UpdateCategoryDto): Promise<CategoryResponseDto> {
     const existing = await this.prisma.danh_muc.findUnique({
@@ -274,7 +305,7 @@ export class CategoriesService {
       },
     });
 
-    await this.invalidateCategoryCache();
+    await this.invalidateCategoryCache(id);
 
     return {
       id: updated.id,
@@ -287,7 +318,7 @@ export class CategoriesService {
    * Xóa danh mục
    * - Kiểm tra tồn tại (PROP_007, 404)
    * - Proactive check _count trên nguyen_lieu & de_xuat_nguyen_lieu (CAT_002, 409)
-   * - Invalidate Cache tag: categories
+   * - Invalidate Cache tag: categories & category:id
    */
   async delete(id: number): Promise<{ success: boolean; message: string }> {
     const existing = await this.prisma.danh_muc.findUnique({
@@ -325,7 +356,7 @@ export class CategoriesService {
       where: { id },
     });
 
-    await this.invalidateCategoryCache();
+    await this.invalidateCategoryCache(id);
 
     return {
       success: true,
@@ -333,9 +364,13 @@ export class CategoriesService {
     };
   }
 
-  private async invalidateCategoryCache(): Promise<void> {
+  private async invalidateCategoryCache(id?: number): Promise<void> {
     if (this.cacheService) {
-      await this.cacheService.debouncedInvalidateTags([CACHE_TAG_CATEGORIES]);
+      const tags = [CACHE_TAG_CATEGORIES];
+      if (id !== undefined) {
+        tags.push(buildCategoryCacheTag(id));
+      }
+      await this.cacheService.debouncedInvalidateTags(tags);
     }
   }
 }

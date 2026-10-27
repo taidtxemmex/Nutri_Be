@@ -17,6 +17,8 @@ import {
 import { ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response, Request } from 'express';
+import * as fs from 'fs';
+import * as path from 'path';
 import { ExtendedDiseaseGroupsService } from '../services/extended-disease-groups.service';
 import { ExtendedDiseaseGroupsImportService } from '../services/extended-disease-groups-import.service';
 import {
@@ -55,12 +57,21 @@ export class ExtendedDiseaseGroupsController {
   @SkipTransform()
   @ApiOperation({ summary: 'Tải file Excel mẫu để import nhóm bệnh mở rộng' })
   async downloadTemplate(@Res() res: Response) {
-    const buffer = await this.importService.getTemplate();
+    const safeFileName = path.basename('Template_import_nhom_benh_mo_rong.xlsx');
+    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
+
     res.set({
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': 'attachment; filename=Template_import_nhom_benh_mo_rong.xlsx',
+      'Content-Disposition': `attachment; filename="${safeFileName}"`,
     });
-    res.send(buffer);
+
+    if (fs.existsSync(filePath)) {
+      return fs.createReadStream(filePath).pipe(res);
+    }
+
+    const buffer = await this.importService.getTemplate();
+    fs.promises.writeFile(filePath, buffer).catch(() => {});
+    return res.send(buffer);
   }
 
   @Post('import')
@@ -93,10 +104,13 @@ export class ExtendedDiseaseGroupsController {
       status: 200,
       message: result.message,
       data: {
+        total: result.totalImported ?? 0,
+        imported: result.totalImported ?? 0,
+        skipped: 0,
+        totalImported: result.totalImported ?? 0,
+        totalErrors: 0,
         success: true,
         message: result.message,
-        totalImported: result.totalImported,
-        totalErrors: 0,
       },
       meta: {
         timestamp: new Date().toISOString(),

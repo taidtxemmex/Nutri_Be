@@ -20,7 +20,10 @@ import {
   CACHE_TAG_USERS,
   CACHE_TTL_DETAIL_SECONDS,
   CACHE_TTL_LIST_SECONDS,
+  CACHE_TTL_PERPETUAL,
+  buildUserAuthCacheKey,
   buildUserCacheTag,
+  buildUserDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import {
   DEFAULT_LIMIT,
@@ -184,64 +187,65 @@ export class UsersService {
     };
 
     if (this.cacheService && cacheKey) {
-      await this.cacheService.set(cacheKey, result, CACHE_TTL_LIST_SECONDS, CACHE_TAG_USERS);
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, CACHE_TAG_USERS);
     }
 
     return result;
   }
 
   /**
-   * Lấy chi tiết tài khoản theo ID - Explicit select (có Cache 60s)
+   * Lấy chi tiết tài khoản theo ID - Tích hợp Shared Entity Cache (Identity Map) vĩnh viễn
    */
   async findById(id: string): Promise<UserDetailResult> {
-    const cacheKey = this.cacheService?.generateKey('users:detail', { id });
-    if (this.cacheService && cacheKey) {
-      const cached = await this.cacheService.get<UserDetailResult>(cacheKey);
-      if (cached) {
-        return cached;
+    const fetchUser = async () => {
+      const user = await this.prisma.nguoi_dung.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          ten_dang_nhap: true,
+          vai_tro: true,
+          active: true,
+          keycloak_user_id: true,
+          created_at: true,
+          ho_so_ca_nhan: {
+            select: {
+              ho_ten: true,
+              email: true,
+              phone: true,
+              dia_chi: true,
+              gioi_tinh: true,
+              ngay_sinh: true,
+            },
+          },
+          nguoi_de_xuat: {
+            select: {
+              trinh_do_hoc_van: true,
+              nghe_nghiep: true,
+              don_vi_cong_tac: true,
+              vi_tri_cong_tac: true,
+              linh_vuc_cong_tac: true,
+            },
+          },
+        },
+      });
+
+      if (!user) {
+        throw new NotFoundException('Không tìm thấy người dùng với ID này.');
       }
+
+      return user;
+    };
+
+    if (this.cacheService) {
+      return this.cacheService.getOrSet<UserDetailResult>(
+        buildUserDetailCacheKey(id),
+        CACHE_TTL_PERPETUAL,
+        fetchUser,
+        [CACHE_TAG_USERS, buildUserCacheTag(id)],
+      );
     }
 
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        ten_dang_nhap: true,
-        vai_tro: true,
-        active: true,
-        keycloak_user_id: true,
-        created_at: true,
-        ho_so_ca_nhan: {
-          select: {
-            ho_ten: true,
-            email: true,
-            phone: true,
-            dia_chi: true,
-            gioi_tinh: true,
-            ngay_sinh: true,
-          },
-        },
-        nguoi_de_xuat: {
-          select: {
-            trinh_do_hoc_van: true,
-            nghe_nghiep: true,
-            don_vi_cong_tac: true,
-            vi_tri_cong_tac: true,
-            linh_vuc_cong_tac: true,
-          },
-        },
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng với ID này.');
-    }
-
-    if (this.cacheService && cacheKey) {
-      await this.cacheService.set(cacheKey, user, CACHE_TTL_DETAIL_SECONDS, buildUserCacheTag(id));
-    }
-
-    return user;
+    return fetchUser();
   }
 
   /**
@@ -457,6 +461,7 @@ export class UsersService {
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
         buildUserCacheTag(targetId),
+        buildUserAuthCacheKey(targetId),
       ]);
     }
 
@@ -498,6 +503,7 @@ export class UsersService {
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
         buildUserCacheTag(targetUserId),
+        buildUserAuthCacheKey(targetUserId),
       ]);
     }
 
@@ -540,6 +546,7 @@ export class UsersService {
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
         buildUserCacheTag(targetUserId),
+        buildUserAuthCacheKey(targetUserId),
       ]);
     }
 
@@ -605,6 +612,7 @@ export class UsersService {
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
         buildUserCacheTag(targetUserId),
+        buildUserAuthCacheKey(targetUserId),
       ]);
     }
 
@@ -677,6 +685,7 @@ export class UsersService {
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
         ...validIds.map((id) => buildUserCacheTag(id)),
+        ...validIds.map((id) => buildUserAuthCacheKey(id)),
       ];
       await this.cacheService.debouncedInvalidateTags(cacheTags);
     }
@@ -747,6 +756,7 @@ export class UsersService {
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
         ...validIds.map((id) => buildUserCacheTag(id)),
+        ...validIds.map((id) => buildUserAuthCacheKey(id)),
       ];
       await this.cacheService.debouncedInvalidateTags(cacheTags);
     }

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';
+import * as crypto from 'crypto';
 import { I18nService } from '../../core/i18n/i18n.service';
 
 @Catch()
@@ -21,7 +22,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const traceId = (request.headers['x-trace-id'] as string) || 'trace-unknown';
+    const traceId =
+      (request.headers['x-trace-id'] as string) ||
+      (request as any).id ||
+      crypto.randomUUID();
+    response.setHeader('X-Trace-Id', traceId);
     const timestamp = new Date().toISOString();
     const locale = request.locale || 'vi';
 
@@ -52,12 +57,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
     // 2. Prisma ORM errors
     else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
+      const isProduction = process.env.NODE_ENV === 'production';
       switch (exception.code) {
         case 'P2002':
           status = HttpStatus.CONFLICT;
           errorCode = 'DATA_CONFLICT';
           const fields = (exception.meta?.target as string[]) || [];
-          message = `Dữ liệu bị trùng lặp ở trường: ${fields.join(', ')}`;
+          message = isProduction
+            ? 'Dữ liệu đã tồn tại trong hệ thống (vi phạm tính duy nhất).'
+            : `Dữ liệu bị trùng lặp ở trường: ${fields.join(', ')}`;
           break;
         case 'P2025':
           status = HttpStatus.NOT_FOUND;
@@ -71,8 +79,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           break;
         default:
           status = HttpStatus.BAD_REQUEST;
-          errorCode = `DATABASE_ERROR_${exception.code}`;
-          message = 'Lỗi truy vấn cơ sở dữ liệu';
+          errorCode = isProduction ? 'DATABASE_ERROR' : `DATABASE_ERROR_${exception.code}`;
+          message = isProduction
+            ? 'Lỗi xử lý cơ sở dữ liệu hệ thống.'
+            : `Lỗi truy vấn cơ sở dữ liệu [Prisma ${exception.code}]`;
       }
     }
     // 3. Unknown errors
@@ -93,6 +103,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     response.status(status).json({
+      message, // Root-level alias for NutriFE frontend compatibility (P0 parity)
       error: {
         code: errorCode,
         message,

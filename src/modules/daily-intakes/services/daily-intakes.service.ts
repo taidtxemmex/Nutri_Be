@@ -16,6 +16,16 @@ import { RdaComparisonEngine, RdaComparisonResult } from '../engines/rda-compari
 import { DemographicProfile } from '../engines/rda-reference-data';
 import { UserRole } from '../../../config/enums/role.enum';
 import { Gender, IntakeInputType } from '../../../config/enums/domain.enum';
+import {
+  CACHE_TAG_DAILY_INTAKES,
+  CACHE_TAG_PATIENTS,
+  CACHE_TTL_PERPETUAL,
+  buildDailyIntakeCacheTag,
+  buildPatientCacheTag,
+  buildPatientDetailCacheKey,
+} from '../../../config/constants/cache.constants';
+import { PatientsService } from '../../patients/services/patients.service';
+import { Optional } from '@nestjs/common';
 
 @Injectable()
 export class DailyIntakesService {
@@ -26,6 +36,7 @@ export class DailyIntakesService {
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
     private readonly nutritionCalculator: NutritionCalculatorService,
+    @Optional() private readonly patientsService?: PatientsService,
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
@@ -124,13 +135,28 @@ export class DailyIntakesService {
   ): Promise<DailyIntakeResponseDto> {
     const patientId = BigInt(dto.patientId);
 
-    // 1. Kiểm tra bệnh nhân thuộc user
-    const patient = await this.prisma.benh_nhan.findFirst({
-      where: { id: patientId, deleted_at: null },
-      select: { id: true, nguoi_dung_id: true },
-    });
+    // 1. Kiểm tra bệnh nhân thuộc user (Tái sử dụng Cache thực thể Bệnh nhân 0ms)
+    let patient: any;
+    if (this.patientsService) {
+      patient = await this.patientsService.getPatientEntity(patientId);
+    } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      patient = await this.cacheService.getOrSet(
+        buildPatientDetailCacheKey(patientId),
+        CACHE_TTL_PERPETUAL,
+        async () =>
+          this.prisma.benh_nhan.findFirst({
+            where: { id: patientId, deleted_at: null },
+          }),
+        [CACHE_TAG_PATIENTS, buildPatientCacheTag(patientId)],
+      );
+    } else {
+      patient = await this.prisma.benh_nhan.findFirst({
+        where: { id: patientId, deleted_at: null },
+        select: { id: true, nguoi_dung_id: true },
+      });
+    }
 
-    if (!patient) {
+    if (!patient || patient.deleted_at) {
       throw new HttpException(
         { code: 'PATIENT_NOT_FOUND', message: 'Không tìm thấy bệnh nhân' },
         HttpStatus.NOT_FOUND,
@@ -503,12 +529,27 @@ export class DailyIntakesService {
   ): Promise<DailyIntakeListDto[]> {
     const patientId = BigInt(patientIdParam);
 
-    const patient = await this.prisma.benh_nhan.findFirst({
-      where: { id: patientId, deleted_at: null },
-      select: { id: true, nguoi_dung_id: true, ho_ten: true },
-    });
+    let patient: any;
+    if (this.patientsService) {
+      patient = await this.patientsService.getPatientEntity(patientId);
+    } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      patient = await this.cacheService.getOrSet(
+        buildPatientDetailCacheKey(patientId),
+        CACHE_TTL_PERPETUAL,
+        async () =>
+          this.prisma.benh_nhan.findFirst({
+            where: { id: patientId, deleted_at: null },
+          }),
+        [CACHE_TAG_PATIENTS, buildPatientCacheTag(patientId)],
+      );
+    } else {
+      patient = await this.prisma.benh_nhan.findFirst({
+        where: { id: patientId, deleted_at: null },
+        select: { id: true, nguoi_dung_id: true, ho_ten: true },
+      });
+    }
 
-    if (!patient) {
+    if (!patient || patient.deleted_at) {
       throw new HttpException(
         { code: 'PATIENT_NOT_FOUND', message: 'Không tìm thấy bệnh nhân' },
         HttpStatus.NOT_FOUND,
@@ -557,11 +598,27 @@ export class DailyIntakesService {
     options?: { limitSetId?: string | number | bigint; physiologicalStatus?: string },
   ): Promise<RdaComparisonResult> {
     const intakeDetail = await this.getById(id, currentUser);
-    const patient = await this.prisma.benh_nhan.findUnique({
-      where: { id: BigInt(intakeDetail.patientId) },
-    });
 
-    if (!patient) {
+    let patient: any;
+    if (this.patientsService) {
+      patient = await this.patientsService.getPatientEntity(intakeDetail.patientId);
+    } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      patient = await this.cacheService.getOrSet(
+        buildPatientDetailCacheKey(intakeDetail.patientId),
+        CACHE_TTL_PERPETUAL,
+        async () =>
+          this.prisma.benh_nhan.findFirst({
+            where: { id: BigInt(intakeDetail.patientId), deleted_at: null },
+          }),
+        [CACHE_TAG_PATIENTS, buildPatientCacheTag(intakeDetail.patientId)],
+      );
+    } else {
+      patient = await this.prisma.benh_nhan.findUnique({
+        where: { id: BigInt(intakeDetail.patientId) },
+      });
+    }
+
+    if (!patient || patient.deleted_at) {
       throw new HttpException(
         { code: 'PATIENT_NOT_FOUND', message: 'Không tìm thấy bệnh nhân' },
         HttpStatus.NOT_FOUND,

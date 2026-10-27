@@ -6,6 +6,7 @@ import {
   CACHE_TAG_USERS,
   CACHE_TTL_DETAIL_SECONDS,
   CACHE_TTL_LIST_SECONDS,
+  CACHE_TTL_PERPETUAL,
   buildUserCacheTag,
 } from '../../../config/constants/cache.constants';
 import { DEFAULT_LIMIT, MAX_LIMIT } from '../../../config/constants/pagination.constants';
@@ -114,8 +115,8 @@ export class ProfilesService {
       await this.cacheService.set(
         cacheKey,
         result,
-        CACHE_TTL_DETAIL_SECONDS,
-        buildUserCacheTag(userId),
+        CACHE_TTL_PERPETUAL,
+        [CACHE_TAG_PROFILES, buildUserCacheTag(userId)],
       );
     }
 
@@ -249,7 +250,7 @@ export class ProfilesService {
     };
 
     if (this.cacheService && cacheKey) {
-      await this.cacheService.set(cacheKey, result, CACHE_TTL_LIST_SECONDS, CACHE_TAG_PROFILES);
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, CACHE_TAG_PROFILES);
     }
 
     return result;
