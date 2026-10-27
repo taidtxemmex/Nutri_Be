@@ -1029,7 +1029,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
       expect(deleteDishRes.body.error.code).toBe('DISH_003');
     });
 
-    it('4.2 Hostile Type & Duplicate Smashing: Gửi trùng lặp ingredientId trong cùng request tạo món', async () => {
+    it('4.2 Hostile Type & Duplicate Smashing: Gửi trùng lặp ingredientId trong cùng request tạo món -> Tự động gộp khối lượng thành công (200)', async () => {
       // Gửi 2 item có cùng ingredientId (ví dụ thịt bò bắp 50g + 50g)
       const res = await request(helper.getHttpServer())
         .post('/api/v1/dish')
@@ -1042,14 +1042,28 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
           ],
         });
 
-      // Do CSDL có uk_dish_ingredient (mon_an_id, nguyen_lieu_id) mà DishesService.create
-      // không merge chi_tiet_mon_an trước khi tx.chi_tiet_mon_an.createMany,
-      // request này bị sập với lỗi DATA_CONFLICT (409) từ Prisma P2002
-      expect(res.status).toBe(409);
-      expect(res.body.error.code).toBe('DATA_CONFLICT');
+      // Layer 1: HTTP Status Code 200 (Thành công do tự động coalesce / gộp nguyên liệu)
+      expect(res.status).toBe(200);
+
+      // Layer 2: API Standard Response Envelope
+      expect(res.body).toHaveProperty('data');
+      expect(res.body.data).toHaveProperty('id');
+      expect(res.body.data.details).toHaveLength(1);
+      expect(res.body.data.details[0].ingredientId).toBe(beefIngId.toString());
+      expect(res.body.data.details[0].netWeight).toBe(100);
+
+      const dishId = res.body.data.id;
+
+      // Layer 3: Database Ground Truth - kiểm tra chi_tiet_mon_an đã được gộp thành công 50g + 50g = 100g
+      const detailsInDb = await helper.getPrisma().chi_tiet_mon_an.findMany({
+        where: { mon_an_id: BigInt(dishId) },
+      });
+      expect(detailsInDb).toHaveLength(1);
+      expect(Number(detailsInDb[0].nguyen_lieu_id)).toBe(beefIngId);
+      expect(Number(detailsInDb[0].khoi_luong_song_sach)).toBe(100);
     });
 
-    it('4.3 Review Lifecycle Tampering: Món ăn ở trạng thái CHO_DUYET vẫn bị sửa ngầm trước khi Admin duyệt', async () => {
+    it('4.3 Review Lifecycle Tampering: Món ăn ở trạng thái CHO_DUYET bị chặn đứng khi cố tình chỉnh sửa -> ném DISH_003 (400)', async () => {
       // 1. User tạo món với tên "Món rau củ lành mạnh"
       const createRes = await request(helper.getHttpServer())
         .post('/api/v1/dish')
@@ -1069,7 +1083,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .expect(200);
 
       // 3. User lập tức gọi PUT /api/dish/:id để tráo đổi công thức trong khi đang CHO_DUYET
-      // LỖ HỔNG: update() chỉ chặn DA_DUYET và HE_THONG, không chặn CHO_DUYET!
+      // Immutability Guard chặn đứng việc chỉnh sửa món CHO_DUYET (ném HTTP 400 DISH_003)
       const tamperRes = await request(helper.getHttpServer())
         .put(`/api/v1/dish/${dishId}`)
         .set('Authorization', `Bearer ${regularToken}`)
@@ -1078,18 +1092,22 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
           details: [{ ingredientId: beefIngId, netWeight: 300 }],
         });
 
-      // Lỗ hổng cho phép cập nhật thành công (status 200) thay vì chặn lại!
-      expect(tamperRes.status).toBe(200);
-      expect(tamperRes.body.data.name).toBe('Món tráo đổi thịt bò siêu nhiều đạm');
+      // Layer 1: HTTP Status Code 400 Bad Request
+      expect(tamperRes.status).toBe(400);
 
-      // Layer 3: Kiểm tra trong DB, món vẫn đang CHO_DUYET nhưng tên và công thức đã bị tráo đổi
+      // Layer 2: API Standard Error Envelope
+      expect(tamperRes.body).toHaveProperty('error');
+      expect(tamperRes.body.error).toHaveProperty('code', 'DISH_003');
+
+      // Layer 3: Database Ground Truth - Món ăn bất biến 100%, vẫn giữ nguyên tên và công thức ban đầu
       const dbDish = await helper.getPrisma().mon_an.findUnique({
         where: { id: BigInt(dishId) },
         include: { chi_tiet_mon_an: true },
       });
       expect(dbDish?.trang_thai).toBe(DishStatus.CHO_DUYET);
-      expect(dbDish?.ten_mon).toBe('Món tráo đổi thịt bò siêu nhiều đạm');
-      expect(Number(dbDish?.chi_tiet_mon_an[0].nguyen_lieu_id)).toBe(beefIngId);
+      expect(dbDish?.ten_mon).toBe('Món rau củ lành mạnh');
+      expect(Number(dbDish?.chi_tiet_mon_an[0].nguyen_lieu_id)).toBe(celeryIngId);
+      expect(Number(dbDish?.chi_tiet_mon_an[0].khoi_luong_song_sach)).toBe(100);
     });
   });
 });

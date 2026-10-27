@@ -25,6 +25,7 @@ import {
   Public,
   Auth,
 } from '../../../common/decorators';
+import { UserRole } from '../../../config/enums/role.enum';
 
 @ApiController('DiseaseGroups', ['disease-groups'])
 export class DiseaseGroupsController {
@@ -53,7 +54,7 @@ export class DiseaseGroupsController {
     return this.diseaseGroupsService.findById(id);
   }
 
-  @Auth()
+  @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
   @Post('')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Tạo mới nhóm bệnh' })
@@ -65,7 +66,7 @@ export class DiseaseGroupsController {
     return this.diseaseGroupsService.create(dto);
   }
 
-  @Auth()
+  @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật nhóm bệnh' })
   @ApiParam({ name: 'id', type: Number, description: 'ID nhóm bệnh' })
@@ -77,7 +78,7 @@ export class DiseaseGroupsController {
     return this.diseaseGroupsService.update(id, dto);
   }
 
-  @Auth()
+  @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
   @Delete(':id')
   @ApiOperation({ summary: 'Xóa nhóm bệnh' })
   @ApiParam({ name: 'id', type: Number, description: 'ID nhóm bệnh' })

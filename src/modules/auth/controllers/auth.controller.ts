@@ -1,6 +1,7 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
+import { AuthRateLimitGuard } from '../../../security/rate-limit/auth-rate-limit.guard';
 import {
   RegisterDto,
   LoginDto,
@@ -24,6 +25,7 @@ import { AuthenticatedUser } from '../interfaces/jwt-payload.interface';
 
 @ApiTags('Auth')
 @Controller('auth')
+@UseGuards(AuthRateLimitGuard)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

@@ -52,6 +52,7 @@ describe('DailyIntakeExcelService', () => {
 
   const mockPatient = {
     id: BigInt(10),
+    nguoi_dung_id: 'doctor-001',
     ho_ten: 'Trần Thị Bích',
     ma_benh_nhan_bv: 'BN-2026-999',
     gioi_tinh: Gender.NU,

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsOptional, IsString, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsOptional, IsString, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateCoefficientDto {
@@ -17,7 +17,8 @@ export class CreateCoefficientDto {
   @ApiProperty({ description: 'Hệ số sống/chín (Shrinkage/Yield coefficient)', example: 0.85 })
   @Type(() => Number)
   @IsNumber({}, { message: 'Hệ số phải là số' })
-  @Min(0.0001, { message: 'Hệ số phải lớn hơn 0' })
+  @Min(0.1, { message: 'Hệ số sống chín phải lớn hơn hoặc bằng 0.1' })
+  @Max(5.0, { message: 'Hệ số sống chín phải nhỏ hơn hoặc bằng 5.0' })
   @IsNotEmpty({ message: 'Hệ số không được để trống' })
   coefficient!: number;
 

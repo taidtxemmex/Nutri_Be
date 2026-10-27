@@ -67,30 +67,89 @@ model SystemCache {
 // ==========================================
 
 model benh_nhan {
-  id               BigInt              @id @default(autoincrement())
-  nguoi_dung_id    String              @db.Char(36)
-  ho_ten           String              @db.VarChar(255)
-  so_dien_thoai    String?             @db.VarChar(20)
-  ngay_sinh        DateTime?           @db.Date
-  gioi_tinh        String              @db.VarChar(20)
-  can_nang         Float?
-  chieu_cao        Float?
-  ghi_chu          String?             @db.Text
-  he_so_hoat_dong  Float?
-  ma_benh_nhan_bv  String?             @db.VarChar(255)
-  tao_luc          DateTime?           @db.DateTime(6)
-  chi_nam_sinh     Boolean?            @db.Bit(1)
-  deleted_at       DateTime?           @map("deleted_at") @db.DateTime(0)
-  nguoi_dung       nguoi_dung          @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "benh_nhan_ibfk_1")
-  de_xuat_thuc_don de_xuat_thuc_don[]
-  khau_phan_24h    khau_phan_24h[]
-  thuc_don         thuc_don[]
+  id                  BigInt                 @id @default(autoincrement())
+  nguoi_dung_id       String                 @db.Char(36)
+  ho_ten              String                 @db.VarChar(255)
+  so_dien_thoai       String?                @db.VarChar(20)
+  ngay_sinh           DateTime?              @db.Date
+  gioi_tinh           String                 @db.VarChar(20)
+  can_nang            Float?
+  chieu_cao           Float?
+  ghi_chu             String?                @db.Text
+  he_so_hoat_dong     Float?
+  ma_benh_nhan_bv     String?                @db.VarChar(255)
+  tao_luc             DateTime?              @db.DateTime(6)
+  chi_nam_sinh        Boolean?               @db.Bit(1)
+  deleted_at          DateTime?              @map("deleted_at") @db.DateTime(0)
+  tinh_trang_thai_san String?                @default("KHONG") @db.VarChar(50)
+  di_ung              String?                @db.Text
+  tien_su_benh        String?                @db.Text
+  nhom_benh_chinh_id  Int?
+  nguoi_dung          nguoi_dung             @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "benh_nhan_ibfk_1")
+  nhom_benh_mo_rong   nhom_benh_mo_rong?     @relation(fields: [nhom_benh_chinh_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_patient_main_disease")
+  de_xuat_thuc_don    de_xuat_thuc_don[]
+  khau_phan_24h       khau_phan_24h[]
+  thuc_don            thuc_don[]
+  benh_nhan_nhan_trac benh_nhan_nhan_trac[]
+  benh_nhan_benh_an   benh_nhan_benh_an[]
 
   @@index([nguoi_dung_id], map: "benh_nhan_ibfk_1")
   @@index([nguoi_dung_id, ho_ten], map: "idx_patient_user_name")
   @@index([so_dien_thoai], map: "idx_patient_phone")
   @@index([ma_benh_nhan_bv], map: "idx_patient_bv_code")
   @@index([deleted_at], map: "idx_patient_deleted_at")
+  @@index([nhom_benh_chinh_id], map: "idx_patient_main_disease")
+}
+
+model benh_nhan_nhan_trac {
+  id                  BigInt     @id @default(autoincrement())
+  benh_nhan_id        BigInt
+  ngay_do             DateTime   @db.Date
+  can_nang            Float
+  chieu_cao           Float
+  bmi                 Float
+  phan_loai_bmi       String     @db.VarChar(50)
+  bmr                 Float?
+  tdee                Float?
+  huyet_ap_tam_thu    Int?
+  huyet_ap_tam_truong Int?
+  vong_eo             Float?
+  vong_mong           Float?
+  he_so_hoat_dong     Float?
+  ghi_chu             String?    @db.Text
+  nguoi_tao_id        String     @db.Char(36)
+  tao_luc             DateTime   @default(now()) @db.DateTime(6)
+  benh_nhan           benh_nhan  @relation(fields: [benh_nhan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_anthropometry_patient")
+  nguoi_dung          nguoi_dung @relation(fields: [nguoi_tao_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_anthropometry_creator")
+
+  @@index([benh_nhan_id, ngay_do(sort: Desc)], map: "idx_anthropometry_patient_date")
+  @@index([nguoi_tao_id], map: "idx_anthropometry_creator")
+}
+
+model benh_nhan_benh_an {
+  id                    BigInt             @id @default(autoincrement())
+  benh_nhan_id          BigInt
+  ngay_kham             DateTime           @db.Date
+  ly_do_kham            String?            @db.VarChar(500)
+  chan_doan_chinh       String             @db.VarChar(500)
+  ma_icd10              String?            @db.VarChar(50)
+  nhom_benh_id          Int?
+  trieu_chung_lam_sang  String?            @db.Text
+  tien_su_benh          String?            @db.Text
+  huong_dieu_tri        String?            @db.Text
+  thuc_don_can_thiep_id BigInt?
+  bac_si_kham_id        String             @db.Char(36)
+  ghi_chu               String?            @db.Text
+  tao_luc               DateTime           @default(now()) @db.DateTime(6)
+  benh_nhan             benh_nhan          @relation(fields: [benh_nhan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_med_record_patient")
+  thuc_don              thuc_don?          @relation(fields: [thuc_don_can_thiep_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_med_record_menu")
+  nguoi_dung            nguoi_dung         @relation(fields: [bac_si_kham_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_med_record_doctor")
+  nhom_benh_mo_rong     nhom_benh_mo_rong? @relation(fields: [nhom_benh_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "fk_med_record_disease")
+
+  @@index([benh_nhan_id, ngay_kham(sort: Desc)], map: "idx_med_record_patient_date")
+  @@index([thuc_don_can_thiep_id], map: "idx_med_record_menu")
+  @@index([bac_si_kham_id], map: "idx_med_record_doctor")
+  @@index([nhom_benh_id], map: "idx_med_record_disease")
 }
 
 model bua_an {
@@ -467,6 +526,8 @@ model nguoi_dung {
   pro_expired_at                                                       DateTime?              @db.DateTime(6)
   profile_completed                                                    Boolean                @db.Bit(1)
   benh_nhan                                                            benh_nhan[]
+  benh_nhan_nhan_trac                                                  benh_nhan_nhan_trac[]
+  benh_nhan_benh_an                                                    benh_nhan_benh_an[]
   bua_an                                                               bua_an[]
   de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_nguoi_duyet_idTonguoi_dung   de_xuat_nguyen_lieu[]  @relation("de_xuat_nguyen_lieu_nguoi_duyet_idTonguoi_dung")
   de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung     de_xuat_nguyen_lieu[]  @relation("de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung")
@@ -612,6 +673,8 @@ model nhom_benh_mo_rong {
   nhom_benh        nhom_benh?         @relation(fields: [ma_nhom_cha], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKm7btvfmi36owyphlk7re5v4y2")
   nguoi_dung       nguoi_dung?        @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "nhom_benh_mo_rong_ibfk_2")
   thuc_don         thuc_don[]
+  benh_nhan        benh_nhan[]
+  benh_nhan_benh_an benh_nhan_benh_an[]
 
   @@index([ma_nhom_cha], map: "FKm7btvfmi36owyphlk7re5v4y2")
   @@index([nguoi_dung_id], map: "bac_si_id")
@@ -648,6 +711,7 @@ model thuc_don {
   gioi_han_dinh_duong_id BigInt?
   chi_tiet_thuc_don      chi_tiet_thuc_don[]
   de_xuat_thuc_don       de_xuat_thuc_don[]
+  benh_nhan_benh_an      benh_nhan_benh_an[]
   gioi_han_dinh_duong    gioi_han_dinh_duong?    @relation(fields: [gioi_han_dinh_duong_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "FKf6w6c6rdroab1wvpd77q5aggu")
   nhom_benh_mo_rong      nhom_benh_mo_rong?      @relation(fields: [nhom_benh_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_thuc_don_nhom_benh_mo_rong")
   nguoi_dung             nguoi_dung              @relation(fields: [nguoi_dung_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "thuc_don_ibfk_1")

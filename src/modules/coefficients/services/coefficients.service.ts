@@ -34,6 +34,16 @@ export class CoefficientsService {
     dto: CreateCoefficientDto,
     currentUser: { id: string; role?: string },
   ): Promise<CoefficientResponseDto> {
+    if (dto.coefficient < 0.1 || dto.coefficient > 5.0) {
+      throw new HttpException(
+        {
+          code: 'COEF_INVALID_RANGE',
+          message: 'Hệ số sống chín phải nằm trong khoảng sinh hóa hợp lệ (0.1 đến 5.0)',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const ingredient = await this.prisma.nguyen_lieu.findFirst({
       where: { id: BigInt(dto.ingredientId), deleted_at: null },
       select: { id: true, ten_nguyen_lieu: true },
@@ -201,6 +211,16 @@ export class CoefficientsService {
     dto: UpdateCoefficientDto,
     currentUser: { id: string; role?: string },
   ): Promise<CoefficientResponseDto> {
+    if (dto.coefficient !== undefined && (dto.coefficient < 0.1 || dto.coefficient > 5.0)) {
+      throw new HttpException(
+        {
+          code: 'COEF_INVALID_RANGE',
+          message: 'Hệ số sống chín phải nằm trong khoảng sinh hóa hợp lệ (0.1 đến 5.0)',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     const existing = await this.prisma.he_so_song_chin.findUnique({
       where: { id: BigInt(id) },
     });

@@ -150,5 +150,22 @@
   "EVID_001": "Không tìm thấy tài liệu",
   "EVID_002": "Yêu cầu tài liệu không hợp lệ",
   "EVID_003": "Phải có ít nhất một minh chứng (file hoặc link)",
-  "EVID_004": "Minh chứng không hợp lệ"
+  "EVID_004": "Minh chứng không hợp lệ",
+  "CAT_IN_USE": "Không thể xóa danh mục vì đang có nguyên liệu sử dụng",
+  "COEF_INVALID_RANGE": "Hệ số sống chín phải nằm trong khoảng sinh hóa hợp lệ (0.1 đến 5.0)",
+  "MENU_001": "Không tìm thấy thực đơn",
+  "MENU_PENDING_PROPOSAL": "Thực đơn đang có đề xuất chờ duyệt, không thể chỉnh sửa",
+  "PROPOSAL_NOT_FOUND": "Không tìm thấy đề xuất",
+  "PROPOSAL_ALREADY_PROCESSED": "Đề xuất này đã được xử lý trước đó",
+  "PATIENT_NOT_FOUND": "Không tìm thấy thông tin bệnh nhân",
+  "PATIENT_IN_USE": "Không thể xóa bệnh nhân đang có thực đơn điều trị hoặc nhật ký khẩu phần 24h",
+  "DAILY_INTAKE_NOT_FOUND": "Không tìm thấy bản ghi khẩu phần 24h",
+  "LIMIT_SET_NOT_FOUND": "Không tìm thấy bộ giới hạn dinh dưỡng",
+  "AUTH_001": "Chưa được xác thực hoặc thông tin đăng nhập không chính xác",
+  "AUTH_002": "Bạn không có quyền thao tác trên tài nguyên này",
+  "AUTH_403": "Bạn không có quyền thực hiện thao tác này",
+  "ERR_IDOR_VIOLATION": "Vi phạm phân quyền IDOR: Không được phép truy cập dữ liệu của người dùng khác",
+  "TOO_MANY_REQUESTS": "Bạn đã thực hiện quá nhiều yêu cầu. Vui lòng thử lại sau.",
+  "IMPORT_EMPTY_FILE": "Tập tin Excel không có nội dung dữ liệu",
+  "IMPORT_FILE_CORRUPTED": "Tập tin Excel bị hỏng hoặc không đúng định dạng (.xlsx)"
 }

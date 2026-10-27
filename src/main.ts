@@ -7,14 +7,24 @@ import { TransformResponseInterceptor } from './common/interceptors/transform-re
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { CustomValidationPipe } from './common/pipes/custom-validation.pipe';
 import { Request, Response, NextFunction } from 'express';
-import { DEFAULT_UPLOAD_DIR, STATIC_UPLOAD_PREFIX } from './config/upload.constants';
+import {
+  PUBLIC_UPLOAD_DIR,
+  STATIC_UPLOAD_PREFIX,
+  ensureUploadDirsExist,
+} from './config/upload.constants';
+import { I18nService } from './core/i18n/i18n.service';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Đảm bảo cây thư mục phân cấp bảo mật uploads tồn tại
+  ensureUploadDirsExist();
+
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // 0. Static Asset Serving: /uploads/* maps directly to project public/uploads/*
-  app.useStaticAssets(DEFAULT_UPLOAD_DIR, {
+  // 0. Static Asset Serving: CHỈ phục vụ thư mục công khai (/uploads/public/* -> public/uploads/public/)
+  // Tuyệt đối CẤM mount thư mục protected/ (chứng chỉ, minh chứng y tế, bệnh án, hóa đơn)
+  app.useStaticAssets(PUBLIC_UPLOAD_DIR, {
     prefix: `${STATIC_UPLOAD_PREFIX}/`,
   });
 
@@ -38,10 +48,11 @@ async function bootstrap() {
     credentials: true,
   });
 
-  // 4. Global Validation, Interceptors, Filters
-  app.useGlobalPipes(new CustomValidationPipe());
+  // 4. Global Validation, Interceptors, Filters (Inject I18nService vào Pipe & Filter)
+  const i18nService = app.get(I18nService);
+  app.useGlobalPipes(new CustomValidationPipe(i18nService));
   app.useGlobalInterceptors(new TransformResponseInterceptor());
-  app.useGlobalFilters(new GlobalExceptionFilter());
+  app.useGlobalFilters(new GlobalExceptionFilter(i18nService));
 
   // 5. Swagger OpenAPI UI at /api/docs
   const swaggerConfig = new DocumentBuilder()

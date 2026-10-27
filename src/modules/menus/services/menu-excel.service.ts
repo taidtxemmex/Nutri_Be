@@ -49,12 +49,12 @@ export class MenuExcelService {
     const exportType = options.exportType || MenuExportType.FULL;
     const servings = options.servings && options.servings > 0 ? options.servings : 1;
 
-    // 1. Kiểm tra CacheService (nếu là export theo menuId)
     const isIdQuery =
       typeof menuIdOrData === 'string' ||
       typeof menuIdOrData === 'number' ||
       typeof menuIdOrData === 'bigint';
 
+    // 1. Kiểm tra CacheService có gắn userId (cô lập tuyệt đối giữa các tài khoản - 0ms cache hit)
     let cacheKey = '';
     if (isIdQuery && this.cacheService) {
       cacheKey = this.cacheService.generateKey('menu:export', {
@@ -62,6 +62,7 @@ export class MenuExcelService {
         exportType,
         servings,
         cols: options.columns ? options.columns.sort().join(',') : 'all',
+        userId: options.userId || 'anonymous',
       });
 
       const cached = await this.cacheService.get<string>(cacheKey);
@@ -71,7 +72,7 @@ export class MenuExcelService {
       }
     }
 
-    // 2. Nạp dữ liệu thực đơn
+    // 2. Nạp dữ liệu thực đơn & phân quyền sở hữu khi cache miss
     const menu = isIdQuery
       ? await this.fetchMenuWithFullRelations(menuIdOrData, options.userId)
       : menuIdOrData;
@@ -108,8 +109,8 @@ export class MenuExcelService {
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
-    // 4. Lưu Cache nếu hợp lệ (TTL 30 phút, tag = menu_${menuId})
-    if (cacheKey && this.cacheService) {
+    // 4. Lưu Cache nếu hợp lệ và dung lượng an toàn (< 2MB chống OOM VPS 2GB)
+    if (cacheKey && this.cacheService && buffer.length <= 2 * 1024 * 1024) {
       await this.cacheService.set(
         cacheKey,
         buffer.toString('base64'),

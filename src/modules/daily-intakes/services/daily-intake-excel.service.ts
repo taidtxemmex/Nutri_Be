@@ -9,6 +9,7 @@ import {
   Gender,
   IntakeInputType,
 } from '../../../config/enums/domain.enum';
+import { UserRole } from '../../../config/enums/role.enum';
 import {
   EXCEL_FONT_FAMILY,
   EXCEL_LIMITS,
@@ -37,6 +38,7 @@ export interface DailyIntakeImportResult {
 export interface ImportDailyIntakeOptions {
   patientId: string | bigint | number;
   userId: string;
+  userRole?: string;
   date?: string | Date;
   overwrite?: boolean;
   notes?: string;
@@ -330,7 +332,7 @@ export class DailyIntakeExcelService {
       );
     }
 
-    // 1. Kiểm tra bệnh nhân tồn tại
+    // 1. Kiểm tra bệnh nhân tồn tại và phân quyền sở hữu (Chống IDOR P0)
     const patientIdBigInt = BigInt(String(options.patientId));
     const patient = await this.prisma.benh_nhan.findFirst({
       where: { id: patientIdBigInt, deleted_at: null },
@@ -343,6 +345,18 @@ export class DailyIntakeExcelService {
           message: `Không tìm thấy bệnh nhân với ID ${options.patientId}`,
         },
         HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const isAdmin =
+      options.userRole === UserRole.ADMIN || options.userRole === UserRole.SUPERADMIN;
+    if (patient.nguoi_dung_id !== options.userId && !isAdmin) {
+      throw new HttpException(
+        {
+          code: 'AUTH_002',
+          message: 'Bạn không có quyền thao tác trên hồ sơ bệnh nhân này',
+        },
+        HttpStatus.FORBIDDEN,
       );
     }
 
@@ -636,24 +650,7 @@ export class DailyIntakeExcelService {
       typeof dailyIntakeIdOrData === 'number' ||
       typeof dailyIntakeIdOrData === 'bigint';
 
-    // 1. Kiểm tra cache
-    let cacheKey = '';
-    if (isIdQuery && this.cacheService) {
-      cacheKey = this.cacheService.generateKey('daily_intake:report', {
-        id: String(dailyIntakeIdOrData),
-        reportType,
-      });
-
-      const cached = await this.cacheService.get<string>(cacheKey);
-      if (cached) {
-        this.logger.debug(
-          `🚀 [Cache Hit] Trả về báo cáo lâm sàng 24h #${dailyIntakeIdOrData} tức thì (0ms)`,
-        );
-        return Buffer.from(cached, 'base64');
-      }
-    }
-
-    // 2. Nạp dữ liệu Khẩu phần 24h
+    // 1. Nạp dữ liệu Khẩu phần 24h & xác thực quyền sở hữu TRƯỚC TIÊN (Chống rò rỉ Cache P0)
     const intake = isIdQuery
       ? await this.fetchDailyIntakeWithRelations(dailyIntakeIdOrData, userId)
       : dailyIntakeIdOrData;
@@ -666,6 +663,24 @@ export class DailyIntakeExcelService {
         },
         HttpStatus.NOT_FOUND,
       );
+    }
+
+    // 2. Kiểm tra cache có gắn userId để cô lập dữ liệu tuyệt đối giữa các bác sĩ
+    let cacheKey = '';
+    if (isIdQuery && this.cacheService) {
+      cacheKey = this.cacheService.generateKey('daily_intake:report', {
+        id: String(dailyIntakeIdOrData),
+        reportType,
+        userId: userId || 'anonymous',
+      });
+
+      const cached = await this.cacheService.get<string>(cacheKey);
+      if (cached) {
+        this.logger.debug(
+          `🚀 [Cache Hit] Trả về báo cáo lâm sàng 24h #${dailyIntakeIdOrData} tức thì (0ms)`,
+        );
+        return Buffer.from(cached, 'base64');
+      }
     }
 
     // 3. Tính toán toàn bộ 86 chỉ tiêu dinh dưỡng bằng NutritionCalculatorService
@@ -707,8 +722,8 @@ export class DailyIntakeExcelService {
 
     const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
 
-    // 6. Lưu vào cache
-    if (cacheKey && this.cacheService) {
+    // 6. Lưu vào cache nếu dung lượng an toàn (< 2MB chống OOM VPS 2GB)
+    if (cacheKey && this.cacheService && buffer.length <= 2 * 1024 * 1024) {
       await this.cacheService.set(
         cacheKey,
         buffer.toString('base64'),

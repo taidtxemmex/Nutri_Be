@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { TransformResponseInterceptor } from '../../src/common/interceptors/transform-response.interceptor';
 import { GlobalExceptionFilter } from '../../src/common/filters/global-exception.filter';
 import { CustomValidationPipe } from '../../src/common/pipes/custom-validation.pipe';
+import { I18nService } from '../../src/core/i18n/i18n.service';
 import { Request, Response, NextFunction } from 'express';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -22,22 +23,23 @@ export class TestAppHelper {
     }).compile();
 
     this.app = moduleFixture.createNestApplication<NestExpressApplication>();
+    const i18nService = moduleFixture.get<I18nService>(I18nService);
 
-    // 1. URL rewrite middleware tương thích tuyệt đối với main.ts
+    // 1. URL rewrite middleware tương thích tuyệt đối với main.ts: Maps legacy /api/v1/* to /api/*
     this.app.use((req: Request, res: Response, next: NextFunction) => {
-      if (req.url.startsWith('/api/') && !req.url.startsWith('/api/v1/')) {
-        req.url = req.url.replace('/api/', '/api/v1/');
+      if (req.url.startsWith('/api/v1/')) {
+        req.url = req.url.replace('/api/v1/', '/api/');
       }
       next();
     });
 
-    // 2. Global Prefix: api/v1
-    this.app.setGlobalPrefix(process.env.GLOBAL_PREFIX || 'api/v1');
+    // 2. Global Prefix: api (đồng bộ chuẩn hóa tuyệt đối với main.ts)
+    this.app.setGlobalPrefix('api');
 
     // 3. Global pipes, interceptors, filters
-    this.app.useGlobalPipes(new CustomValidationPipe());
+    this.app.useGlobalPipes(new CustomValidationPipe(i18nService));
     this.app.useGlobalInterceptors(new TransformResponseInterceptor());
-    this.app.useGlobalFilters(new GlobalExceptionFilter());
+    this.app.useGlobalFilters(new GlobalExceptionFilter(i18nService));
 
     await this.app.init();
 
@@ -66,39 +68,48 @@ export class TestAppHelper {
    */
   async cleanDatabase(): Promise<void> {
     const tables = [
+      'minh_chung',
+      'chi_tiet_thuc_don',
+      'de_xuat_thuc_don',
+      'khau_phan_24h_nguyen_lieu',
+      'khau_phan_24h_bua_an',
+      'khau_phan_24h',
+      'chi_tiet_bua_an',
+      'bua_an',
+      'chi_tiet_mon_an',
+      'mon_an',
+      'he_so_song_chin',
+      'de_xuat_nguyen_lieu',
+      'gioi_han_dinh_duong',
+      'thuc_don',
+      'benh_nhan',
+      'nguyen_lieu',
+      'danh_muc',
+      'nhom_benh_mo_rong',
+      'nhom_benh',
+      'ho_so_ca_nhan',
       'lich_su_dang_nhap',
       'thiet_bi_dang_nhap',
       'ma_xac_thuc',
-      'ho_so_ca_nhan',
       'nguoi_de_xuat',
       'dang_ky_cho_xac_thuc',
       'dang_ky',
       'yeu_cau_thanh_toan',
-      'minh_chung',
-      'khau_phan_24h_nguyen_lieu',
-      'khau_phan_24h_bua_an',
-      'khau_phan_24h',
-      'de_xuat_thuc_don',
-      'de_xuat_nguyen_lieu',
-      'benh_nhan',
-      'bua_an',
-      'thuc_don',
-      'mon_an',
-      '_system_jobs',
       '_system_jobs_dlq',
+      '_system_jobs',
       '_system_cache',
       'nguoi_dung',
     ];
 
-    await this.prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
+    await this.prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;').catch(() => {});
     for (const table of tables) {
       try {
         await this.prisma.$executeRawUnsafe(`DELETE FROM \`${table}\`;`);
       } catch {
-        // Bỏ qua nếu bảng trống hoặc không tồn tại
+        // Bỏ qua nếu bảng không tồn tại
       }
     }
-    await this.prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
+    await this.prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;').catch(() => {});
   }
 
   /**

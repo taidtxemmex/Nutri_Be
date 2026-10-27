@@ -154,8 +154,24 @@ export class DailyIntakesController {
     summary: 'Báo cáo đánh giá RDA/DRI lâm sàng đối chiếu chuẩn Viện Dinh Dưỡng Quốc Gia',
   })
   @ApiParam({ name: 'id', description: 'ID khẩu phần 24h' })
-  async getRdaReport(@Param('id') id: string, @CurrentUser() user: any): Promise<any> {
-    return this.service.getRdaReport(id, user);
+  @ApiQuery({
+    name: 'limitSetId',
+    required: false,
+    description: 'ID bộ giới hạn dinh dưỡng tùy biến',
+  })
+  @ApiQuery({
+    name: 'physiologicalStatus',
+    required: false,
+    description:
+      'Tình trạng sinh lý đặc thù (PREGNANT_T1, PREGNANT_T2, PREGNANT_T3, LACTATING_0_6M, LACTATING_7_12M)',
+  })
+  async getRdaReport(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('limitSetId') limitSetId?: string,
+    @Query('physiologicalStatus') physiologicalStatus?: string,
+  ): Promise<any> {
+    return this.service.getRdaReport(id, user, { limitSetId, physiologicalStatus });
   }
 
   @Post('import')
@@ -173,6 +189,7 @@ export class DailyIntakesController {
     const result = await this.excelService.importDailyIntakeExcel(file?.buffer, {
       patientId: query.patientId,
       userId: user.id,
+      userRole: user.role,
       date: query.date,
       overwrite: query.overwrite,
     });

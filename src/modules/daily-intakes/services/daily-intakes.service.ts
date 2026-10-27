@@ -554,6 +554,7 @@ export class DailyIntakesService {
   async getRdaReport(
     id: string | number | bigint,
     currentUser: { id: string; role?: string },
+    options?: { limitSetId?: string | number | bigint; physiologicalStatus?: string },
   ): Promise<RdaComparisonResult> {
     const intakeDetail = await this.getById(id, currentUser);
     const patient = await this.prisma.benh_nhan.findUnique({
@@ -573,6 +574,7 @@ export class DailyIntakesService {
     const demographic: DemographicProfile = {
       gender: isMale ? 'NAM' : 'NU',
       ageYears: age,
+      physiologicalStatus: (options?.physiologicalStatus as any) || 'NORMAL',
       activityLevel:
         patient.he_so_hoat_dong && patient.he_so_hoat_dong > 1.6
           ? 'VERY_ACTIVE'
@@ -582,6 +584,24 @@ export class DailyIntakesService {
       activityFactor: patient.he_so_hoat_dong ? Number(patient.he_so_hoat_dong) : undefined,
     };
 
-    return RdaComparisonEngine.compare(intakeDetail.totalDayNutrients, demographic);
+    let customTargets: any = undefined;
+    if (options?.limitSetId) {
+      const limitSet = await this.prisma.gioi_han_dinh_duong.findUnique({
+        where: { id: BigInt(options.limitSetId) },
+      });
+      if (limitSet?.gioi_han_json && typeof limitSet.gioi_han_json === 'object') {
+        const rawJson = limitSet.gioi_han_json as Record<string, any>;
+        customTargets = {};
+        for (const [k, v] of Object.entries(rawJson)) {
+          if (typeof v === 'number') {
+            customTargets[k] = { rda: v, nameVi: k, unit: '' };
+          } else if (v && typeof v === 'object' && typeof v.rda === 'number') {
+            customTargets[k] = v;
+          }
+        }
+      }
+    }
+
+    return RdaComparisonEngine.compare(intakeDetail.totalDayNutrients, demographic, customTargets);
   }
 }

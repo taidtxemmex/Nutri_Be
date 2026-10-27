@@ -680,7 +680,19 @@ export class MenuProposalsService {
       );
     }
 
-    return this.menuExcelService.exportMenuExcel(proposal.menu_goc_id, {
+    // Đọc trực tiếp từ snapshot_json đóng băng (TC-S4-04), chống lỗi 404 khi menu gốc bị xóa/sửa
+    let snapshotData: any = null;
+    if (proposal.snapshot_json) {
+      try {
+        snapshotData = JSON.parse(proposal.snapshot_json);
+      } catch (err: any) {
+        this.logger.error(`Lỗi parse snapshot_json cho proposal ID=${proposalId}: ${err.message}`);
+      }
+    }
+
+    const exportTarget = snapshotData || proposal.menu_goc_id;
+
+    return this.menuExcelService.exportMenuExcel(exportTarget, {
       exportType: MenuExportType.FULL,
       columns,
       servings: 1,

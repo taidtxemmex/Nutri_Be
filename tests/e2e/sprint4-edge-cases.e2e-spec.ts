@@ -51,7 +51,8 @@ describe('Sprint 4: Edge Cases & Hostile Adversarial E2E Suite (Module 07)', () 
   beforeEach(async () => {
     const prisma = helper.getPrisma();
 
-    // 1. Dọn dẹp CSDL triệt để theo thứ tự khóa ngoại từ con đến cha
+    // 1. Dọn dẹp CSDL triệt để với FOREIGN_KEY_CHECKS an toàn (TC-S4-01)
+    await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `chi_tiet_thuc_don`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `de_xuat_thuc_don`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `thuc_don`;').catch(() => {});
@@ -68,6 +69,7 @@ describe('Sprint 4: Edge Cases & Hostile Adversarial E2E Suite (Module 07)', () 
     await prisma.$executeRawUnsafe('DELETE FROM `nguyen_lieu`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `danh_muc`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `benh_nhan`;').catch(() => {});
+    await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;').catch(() => {});
     await helper.cleanDatabase();
 
     // 2. Tạo danh mục chuẩn

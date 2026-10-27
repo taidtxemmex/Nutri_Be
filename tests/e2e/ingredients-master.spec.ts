@@ -18,15 +18,26 @@ describe('Ingredients Master E2E & 3-Layer Persistence Validation', () => {
   });
 
   beforeEach(async () => {
-    // 1. Dọn dẹp CSDL theo thứ tự khóa ngoại từ bảng con tới bảng cha
+    // 1. Dọn dẹp CSDL theo thứ tự khóa ngoại an toàn với FOREIGN_KEY_CHECKS
     const prisma = helper.getPrisma();
-    await prisma.$executeRawUnsafe('DELETE FROM `he_so_song_chin`;').catch(() => {});
+    await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `chi_tiet_thuc_don`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `de_xuat_thuc_don`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `thuc_don`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `khau_phan_24h_nguyen_lieu`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `khau_phan_24h_bua_an`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `khau_phan_24h`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `gioi_han_dinh_duong`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `chi_tiet_bua_an`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `bua_an`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `chi_tiet_mon_an`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `mon_an`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `he_so_song_chin`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `de_xuat_nguyen_lieu`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `nguyen_lieu`;').catch(() => {});
     await prisma.$executeRawUnsafe('DELETE FROM `danh_muc`;').catch(() => {});
+    await prisma.$executeRawUnsafe('DELETE FROM `benh_nhan`;').catch(() => {});
+    await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;').catch(() => {});
     await helper.cleanDatabase();
 
     // 2. Tạo danh mục chuẩn dùng chung

@@ -117,7 +117,19 @@ export class DishesService {
     }
 
     // Kiểm tra tất cả nguyên liệu có tồn tại trong DB không
+    // Tự động gộp các nguyên liệu trùng ID trong payload (TC-S3-03 BVA)
+    const mergedDetailsMap = new Map<string, number>();
     for (const d of dto.details) {
+      const ingIdStr = String(d.ingredientId);
+      const currentWeight = mergedDetailsMap.get(ingIdStr) || 0;
+      mergedDetailsMap.set(ingIdStr, currentWeight + Number(d.netWeight));
+    }
+    const coalescedDetails = Array.from(mergedDetailsMap.entries()).map(([ingId, weight]) => ({
+      ingredientId: ingId,
+      netWeight: weight,
+    }));
+
+    for (const d of coalescedDetails) {
       const ing = await this.prisma.nguyen_lieu.findFirst({
         where: { id: BigInt(d.ingredientId), deleted_at: null },
         select: { id: true },
@@ -132,7 +144,7 @@ export class DishesService {
 
     // Tự động tính recipe_hash SHA-256
     const recipeHash = computeRecipeHash(
-      dto.details.map((d) => ({
+      coalescedDetails.map((d) => ({
         ingredientId: Number(d.ingredientId),
         weight: d.netWeight,
       })),
@@ -150,7 +162,7 @@ export class DishesService {
       });
 
       await tx.chi_tiet_mon_an.createMany({
-        data: dto.details.map((d) => ({
+        data: coalescedDetails.map((d) => ({
           mon_an_id: dish.id,
           nguyen_lieu_id: BigInt(d.ingredientId),
           khoi_luong_song_sach: d.netWeight,
@@ -208,6 +220,7 @@ export class DishesService {
         },
       },
       orderBy: { id: 'desc' },
+      take: 100,
     });
 
     return dishes.map((d) => this.mapToSummaryDto(d, currentUser.id));
@@ -228,6 +241,7 @@ export class DishesService {
         },
       },
       orderBy: { ten_mon: 'asc' },
+      take: 100,
     });
 
     return dishes.map((d) => this.mapToSummaryDto(d, currentUserId));
@@ -262,6 +276,7 @@ export class DishesService {
         },
       },
       orderBy: { id: 'desc' },
+      take: 100,
     });
 
     return dishes.map((d) => this.mapToSummaryDto(d, currentUserId));
@@ -373,18 +388,37 @@ export class DishesService {
       );
     }
 
-    // 🔒 Immutability Guard
+    // 🔒 Immutability Guard: Chặn sửa món đã duyệt hoặc đang chờ duyệt (TC-S3-02)
     if (dish.trang_thai === DishStatus.DA_DUYET || dish.trang_thai === DishStatus.HE_THONG) {
       throw new HttpException(
-        { code: 'DISH_002', message: 'Không thể chỉnh sửa món ăn này' },
+        { code: 'DISH_002', message: 'Không thể chỉnh sửa món ăn đã được duyệt' },
         HttpStatus.BAD_REQUEST,
       );
     }
 
-    const newDetails = dto.details;
+    if (dish.trang_thai === DishStatus.CHO_DUYET) {
+      throw new HttpException(
+        { code: 'DISH_003', message: 'Không thể chỉnh sửa món ăn đang chờ duyệt' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
-    if (newDetails && newDetails.length > 0) {
-      for (const d of newDetails) {
+    const rawDetails = dto.details;
+    let coalescedDetails: Array<{ ingredientId: string; netWeight: number }> | undefined = undefined;
+
+    if (rawDetails !== undefined) {
+      const mergedMap = new Map<string, number>();
+      for (const d of rawDetails) {
+        const ingIdStr = String(d.ingredientId);
+        const currentWeight = mergedMap.get(ingIdStr) || 0;
+        mergedMap.set(ingIdStr, currentWeight + Number(d.netWeight));
+      }
+      coalescedDetails = Array.from(mergedMap.entries()).map(([ingId, weight]) => ({
+        ingredientId: ingId,
+        netWeight: weight,
+      }));
+
+      for (const d of coalescedDetails) {
         const ing = await this.prisma.nguyen_lieu.findFirst({
           where: { id: BigInt(d.ingredientId), deleted_at: null },
           select: { id: true },
@@ -399,9 +433,9 @@ export class DishesService {
     }
 
     const recipeHash =
-      newDetails && newDetails.length > 0
+      coalescedDetails && coalescedDetails.length > 0
         ? computeRecipeHash(
-            newDetails.map((d) => ({
+            coalescedDetails.map((d) => ({
               ingredientId: Number(d.ingredientId),
               weight: d.netWeight,
             })),
@@ -417,14 +451,14 @@ export class DishesService {
         },
       });
 
-      if (newDetails !== undefined) {
+      if (coalescedDetails !== undefined) {
         await tx.chi_tiet_mon_an.deleteMany({
           where: { mon_an_id: BigInt(id) },
         });
 
-        if (newDetails.length > 0) {
+        if (coalescedDetails.length > 0) {
           await tx.chi_tiet_mon_an.createMany({
-            data: newDetails.map((d) => ({
+            data: coalescedDetails.map((d) => ({
               mon_an_id: BigInt(id),
               nguyen_lieu_id: BigInt(d.ingredientId),
               khoi_luong_song_sach: d.netWeight,

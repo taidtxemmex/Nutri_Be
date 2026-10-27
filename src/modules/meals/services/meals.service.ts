@@ -164,6 +164,7 @@ export class MealsService {
         },
       },
       orderBy: { id: 'desc' },
+      take: 100,
     });
 
     return meals.map((meal) => this.mapMealEntityToResponse(meal));

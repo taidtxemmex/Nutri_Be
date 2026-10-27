@@ -150,5 +150,22 @@
   "EVID_001": "Evidence not found",
   "EVID_002": "Invalid evidence request",
   "EVID_003": "At least one evidence is required",
-  "EVID_004": "Invalid evidence"
+  "EVID_004": "Invalid evidence",
+  "CAT_IN_USE": "Cannot delete category because it contains ingredients in use",
+  "COEF_INVALID_RANGE": "Cooking yield coefficient must be within valid biochemical range (0.1 to 5.0)",
+  "MENU_001": "Menu not found",
+  "MENU_PENDING_PROPOSAL": "Menu has a pending proposal and cannot be edited",
+  "PROPOSAL_NOT_FOUND": "Proposal not found",
+  "PROPOSAL_ALREADY_PROCESSED": "Proposal has already been processed",
+  "PATIENT_NOT_FOUND": "Patient not found",
+  "PATIENT_IN_USE": "Cannot delete patient with existing dietary menus or 24h intake records",
+  "DAILY_INTAKE_NOT_FOUND": "Daily intake record not found",
+  "LIMIT_SET_NOT_FOUND": "Nutrition limit set not found",
+  "AUTH_001": "Authentication required or invalid credentials",
+  "AUTH_002": "You do not have permission to access this resource",
+  "AUTH_403": "You do not have permission to perform this action",
+  "ERR_IDOR_VIOLATION": "IDOR Violation: Access denied to other user's data",
+  "TOO_MANY_REQUESTS": "Too many requests. Please try again later.",
+  "IMPORT_EMPTY_FILE": "Excel file contains no data",
+  "IMPORT_FILE_CORRUPTED": "Corrupted or invalid Excel file format (.xlsx)"
 }

@@ -150,5 +150,22 @@
   "EVID_001": "未找到相关医学证据文件",
   "EVID_002": "证据请求无效",
   "EVID_003": "必须提供至少一份医学证明材料",
-  "EVID_004": "证明材料无效"
+  "EVID_004": "证明材料无效",
+  "CAT_IN_USE": "该类别包含正在使用的食材，无法删除",
+  "COEF_INVALID_RANGE": "烹饪生熟系数必须在有效生物化学范围（0.1至5.0）内",
+  "MENU_001": "未找到食谱",
+  "MENU_PENDING_PROPOSAL": "食谱正在审核中，无法修改",
+  "PROPOSAL_NOT_FOUND": "未找到审核提案",
+  "PROPOSAL_ALREADY_PROCESSED": "该提案之前已被处理",
+  "PATIENT_NOT_FOUND": "未找到患者档案",
+  "PATIENT_IN_USE": "该患者拥有关联的治疗食谱或24小时摄入记录，无法删除",
+  "DAILY_INTAKE_NOT_FOUND": "未找到24小时摄入记录",
+  "LIMIT_SET_NOT_FOUND": "未找到营养素限额设定",
+  "AUTH_001": "需要身份验证或凭据无效",
+  "AUTH_002": "您没有权限操作此资源",
+  "AUTH_403": "您没有权限执行此操作",
+  "ERR_IDOR_VIOLATION": "IDOR越权访问违规：禁止访问其他用户的数据",
+  "TOO_MANY_REQUESTS": "请求过多，请稍后再试。",
+  "IMPORT_EMPTY_FILE": "Excel文件无数据内容",
+  "IMPORT_FILE_CORRUPTED": "Excel文件损坏或格式无效（.xlsx）"
 }

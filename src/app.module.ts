@@ -19,6 +19,8 @@ import { MenusModule } from './modules/menus/menus.module';
 import { MenuProposalsModule } from './modules/menu-proposals/menu-proposals.module';
 import { NutritionLimitSetsModule } from './modules/nutrition-limit-sets/nutrition-limit-sets.module';
 import { DailyIntakesModule } from './modules/daily-intakes/daily-intakes.module';
+import { PatientsModule } from './modules/patients/patients.module';
+import { IngredientProposalsModule } from './modules/ingredient-proposals/ingredient-proposals.module';
 
 @Module({
   imports: [
@@ -34,6 +36,8 @@ import { DailyIntakesModule } from './modules/daily-intakes/daily-intakes.module
     AuthModule,
     UsersModule,
     ProfilesModule,
+    PatientsModule,
+    IngredientProposalsModule,
     MasterDataModule,
     IngredientsModule,
     DishesModule,
