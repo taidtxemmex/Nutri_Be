@@ -22,6 +22,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
+
+    // Nếu response headers đã được gửi (ví dụ: streaming file Excel bị lỗi giữa chừng), không set header lại
+    if (response.headersSent) {
+      this.logger.error(
+        `[Stream Exception] Lỗi xảy ra sau khi headers đã gửi: ${
+          exception instanceof Error ? exception.stack : exception
+        }`,
+      );
+      return;
+    }
+
     const traceId =
       (request.headers['x-trace-id'] as string) || (request as any).id || crypto.randomUUID();
     response.setHeader('X-Trace-Id', traceId);

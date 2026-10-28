@@ -52,6 +52,27 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
           },
         });
       }
+      if (!this.queueService.hasHandler('email')) {
+        this.queueService.process({
+          queueName: 'email',
+          handler: async (payload: any) => {
+            const to = payload.to || payload.email || 'user@nutri.vn';
+            const subject =
+              payload.subject ||
+              (payload.type === 'VERIFY_EMAIL'
+                ? 'Xác thực tài khoản Nutri'
+                : payload.type === 'RESET_PASSWORD'
+                  ? 'Đặt lại mật khẩu Nutri'
+                  : 'Thông báo từ hệ thống Nutri');
+            await this.inMemoryMailer!.sendMail({
+              to,
+              subject,
+              payload,
+              body: `Type: ${payload.type || 'NOTIFICATION'}, Token: ${payload.token || ''}`,
+            });
+          },
+        });
+      }
     }
 
     // 2. Tự động khởi động worker polling (trừ khi có cờ tắt rõ ràng)
