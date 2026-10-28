@@ -12,29 +12,17 @@ import {
   Res,
   BadRequestException,
   ForbiddenException,
-  UnauthorizedException,
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import {
-  AnyFilesInterceptor,
-  FileInterceptor,
-} from '@nestjs/platform-express';
-import {
-  ApiOperation,
-  ApiConsumes,
-  ApiQuery,
-  ApiParam,
-} from '@nestjs/swagger';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { Response } from 'express';
 import * as path from 'path';
 import { LocalStorageService } from '../services/local-storage.service';
 import { FileMagicBytePipe } from '../pipes/file-magic-byte.pipe';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import {
-  FileUploadResponseDto,
-  EvidenceUploadResponseDto,
-} from '../dto/file-upload-response.dto';
+import { FileUploadResponseDto, EvidenceUploadResponseDto } from '../dto/file-upload-response.dto';
 import { UploadEvidenceDto } from '../dto/upload-evidence.dto';
 import { PrismaService } from '../../../core/database/prisma.service';
 import {
@@ -101,7 +89,7 @@ export class FilesController {
 
     const uploadResults: FileUploadResponseDto[] = [];
     for (const file of files) {
-      const result = await this.storageService.upload(file, subDir);
+      const result = await this.storageService.upload({ file, subDirectory: subDir });
       uploadResults.push(result);
     }
 
@@ -185,7 +173,7 @@ export class FilesController {
     let uploadRes: any;
     const subFolder = body.paymentRequestId ? 'protected/payments' : 'protected/evidence';
     try {
-      uploadRes = await this.storageService.upload(file, subFolder);
+      uploadRes = await this.storageService.upload({ file, subDirectory: subFolder });
 
       const evidence = await this.prisma.minh_chung.create({
         data: {
@@ -202,16 +190,15 @@ export class FilesController {
       });
 
       // 4. Sinh link HMAC xem trước và tải về có hạn 10 phút
-      const previewUrl = this.storageService.generateSignedUrl(
-        uploadRes.objectKey,
-        'preview',
-      );
-      const downloadUrl = this.storageService.generateSignedUrl(
-        uploadRes.objectKey,
-        'download',
-        undefined,
-        uploadRes.originalFileName,
-      );
+      const previewUrl = this.storageService.generateSignedUrl({
+        objectKey: uploadRes.objectKey,
+        action: 'preview',
+      });
+      const downloadUrl = this.storageService.generateSignedUrl({
+        objectKey: uploadRes.objectKey,
+        action: 'download',
+        originalFileName: uploadRes.originalFileName,
+      });
 
       return {
         id: evidence.id.toString(),
@@ -226,7 +213,7 @@ export class FilesController {
       };
     } catch (err) {
       if (uploadRes?.objectKey) {
-        await this.storageService.delete(uploadRes.objectKey).catch(() => {});
+        await this.storageService.delete({ objectKey: uploadRes.objectKey }).catch(() => {});
       }
       throw err;
     }
@@ -248,12 +235,12 @@ export class FilesController {
     @Query('expires') expires: string,
     @Res() res: Response,
   ): Promise<void> {
-    const isValid = this.storageService.verifySignedUrl(
+    const isValid = this.storageService.verifySignedUrl({
       objectKey,
       token,
-      Number(expires),
-      'preview',
-    );
+      expires: Number(expires),
+      action: 'preview',
+    });
 
     if (!isValid) {
       throw new ForbiddenException({
@@ -262,7 +249,7 @@ export class FilesController {
       });
     }
 
-    const fileData = await this.storageService.getFile(objectKey);
+    const fileData = await this.storageService.getFile({ objectKey });
 
     res.setHeader('Content-Type', fileData.mimeType || 'application/octet-stream');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -289,12 +276,12 @@ export class FilesController {
     @Query('filename') filename: string,
     @Res() res: Response,
   ): Promise<void> {
-    const isValid = this.storageService.verifySignedUrl(
+    const isValid = this.storageService.verifySignedUrl({
       objectKey,
       token,
-      Number(expires),
-      'download',
-    );
+      expires: Number(expires),
+      action: 'download',
+    });
 
     if (!isValid) {
       throw new ForbiddenException({
@@ -303,7 +290,7 @@ export class FilesController {
       });
     }
 
-    const fileData = await this.storageService.getFile(objectKey);
+    const fileData = await this.storageService.getFile({ objectKey });
 
     // Chống HTTP Header Injection (CWE-113): Lọc bỏ \r, \n, "
     const rawFileName = filename || path.basename(objectKey);
@@ -327,7 +314,7 @@ export class FilesController {
   async deleteFile(
     @Param('objectKey') objectKey: string,
   ): Promise<{ success: boolean; message: string }> {
-    const deleted = await this.storageService.delete(objectKey);
+    const deleted = await this.storageService.delete({ objectKey });
     return {
       success: deleted,
       message: deleted

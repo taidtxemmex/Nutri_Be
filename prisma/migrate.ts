@@ -40,7 +40,9 @@ export async function down(targetMigrationName?: string): Promise<void> {
       `;
 
       if (!latest || latest.length === 0) {
-        console.log('ℹ️  Không có migration nào khả dụng để rollback (hoặc chỉ còn baseline 0_init).');
+        console.log(
+          'ℹ️  Không có migration nào khả dụng để rollback (hoặc chỉ còn baseline 0_init).',
+        );
         return;
       }
       targetName = latest[0].migration_name;
@@ -50,7 +52,9 @@ export async function down(targetMigrationName?: string): Promise<void> {
     const rollbackSqlPath = path.join(migrationDir, 'rollback.sql');
 
     if (!fs.existsSync(rollbackSqlPath)) {
-      throw new Error(`Không tìm thấy file rollback.sql cho migration: ${targetName} tại ${rollbackSqlPath}`);
+      throw new Error(
+        `Không tìm thấy file rollback.sql cho migration: ${targetName} tại ${rollbackSqlPath}`,
+      );
     }
 
     console.log(`📖 Đang đọc script rollback từ: ${rollbackSqlPath}`);
@@ -62,7 +66,9 @@ export async function down(targetMigrationName?: string): Promise<void> {
       .map((s) => s.trim())
       .filter((s) => s.length > 0 && !s.startsWith('--'));
 
-    console.log(`⚡ Đang thực thi ${rawStatements.length} câu lệnh DDL rollback cho [${targetName}]...`);
+    console.log(
+      `⚡ Đang thực thi ${rawStatements.length} câu lệnh DDL rollback cho [${targetName}]...`,
+    );
 
     // Thực thi tuần tự từng câu lệnh DDL
     for (const stmt of rawStatements) {

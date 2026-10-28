@@ -53,7 +53,8 @@ export function getExcelMulterOptions() {
         return cb(
           new UnsupportedMediaTypeException({
             code: 'EXCEL_INVALID_FORMAT',
-            message: 'Chỉ chấp nhận tệp định dạng chuẩn .xlsx. Định dạng .xls hoặc khác bị từ chối.',
+            message:
+              'Chỉ chấp nhận tệp định dạng chuẩn .xlsx. Định dạng .xls hoặc khác bị từ chối.',
           }),
           false,
         );
@@ -70,9 +71,10 @@ export function getExcelMulterOptions() {
  * Chặn đứng tệp giả mạo phần mở rộng, Legacy OLE2 .xls và mã độc Macro nhúng (CWE-1236, CWE-434).
  */
 @Injectable()
-export class ExcelMagicByteValidationPipe
-  implements PipeTransform<Express.Multer.File, Promise<Express.Multer.File>>
-{
+export class ExcelMagicByteValidationPipe implements PipeTransform<
+  Express.Multer.File,
+  Promise<Express.Multer.File>
+> {
   async transform(file: Express.Multer.File): Promise<Express.Multer.File> {
     if (!file || !file.buffer) {
       throw new BadRequestException({

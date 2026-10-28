@@ -1,7 +1,13 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
-import { CreateIngredientProposalDto } from '../dto/create-ingredient-proposal.dto';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import {
+  CreateIngredientProposalParamsDto,
+  FindAllIngredientProposalsParamsDto,
+  FindIngredientProposalByIdParamsDto,
+  ApproveIngredientProposalParamsDto,
+  RejectIngredientProposalParamsDto,
+} from '../dto';
+import { isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class IngredientProposalsService {
@@ -16,10 +22,7 @@ export class IngredientProposalsService {
   /**
    * 1. POST /api/ingredient-proposals: Nộp đề xuất nguyên liệu mới
    */
-  async create(
-    dto: CreateIngredientProposalDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<any> {
+  async create({ dto, currentUser }: CreateIngredientProposalParamsDto): Promise<any> {
     const categoryId = Number(dto.categoryId);
     const category = await this.prisma.danh_muc.findUnique({
       where: { id: categoryId },
@@ -33,9 +36,7 @@ export class IngredientProposalsService {
     }
 
     const proposalType =
-      dto.proposalType === 'UPDATE' || dto.proposalType === 'CAP_NHAT'
-        ? 'CAP_NHAT'
-        : 'THEM_MOI';
+      dto.proposalType === 'UPDATE' || dto.proposalType === 'CAP_NHAT' ? 'CAP_NHAT' : 'THEM_MOI';
 
     const nutrientsJson = JSON.stringify(dto.nutrients || {});
 
@@ -87,7 +88,7 @@ export class IngredientProposalsService {
   /**
    * 2. GET /api/ingredient-proposals: Danh sách đề xuất
    */
-  async findAll(currentUser: { id: string; role?: string }, status?: string): Promise<any[]> {
+  async findAll({ currentUser, status }: FindAllIngredientProposalsParamsDto): Promise<any[]> {
     const where: any = {};
     if (!this.isAdmin(currentUser)) {
       where.nguoi_tao_id = currentUser.id;
@@ -101,7 +102,9 @@ export class IngredientProposalsService {
       where,
       include: {
         danh_muc_de_xuat_nguyen_lieu_danh_mucTodanh_muc: { select: { ten_danh_muc: true } },
-        nguoi_dung_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+        nguoi_dung_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung: {
+          select: { ten_dang_nhap: true },
+        },
       },
       orderBy: { id: 'desc' },
       take: 100,
@@ -122,14 +125,16 @@ export class IngredientProposalsService {
   /**
    * 3. GET /api/ingredient-proposals/:id: Chi tiết đề xuất
    */
-  async findById(id: string | number | bigint, currentUser: { id: string; role?: string }): Promise<any> {
+  async findById({ id, currentUser }: FindIngredientProposalByIdParamsDto): Promise<any> {
     const proposalId = BigInt(id);
     const proposal = await this.prisma.de_xuat_nguyen_lieu.findUnique({
       where: { id: proposalId },
       include: {
         danh_muc_de_xuat_nguyen_lieu_danh_mucTodanh_muc: true,
         minh_chung: true,
-        nguoi_dung_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+        nguoi_dung_de_xuat_nguyen_lieu_nguoi_tao_idTonguoi_dung: {
+          select: { ten_dang_nhap: true },
+        },
       },
     });
 
@@ -178,7 +183,7 @@ export class IngredientProposalsService {
   /**
    * 4. PUT /api/ingredient-proposals/:id/approve: Phê duyệt đề xuất nguyên liệu (Admin Only)
    */
-  async approve(id: string | number | bigint, currentUser: { id: string; role?: string }): Promise<any> {
+  async approve({ id, currentUser }: ApproveIngredientProposalParamsDto): Promise<any> {
     if (!this.isAdmin(currentUser)) {
       throw new HttpException(
         { code: 'AUTH_002', message: 'Chỉ quản trị viên mới có quyền phê duyệt đề xuất' },
@@ -256,11 +261,7 @@ export class IngredientProposalsService {
   /**
    * 5. PUT /api/ingredient-proposals/:id/reject: Từ chối đề xuất nguyên liệu (Admin Only)
    */
-  async reject(
-    id: string | number | bigint,
-    reason: string,
-    currentUser: { id: string; role?: string },
-  ): Promise<any> {
+  async reject({ id, reason, currentUser }: RejectIngredientProposalParamsDto): Promise<any> {
     if (!this.isAdmin(currentUser)) {
       throw new HttpException(
         { code: 'AUTH_002', message: 'Chỉ quản trị viên mới có quyền từ chối đề xuất' },

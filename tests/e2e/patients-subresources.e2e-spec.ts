@@ -4,7 +4,7 @@ dotenv.config({ path: '.env.test', override: true });
 import * as request from 'supertest';
 import { TestAppHelper } from '../helpers/test-app.helper';
 import { UserRole } from '../../src/config/enums/role.enum';
-import { MenuType, TargetType, IntakeInputType } from '../../src/config/enums/domain.enum';
+import { MenuType, TargetType } from '../../src/config/enums/domain.enum';
 
 jest.setTimeout(60000);
 
@@ -25,11 +25,11 @@ describe('Sprint 5 Suite 4: Sub-resources, IDOR & Delete Guard (Tasks 5.5 & 5.6)
   const helper = new TestAppHelper();
 
   let adminToken: string;
-  let adminUser: any;
+  let _adminUser: any;
   let doctorAToken: string;
   let doctorAUser: any;
   let doctorBToken: string;
-  let doctorBUser: any;
+  let _doctorBUser: any;
 
   beforeAll(async () => {
     await helper.init();
@@ -60,7 +60,7 @@ describe('Sprint 5 Suite 4: Sub-resources, IDOR & Delete Guard (Tasks 5.5 & 5.6)
       fullName: 'Giám Đốc Bệnh Viện (Admin)',
     });
     adminToken = admin.token;
-    adminUser = admin.user;
+    _adminUser = admin.user;
 
     const docA = await helper.createTestUser({
       username: `doc_sub_a_${unique}`,
@@ -78,7 +78,7 @@ describe('Sprint 5 Suite 4: Sub-resources, IDOR & Delete Guard (Tasks 5.5 & 5.6)
       fullName: 'Bác Sĩ Trần Thị B (Attacker IDOR)',
     });
     doctorBToken = docB.token;
-    doctorBUser = docB.user;
+    _doctorBUser = docB.user;
   });
 
   afterAll(async () => {
@@ -252,7 +252,9 @@ describe('Sprint 5 Suite 4: Sub-resources, IDOR & Delete Guard (Tasks 5.5 & 5.6)
         where: { id: recordId },
       });
       expect(dbRecord).not.toBeNull();
-      expect(dbRecord?.chan_doan_chinh).toBe('Đái tháo đường týp 2 có biến chứng mạch máu ngoại vi');
+      expect(dbRecord?.chan_doan_chinh).toBe(
+        'Đái tháo đường týp 2 có biến chứng mạch máu ngoại vi',
+      );
       expect(dbRecord?.ma_icd10).toBe('E11.5');
       expect(dbRecord?.bac_si_kham_id).toBe(doctorAUser.id);
     });

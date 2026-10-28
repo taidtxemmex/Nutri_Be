@@ -13,14 +13,43 @@ export interface NormalizedPagination {
   skip: number;
 }
 
+export interface NormalizePaginationParamDto {
+  query?: { page?: number | string; limit?: number | string; size?: number | string };
+  defaultLimit?: number;
+  maxLimit?: number;
+}
+
 /**
  * Single Source of Truth chuẩn hóa phân trang (Pillar II & DRY D10)
  */
 export function normalizePagination(
-  query?: { page?: number | string; limit?: number | string; size?: number | string },
-  defaultLimit = DEFAULT_LIMIT,
-  maxLimit = MAX_LIMIT,
+  paramOrQuery?:
+    | NormalizePaginationParamDto
+    | { page?: number | string; limit?: number | string; size?: number | string },
+  legacyDefaultLimit = DEFAULT_LIMIT,
+  legacyMaxLimit = MAX_LIMIT,
 ): NormalizedPagination {
+  let query:
+    { page?: number | string; limit?: number | string; size?: number | string } | undefined;
+  let defaultLimit = DEFAULT_LIMIT;
+  let maxLimit = MAX_LIMIT;
+
+  if (
+    paramOrQuery &&
+    typeof paramOrQuery === 'object' &&
+    ('query' in paramOrQuery || 'defaultLimit' in paramOrQuery || 'maxLimit' in paramOrQuery)
+  ) {
+    const dto = paramOrQuery as NormalizePaginationParamDto;
+    query = dto.query;
+    defaultLimit = dto.defaultLimit ?? DEFAULT_LIMIT;
+    maxLimit = dto.maxLimit ?? MAX_LIMIT;
+  } else {
+    query = paramOrQuery as
+      { page?: number | string; limit?: number | string; size?: number | string } | undefined;
+    defaultLimit = legacyDefaultLimit;
+    maxLimit = legacyMaxLimit;
+  }
+
   const rawPage = query?.page ? Number(query.page) : DEFAULT_PAGE;
   const page = isNaN(rawPage) || rawPage < 1 ? DEFAULT_PAGE : Math.floor(rawPage);
 

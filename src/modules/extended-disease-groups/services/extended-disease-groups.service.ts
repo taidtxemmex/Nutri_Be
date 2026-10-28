@@ -7,17 +7,14 @@ import {
   buildExtendedDiseaseGroupCacheTag,
   buildExtendedDiseaseGroupDetailCacheKey,
 } from '../../../config/constants/cache.constants';
-import {
-  DEFAULT_PAGE,
-  DEFAULT_LIMIT,
-  MAX_LIMIT,
-} from '../../../config/constants/pagination.constants';
 import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
-  CreateExtendedDiseaseGroupDto,
-  UpdateExtendedDiseaseGroupDto,
-  ExtendedDiseaseGroupQueryDto,
   ExtendedDiseaseGroupResponseDto,
+  FindExtendedDiseaseGroupsParamsDto,
+  FindExtendedDiseaseGroupByIdParamsDto,
+  CreateExtendedDiseaseGroupParamsDto,
+  UpdateExtendedDiseaseGroupParamsDto,
+  DeleteExtendedDiseaseGroupParamsDto,
 } from '../dto';
 
 export interface PaginatedExtendedDiseaseGroupsResult {
@@ -39,19 +36,22 @@ export class ExtendedDiseaseGroupsService {
   /**
    * Lấy danh sách nhóm bệnh mở rộng của user hiện tại (IDOR Defense: where nguoi_dung_id)
    */
-  async findAll(
-    userId: string,
-    query?: ExtendedDiseaseGroupQueryDto,
-  ): Promise<PaginatedExtendedDiseaseGroupsResult> {
+  async findAll({
+    userId,
+    query,
+  }: FindExtendedDiseaseGroupsParamsDto): Promise<PaginatedExtendedDiseaseGroupsResult> {
     const { page, limit, skip } = normalizePagination(query);
 
-    const cacheKey = this.cacheService?.generateKey(`extended-disease-groups:${userId}`, {
-      page,
-      limit,
-      parentId: query?.parentId,
-      search: query?.search,
-      sortBy: query?.sortBy,
-      sortOrder: query?.sortOrder,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: `extended-disease-groups:${userId}`,
+      params: {
+        page,
+        limit,
+        parentId: query?.parentId,
+        search: query?.search,
+        sortBy: query?.sortBy,
+        sortOrder: query?.sortOrder,
+      },
     });
 
     if (this.cacheService && cacheKey) {
@@ -145,7 +145,10 @@ export class ExtendedDiseaseGroupsService {
   /**
    * Lấy chi tiết nhóm bệnh mở rộng theo ID (chỉ của chính user)
    */
-  async findById(id: number, userId: string): Promise<ExtendedDiseaseGroupResponseDto> {
+  async findById({
+    id,
+    userId,
+  }: FindExtendedDiseaseGroupByIdParamsDto): Promise<ExtendedDiseaseGroupResponseDto> {
     const cacheKey = buildExtendedDiseaseGroupDetailCacheKey(id);
     if (this.cacheService) {
       const cached = await this.cacheService.get<ExtendedDiseaseGroupResponseDto>(cacheKey);
@@ -194,12 +197,10 @@ export class ExtendedDiseaseGroupsService {
     };
 
     if (this.cacheService) {
-      await this.cacheService.set(
-        cacheKey,
-        response,
-        CACHE_TTL_PERPETUAL,
-        [CACHE_TAG_EXTENDED_DISEASE_GROUPS, buildExtendedDiseaseGroupCacheTag(id)],
-      );
+      await this.cacheService.set(cacheKey, response, CACHE_TTL_PERPETUAL, [
+        CACHE_TAG_EXTENDED_DISEASE_GROUPS,
+        buildExtendedDiseaseGroupCacheTag(id),
+      ]);
     }
 
     return response;
@@ -208,10 +209,10 @@ export class ExtendedDiseaseGroupsService {
   /**
    * Tạo mới nhóm bệnh mở rộng cho user hiện tại
    */
-  async create(
-    userId: string,
-    dto: CreateExtendedDiseaseGroupDto,
-  ): Promise<ExtendedDiseaseGroupResponseDto> {
+  async create({
+    userId,
+    dto,
+  }: CreateExtendedDiseaseGroupParamsDto): Promise<ExtendedDiseaseGroupResponseDto> {
     const parent = await this.prisma.nhom_benh.findUnique({
       where: { id: dto.parentId },
       select: { id: true, ma_nhom: true, ten_nhom: true },
@@ -243,7 +244,7 @@ export class ExtendedDiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache(created.id);
+    await this.invalidateCache({ id: created.id });
 
     const parentCode = parent.ma_nhom ? `${parent.ma_nhom} - ` : '';
     return {
@@ -260,11 +261,11 @@ export class ExtendedDiseaseGroupsService {
   /**
    * Cập nhật nhóm bệnh mở rộng của user
    */
-  async update(
-    id: number,
-    userId: string,
-    dto: UpdateExtendedDiseaseGroupDto,
-  ): Promise<ExtendedDiseaseGroupResponseDto> {
+  async update({
+    id,
+    userId,
+    dto,
+  }: UpdateExtendedDiseaseGroupParamsDto): Promise<ExtendedDiseaseGroupResponseDto> {
     const existing = await this.prisma.nhom_benh_mo_rong.findFirst({
       where: {
         id,
@@ -318,7 +319,7 @@ export class ExtendedDiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache(updated.id);
+    await this.invalidateCache({ id: updated.id });
 
     const parentCode = updated.nhom_benh?.ma_nhom ? `${updated.nhom_benh.ma_nhom} - ` : '';
     return {
@@ -336,7 +337,10 @@ export class ExtendedDiseaseGroupsService {
    * Xóa nhóm bệnh mở rộng của user
    * - Proactive check _count trên thuc_don & de_xuat_thuc_don (EDG_001, 409)
    */
-  async delete(id: number, userId: string): Promise<{ success: boolean; message: string }> {
+  async delete({
+    id,
+    userId,
+  }: DeleteExtendedDiseaseGroupParamsDto): Promise<{ success: boolean; message: string }> {
     const existing = await this.prisma.nhom_benh_mo_rong.findFirst({
       where: {
         id,
@@ -374,7 +378,7 @@ export class ExtendedDiseaseGroupsService {
       where: { id },
     });
 
-    await this.invalidateCache(id);
+    await this.invalidateCache({ id });
 
     return {
       success: true,
@@ -382,7 +386,7 @@ export class ExtendedDiseaseGroupsService {
     };
   }
 
-  private async invalidateCache(id?: number): Promise<void> {
+  private async invalidateCache({ id }: { id?: number } = {}): Promise<void> {
     if (this.cacheService) {
       const tags = [CACHE_TAG_EXTENDED_DISEASE_GROUPS];
       if (id) {

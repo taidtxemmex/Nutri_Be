@@ -1,6 +1,9 @@
 import { Response } from 'express';
 import { Writable } from 'stream';
-import { BaseExcelStreamer, ExcelColumnDefinition } from '../../../core/excel-engine/base-excel.streamer';
+import {
+  BaseExcelStreamer,
+  ExcelColumnDefinition,
+} from '../../../core/excel-engine/base-excel.streamer';
 import { ExcelSecurityUtil } from '../../../security/excel/excel-security.util';
 import { EXCEL_FONT_FAMILY, EXCEL_STYLES } from '../../../config/constants/excel.constants';
 
@@ -45,6 +48,11 @@ export interface MarketPlanMenuContext {
   gRatio?: number;
 }
 
+export class StreamMarketPlanParamDto {
+  context: MarketPlanMenuContext;
+  ingredients: MarketPlanIngredient[];
+}
+
 /**
  * 14 nhóm thực phẩm chuẩn Viện Dinh Dưỡng Quốc Gia (NIN) / Bộ Y Tế Việt Nam
  */
@@ -85,9 +93,25 @@ export class MenuMarketPlanStreamer extends BaseExcelStreamer {
    * Stream toàn bộ bảng kế hoạch đi chợ
    */
   public async streamMarketPlan(
-    context: MarketPlanMenuContext,
-    ingredients: MarketPlanIngredient[],
+    paramOrContext: StreamMarketPlanParamDto | MarketPlanMenuContext,
+    legacyIngredients?: MarketPlanIngredient[],
   ): Promise<void> {
+    let context: MarketPlanMenuContext;
+    let ingredients: MarketPlanIngredient[];
+
+    if (
+      paramOrContext &&
+      typeof paramOrContext === 'object' &&
+      'context' in paramOrContext &&
+      'ingredients' in paramOrContext
+    ) {
+      context = paramOrContext.context;
+      ingredients = paramOrContext.ingredients;
+    } else {
+      context = paramOrContext as MarketPlanMenuContext;
+      ingredients = legacyIngredients || [];
+    }
+
     const servings = context.servings > 0 ? context.servings : 1;
 
     // 1. Tiêu đề lớn báo cáo (Merge 11 cột)
@@ -230,7 +254,8 @@ export class MenuMarketPlanStreamer extends BaseExcelStreamer {
       this.addInfoRow(patientInfo, 'FF1F497D');
 
       if (p.bmi || p.tdee) {
-        const anthropometry = `Chỉ số nhân trắc: BMI: ${p.bmi || 'N/A'} | Nhu cầu năng lượng ước tính (TDEE): ${p.tdee ? `${p.tdee} kcal/ngày` : 'N/A'}`;
+        const tdeeText = p.tdee ? `${p.tdee} kcal/ngày` : 'N/A';
+        const anthropometry = `Chỉ số nhân trắc: BMI: ${p.bmi || 'N/A'} | Nhu cầu năng lượng ước tính (TDEE): ${tdeeText}`;
         this.addInfoRow(anthropometry, 'FF333333');
       }
     }
@@ -244,8 +269,7 @@ export class MenuMarketPlanStreamer extends BaseExcelStreamer {
       const p = context.pRatio !== undefined ? `${context.pRatio}%` : 'N/A';
       const l = context.lRatio !== undefined ? `${context.lRatio}%` : 'N/A';
       const g = context.gRatio !== undefined ? `${context.gRatio}%` : 'N/A';
-      const plgInfo =
-        `Năng lượng: ${context.energyKcal} kcal/suất | Tỷ lệ P:L:G: ${p} : ${l} : ${g} (Chuẩn BYT: 13-20% : 20-25% : 55-65%)`;
+      const plgInfo = `Năng lượng: ${context.energyKcal} kcal/suất | Tỷ lệ P:L:G: ${p} : ${l} : ${g} (Chuẩn BYT: 13-20% : 20-25% : 55-65%)`;
       this.addInfoRow(plgInfo, 'FF0D47A1', true);
     }
 
@@ -338,7 +362,7 @@ export class MenuMarketPlanStreamer extends BaseExcelStreamer {
     lossN: number,
     raw1: number,
     rawN: number,
-    servings: number,
+    _servings: number,
   ): Promise<void> {
     const r = this.rowCount + 1;
     const row = this.worksheet.getRow(r);

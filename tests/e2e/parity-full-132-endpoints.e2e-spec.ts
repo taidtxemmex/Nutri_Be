@@ -4,7 +4,6 @@ dotenv.config({ path: '.env.test', override: true });
 import * as request from 'supertest';
 import { TestAppHelper } from '../helpers/test-app.helper';
 import { HttpStatus } from '@nestjs/common';
-import { UserRole } from '../../src/config/enums/role.enum';
 
 /**
  * PARITY FULL 132 ENDPOINTS E2E TEST SUITE (Task 8.1 [T11.1])
@@ -17,7 +16,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
   let adminToken: string;
   let doctorToken: string;
   let userToken: string;
-  let adminUser: any;
+  let _adminUser: any;
   let doctorUser: any;
   let normalUser: any;
 
@@ -40,7 +39,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
       username: 'parity_admin',
       role: 'SUPERADMIN',
     });
-    adminUser = adminRes.user;
+    _adminUser = adminRes.user;
     adminToken = adminRes.token;
 
     const doctorRes = await helper.createTestUser({
@@ -151,14 +150,12 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
   // =========================================================================
   describe('I. AuthController (STT 1 -> 7)', () => {
     it('1. POST /api/v1/auth/register & /api/auth/register', async () => {
-      const res = await request(helper.getHttpServer())
-        .post('/api/auth/register')
-        .send({
-          username: 'parity_reg_user',
-          password: 'Password123!',
-          email: 'parity_reg@test.com',
-          fullName: 'Parity Register Test',
-        });
+      const res = await request(helper.getHttpServer()).post('/api/auth/register').send({
+        username: 'parity_reg_user',
+        password: 'Password123!',
+        email: 'parity_reg@test.com',
+        fullName: 'Parity Register Test',
+      });
       expect([HttpStatus.CREATED, HttpStatus.OK, HttpStatus.BAD_REQUEST]).toContain(res.status);
     });
 
@@ -252,7 +249,9 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
         const res = await request(helper.getHttpServer())
           .delete(`/api/category/${createdCatId}`)
           .set('Authorization', `Bearer ${adminToken}`);
-        expect([HttpStatus.OK, HttpStatus.NO_CONTENT, HttpStatus.BAD_REQUEST]).toContain(res.status);
+        expect([HttpStatus.OK, HttpStatus.NO_CONTENT, HttpStatus.BAD_REQUEST]).toContain(
+          res.status,
+        );
       }
     });
   });
@@ -755,8 +754,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
   describe('XII. FileController (STT 60)', () => {
     it('60. POST /api/files requires authentication and rejects missing file', async () => {
       // 1. Chặn anonymous upload (B1 sprint 7 fix)
-      const unauthRes = await request(helper.getHttpServer())
-        .post('/api/files');
+      const unauthRes = await request(helper.getHttpServer()).post('/api/files');
       expect(unauthRes.status).toBe(HttpStatus.UNAUTHORIZED);
 
       // 2. Authenticated user without file returns 400 Bad Request
@@ -808,7 +806,9 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
     });
 
     it('65. GET /api/ingredient/:id (Detail 86 nutrients)', async () => {
-      const res = await request(helper.getHttpServer()).get(`/api/ingredient/${sampleIngredientId}`);
+      const res = await request(helper.getHttpServer()).get(
+        `/api/ingredient/${sampleIngredientId}`,
+      );
       expect(res.status).toBe(HttpStatus.OK);
       expect(res.body?.data).toBeDefined();
     });
@@ -916,7 +916,12 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
         .post('/api/meal')
         .set('Authorization', `Bearer ${doctorToken}`)
         .send({ name: 'Bữa sáng độc lập' });
-      expect([HttpStatus.FORBIDDEN, HttpStatus.BAD_REQUEST, HttpStatus.CREATED, HttpStatus.OK]).toContain(res.status);
+      expect([
+        HttpStatus.FORBIDDEN,
+        HttpStatus.BAD_REQUEST,
+        HttpStatus.CREATED,
+        HttpStatus.OK,
+      ]).toContain(res.status);
     });
 
     it('76. GET /api/meal', async () => {
@@ -930,7 +935,9 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
       const res = await request(helper.getHttpServer())
         .get('/api/meal/999999')
         .set('Authorization', `Bearer ${doctorToken}`);
-      expect([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST]).toContain(res.status);
+      expect([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST]).toContain(
+        res.status,
+      );
     });
 
     it('78. PUT /api/meal/:id', async () => {
@@ -938,14 +945,18 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
         .put('/api/meal/999999')
         .set('Authorization', `Bearer ${doctorToken}`)
         .send({ name: 'Bữa trưa cập nhật' });
-      expect([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST]).toContain(res.status);
+      expect([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST]).toContain(
+        res.status,
+      );
     });
 
     it('79. DELETE /api/meal/:id', async () => {
       const res = await request(helper.getHttpServer())
         .delete('/api/meal/999999')
         .set('Authorization', `Bearer ${doctorToken}`);
-      expect([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST]).toContain(res.status);
+      expect([HttpStatus.FORBIDDEN, HttpStatus.NOT_FOUND, HttpStatus.BAD_REQUEST]).toContain(
+        res.status,
+      );
     });
   });
 
@@ -1155,7 +1166,9 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
 
     it('97. GET /api/nutrition-guide/:id (Detail guide)', async () => {
       if (createdGuideId) {
-        const res = await request(helper.getHttpServer()).get(`/api/nutrition-guide/${createdGuideId}`);
+        const res = await request(helper.getHttpServer()).get(
+          `/api/nutrition-guide/${createdGuideId}`,
+        );
         expect(res.status).toBe(HttpStatus.OK);
       }
     });

@@ -27,6 +27,14 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   AuthResponseDto,
+  RegisterParamDto,
+  VerifyEmailParamDto,
+  LoginParamDto,
+  RefreshTokenParamDto,
+  LogoutParamDto,
+  GoogleLoginParamDto,
+  ForgotPasswordParamDto,
+  ResetPasswordParamDto,
 } from '../dto';
 import { UserRole, AuthProvider } from '../../../config/enums';
 import { JwtPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
@@ -63,7 +71,13 @@ export class AuthService {
    * Lưu vào `dang_ky_cho_xac_thuc`
    * Đẩy job gửi email kích hoạt vào `_system_jobs`
    */
-  async register(dto: RegisterDto): Promise<{ success: boolean; message: string }> {
+  async register(
+    paramOrDto: RegisterParamDto | RegisterDto,
+  ): Promise<{ success: boolean; message: string }> {
+    const dto =
+      paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto
+        ? paramOrDto.dto
+        : (paramOrDto as RegisterDto);
     const trimmedUsername = dto.username.trim();
     const trimmedEmail = dto.email.trim().toLowerCase();
 
@@ -158,7 +172,14 @@ export class AuthService {
    * Xác thực tài khoản qua email token:
    * Chuyển dữ liệu từ `dang_ky_cho_xac_thuc` sang `nguoi_dung` & `ho_so_ca_nhan`
    */
-  async verifyEmail(token: string): Promise<{ success: boolean; message: string }> {
+  async verifyEmail(
+    paramOrToken: VerifyEmailParamDto | string,
+  ): Promise<{ success: boolean; message: string }> {
+    const token =
+      paramOrToken && typeof paramOrToken === 'object' && 'token' in paramOrToken
+        ? paramOrToken.token
+        : (paramOrToken as string);
+
     if (!token) {
       throw new BadRequestException('Mã xác thực không hợp lệ.');
     }
@@ -225,10 +246,24 @@ export class AuthService {
    * Ghi log lịch sử đăng nhập
    */
   async login(
-    dto: LoginDto,
-    ipAddress?: string,
-    userAgent?: string,
+    paramOrDto: LoginParamDto | LoginDto,
+    legacyIp?: string,
+    legacyUserAgent?: string,
   ): Promise<AuthResponseDto & { sessionId?: string }> {
+    let dto: LoginDto;
+    let ipAddress: string | undefined;
+    let userAgent: string | undefined;
+
+    if (paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto) {
+      dto = paramOrDto.dto;
+      ipAddress = paramOrDto.ip;
+      userAgent = paramOrDto.userAgent;
+    } else {
+      dto = paramOrDto as LoginDto;
+      ipAddress = legacyIp;
+      userAgent = legacyUserAgent;
+    }
+
     const trimmedUsername = dto.username.trim();
 
     const user = await this.prisma.nguoi_dung.findUnique({
@@ -298,7 +333,9 @@ export class AuthService {
 
     // Tạo refresh token có cơ chế rotation chống Replay Attack
     const rawRefreshToken = this.refreshTokenRotationService.generateTokenString();
-    await this.refreshTokenRotationService.storeRefreshToken(user.id, rawRefreshToken, {
+    await this.refreshTokenRotationService.storeRefreshToken({
+      userId: user.id,
+      rawToken: rawRefreshToken,
       ipAddress,
       userAgent,
     });
@@ -333,14 +370,29 @@ export class AuthService {
    * Xoay vòng Refresh Token (Token Rotation per RFC 6819)
    */
   async refreshToken(
-    dto: RefreshTokenDto,
-    ipAddress?: string,
-    userAgent?: string,
+    paramOrDto: RefreshTokenParamDto | RefreshTokenDto,
+    legacyIp?: string,
+    legacyUserAgent?: string,
   ): Promise<AuthResponseDto> {
-    const rotation = await this.refreshTokenRotationService.validateAndRotateRefreshToken(
-      dto.refreshToken,
-      { ipAddress, userAgent },
-    );
+    let dto: RefreshTokenDto;
+    let ipAddress: string | undefined;
+    let userAgent: string | undefined;
+
+    if (paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto) {
+      dto = paramOrDto.dto;
+      ipAddress = paramOrDto.ip;
+      userAgent = paramOrDto.userAgent;
+    } else {
+      dto = paramOrDto as RefreshTokenDto;
+      ipAddress = legacyIp;
+      userAgent = legacyUserAgent;
+    }
+
+    const rotation = await this.refreshTokenRotationService.validateAndRotateRefreshToken({
+      oldRawToken: dto.refreshToken,
+      ipAddress,
+      userAgent,
+    });
 
     const user = await this.prisma.nguoi_dung.findUnique({
       where: { id: rotation.userId },
@@ -404,10 +456,24 @@ export class AuthService {
    * Đăng xuất: thu hồi refresh token và cập nhật logout_time
    */
   async logout(
-    currentUser: AuthenticatedUser,
-    refreshToken?: string,
-    sessionId?: string,
+    paramOrUser: LogoutParamDto | AuthenticatedUser,
+    legacyRefreshToken?: string,
+    legacySessionId?: string,
   ): Promise<{ success: boolean; message: string }> {
+    let currentUser: AuthenticatedUser;
+    let refreshToken: string | undefined;
+    let sessionId: string | undefined;
+
+    if (paramOrUser && typeof paramOrUser === 'object' && 'user' in paramOrUser) {
+      currentUser = paramOrUser.user;
+      refreshToken = paramOrUser.refreshToken;
+      sessionId = paramOrUser.sessionId;
+    } else {
+      currentUser = paramOrUser as AuthenticatedUser;
+      refreshToken = legacyRefreshToken;
+      sessionId = legacySessionId;
+    }
+
     if (refreshToken) {
       await this.refreshTokenRotationService.revokeRefreshToken(refreshToken);
     }
@@ -443,10 +509,24 @@ export class AuthService {
    * Đăng nhập hoặc trao đổi mã xác thực Google OAuth2 (Google ID Token)
    */
   async googleLogin(
-    dto: GoogleAuthDto,
-    ipAddress?: string,
-    userAgent?: string,
+    paramOrDto: GoogleLoginParamDto | GoogleAuthDto,
+    legacyIp?: string,
+    legacyUserAgent?: string,
   ): Promise<AuthResponseDto> {
+    let dto: GoogleAuthDto;
+    let ipAddress: string | undefined;
+    let userAgent: string | undefined;
+
+    if (paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto) {
+      dto = paramOrDto.dto;
+      ipAddress = paramOrDto.ip;
+      userAgent = paramOrDto.userAgent;
+    } else {
+      dto = paramOrDto as GoogleAuthDto;
+      ipAddress = legacyIp;
+      userAgent = legacyUserAgent;
+    }
+
     const rawToken = dto.credential || dto.idToken;
 
     if (!rawToken) {
@@ -606,7 +686,9 @@ export class AuthService {
     });
 
     const rawRefreshToken = this.refreshTokenRotationService.generateTokenString();
-    await this.refreshTokenRotationService.storeRefreshToken(user.id, rawRefreshToken, {
+    await this.refreshTokenRotationService.storeRefreshToken({
+      userId: user.id,
+      rawToken: rawRefreshToken,
       ipAddress,
       userAgent,
     });
@@ -624,7 +706,13 @@ export class AuthService {
   /**
    * Quên mật khẩu: sinh token OTP trong `ma_xac_thuc`, đẩy mail job vào `_system_jobs` (< 5ms)
    */
-  async forgotPassword(dto: ForgotPasswordDto): Promise<{ success: boolean; message: string }> {
+  async forgotPassword(
+    paramOrDto: ForgotPasswordParamDto | ForgotPasswordDto,
+  ): Promise<{ success: boolean; message: string }> {
+    const dto =
+      paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto
+        ? paramOrDto.dto
+        : (paramOrDto as ForgotPasswordDto);
     const email = dto.email.trim().toLowerCase();
 
     const profile = await this.prisma.ho_so_ca_nhan.findFirst({
@@ -689,7 +777,13 @@ export class AuthService {
   /**
    * Đặt lại mật khẩu: kiểm tra token trong `ma_xac_thuc`, băm mật khẩu mới, thu hồi mọi phiên cũ
    */
-  async resetPassword(dto: ResetPasswordDto): Promise<{ success: boolean; message: string }> {
+  async resetPassword(
+    paramOrDto: ResetPasswordParamDto | ResetPasswordDto,
+  ): Promise<{ success: boolean; message: string }> {
+    const dto =
+      paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto
+        ? paramOrDto.dto
+        : (paramOrDto as ResetPasswordDto);
     const token = dto.token.trim();
 
     const record = await this.prisma.ma_xac_thuc.findUnique({

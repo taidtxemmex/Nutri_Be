@@ -1,8 +1,14 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { EvidenceStorageService } from './evidence-storage.service';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import { isAdminRole } from '../../../config/enums/role.enum';
 import { MAX_FILE_SIZE_BYTES } from '../../../config/upload.constants';
+import { GeneratePreviewUrlParamsDto, GenerateDownloadUrlParamsDto } from '../dto';
+
+export interface FindAndCheckPermissionParamDto {
+  evidenceId: string | number;
+  currentUser: { id: string; role?: string };
+}
 
 @Injectable()
 export class EvidencesService {
@@ -18,9 +24,23 @@ export class EvidencesService {
   }
 
   private async findAndCheckPermission(
-    evidenceId: string | number,
-    currentUser: { id: string; role?: string },
+    paramOrEvidenceId: FindAndCheckPermissionParamDto | string | number,
+    legacyCurrentUser?: { id: string; role?: string },
   ) {
+    let evidenceId: string | number;
+    let currentUser: { id: string; role?: string };
+
+    if (
+      paramOrEvidenceId &&
+      typeof paramOrEvidenceId === 'object' &&
+      'evidenceId' in paramOrEvidenceId
+    ) {
+      evidenceId = paramOrEvidenceId.evidenceId;
+      currentUser = paramOrEvidenceId.currentUser;
+    } else {
+      evidenceId = paramOrEvidenceId as string | number;
+      currentUser = legacyCurrentUser!;
+    }
     const evidence = await this.prisma.minh_chung.findUnique({
       where: { id: BigInt(evidenceId) },
       include: {
@@ -54,11 +74,8 @@ export class EvidencesService {
     return evidence;
   }
 
-  async generatePreviewUrl(
-    id: string | number,
-    currentUser: { id: string; role?: string },
-  ): Promise<string> {
-    const evidence = await this.findAndCheckPermission(id, currentUser);
+  async generatePreviewUrl({ id, currentUser }: GeneratePreviewUrlParamsDto): Promise<string> {
+    const evidence = await this.findAndCheckPermission({ evidenceId: id, currentUser });
 
     if (evidence.link_ngoai && !evidence.object_key) {
       return evidence.link_ngoai;
@@ -78,14 +95,11 @@ export class EvidencesService {
       );
     }
 
-    return this.storageService.generatePreviewUrl(evidence.object_key);
+    return this.storageService.generatePreviewUrl({ objectKey: evidence.object_key });
   }
 
-  async generateDownloadUrl(
-    id: string | number,
-    currentUser: { id: string; role?: string },
-  ): Promise<string> {
-    const evidence = await this.findAndCheckPermission(id, currentUser);
+  async generateDownloadUrl({ id, currentUser }: GenerateDownloadUrlParamsDto): Promise<string> {
+    const evidence = await this.findAndCheckPermission({ evidenceId: id, currentUser });
 
     if (evidence.link_ngoai && !evidence.object_key) {
       return evidence.link_ngoai;
@@ -98,9 +112,9 @@ export class EvidencesService {
       );
     }
 
-    return this.storageService.generateDownloadUrl(
-      evidence.object_key,
-      evidence.ten_file_goc || undefined,
-    );
+    return this.storageService.generateDownloadUrl({
+      objectKey: evidence.object_key,
+      originalFileName: evidence.ten_file_goc || undefined,
+    });
   }
 }

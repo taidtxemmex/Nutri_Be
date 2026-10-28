@@ -46,7 +46,7 @@ describe('ExtendedDiseaseGroupsService', () => {
         },
       ]);
 
-      const result = await service.findAll('user-123', { page: 1, limit: 10 });
+      const result = await service.findAll({ userId: 'user-123', query: { page: 1, limit: 10 } });
 
       expect(mockPrisma.nhom_benh_mo_rong.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -63,7 +63,9 @@ describe('ExtendedDiseaseGroupsService', () => {
     it('should throw DATA_001 if group belongs to another user', async () => {
       mockPrisma.nhom_benh_mo_rong.findFirst.mockResolvedValue(null);
 
-      await expect(service.findById(1, 'attacker-user')).rejects.toThrow(NotFoundException);
+      await expect(service.findById({ id: 1, userId: 'attacker-user' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should return group details if owned by user', async () => {
@@ -76,7 +78,7 @@ describe('ExtendedDiseaseGroupsService', () => {
         nhom_benh: { id: 1, ma_nhom: 'A', ten_nhom: 'Bệnh tim mạch' },
       });
 
-      const result = await service.findById(1, 'user-123');
+      const result = await service.findById({ id: 1, userId: 'user-123' });
 
       expect(result.id).toBe(1);
       expect(result.extendedCode).toBe('A-01');
@@ -87,7 +89,9 @@ describe('ExtendedDiseaseGroupsService', () => {
     it('should throw DATA_001 if not found or not owned', async () => {
       mockPrisma.nhom_benh_mo_rong.findFirst.mockResolvedValue(null);
 
-      await expect(service.delete(999, 'user-123')).rejects.toThrow(NotFoundException);
+      await expect(service.delete({ id: 999, userId: 'user-123' })).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should throw EDG_001 if group is in use by menus or menu proposals', async () => {
@@ -100,7 +104,9 @@ describe('ExtendedDiseaseGroupsService', () => {
         },
       });
 
-      await expect(service.delete(1, 'user-123')).rejects.toThrow(ConflictException);
+      await expect(service.delete({ id: 1, userId: 'user-123' })).rejects.toThrow(
+        ConflictException,
+      );
     });
 
     it('should delete group when not in use', async () => {
@@ -114,7 +120,7 @@ describe('ExtendedDiseaseGroupsService', () => {
       });
       mockPrisma.nhom_benh_mo_rong.delete.mockResolvedValue({ id: 1 });
 
-      const result = await service.delete(1, 'user-123');
+      const result = await service.delete({ id: 1, userId: 'user-123' });
 
       expect(result.success).toBe(true);
       expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(

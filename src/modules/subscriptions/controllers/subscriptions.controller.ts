@@ -1,23 +1,13 @@
-import {
-  Get,
-  Post,
-  Body,
-  Param,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
+import { Get, Post, Body, Param, HttpCode, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { SubscriptionsService } from '../services/subscriptions.service';
-import {
-  SubscriptionRequestDto,
-  SubscriptionApproveDto,
-  SubscriptionResponseDto,
-} from '../dto';
+import { SubscriptionRequestDto, SubscriptionApproveDto, SubscriptionResponseDto } from '../dto';
 import { ApiController, ApiStandardResponse, Auth, CurrentUser } from '../../../common/decorators';
 import { UserRole } from '../../../config/enums/role.enum';
 
-@ApiController('Subscriptions', ['subscriptions', 'subscription', 'admin/subscriptions'], { auth: true })
+@ApiController('Subscriptions', ['subscriptions', 'subscription', 'admin/subscriptions'], {
+  auth: true,
+})
 export class SubscriptionsController {
   constructor(private readonly subscriptionsService: SubscriptionsService) {}
 
@@ -33,7 +23,7 @@ export class SubscriptionsController {
     @CurrentUser() user: any,
   ): Promise<SubscriptionResponseDto> {
     const userId = user?.id || user?.sub;
-    return this.subscriptionsService.requestSubscription(userId, dto);
+    return this.subscriptionsService.requestSubscription({ userId, dto });
   }
 
   @Get('my-requests')
@@ -45,7 +35,7 @@ export class SubscriptionsController {
   })
   async getMyRequests(@CurrentUser() user: any): Promise<SubscriptionResponseDto[]> {
     const userId = user?.id || user?.sub;
-    return this.subscriptionsService.listUserRequests(userId);
+    return this.subscriptionsService.listUserRequests({ userId });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -64,7 +54,7 @@ export class SubscriptionsController {
   async listAllRequests(
     @Query('statuses') statuses?: string | string[],
   ): Promise<SubscriptionResponseDto[]> {
-    return this.subscriptionsService.listAllRequests(statuses);
+    return this.subscriptionsService.listAllRequests({ statuses });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -84,7 +74,7 @@ export class SubscriptionsController {
     @CurrentUser() admin: any,
   ): Promise<SubscriptionResponseDto> {
     const adminId = admin?.id || admin?.sub;
-    return this.subscriptionsService.approveSubscription(id, adminId);
+    return this.subscriptionsService.approveSubscription({ subscriptionId: id, adminId });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -102,6 +92,6 @@ export class SubscriptionsController {
     @CurrentUser() admin: any,
   ): Promise<SubscriptionResponseDto> {
     const adminId = admin?.id || admin?.sub;
-    return this.subscriptionsService.rejectSubscription(id, adminId, dto);
+    return this.subscriptionsService.rejectSubscription({ subscriptionId: id, adminId, dto });
   }
 }

@@ -17,7 +17,7 @@ import { Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiOperation, ApiParam, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiOperation, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
 import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { DailyIntakesService } from '../services/daily-intakes.service';
 import { DailyIntakeExcelService } from '../services/daily-intake-excel.service';
@@ -62,13 +62,15 @@ export class DailyIntakesController {
     @Query() query: DailyIntakeQueryDto,
     @CurrentUser() user: any,
   ): Promise<{ items: DailyIntakeListDto[]; total: number; page: number; limit: number }> {
-    return this.service.getAll(query, user);
+    return this.service.getAll({ query, currentUser: user });
   }
 
   @Get(['template', 'import-template'])
   @Auth()
   @SkipTransform()
-  @ApiOperation({ summary: 'Tải file Excel mẫu để nhập liệu khẩu phần 24h (theo bữa hoặc theo ngày)' })
+  @ApiOperation({
+    summary: 'Tải file Excel mẫu để nhập liệu khẩu phần 24h (theo bữa hoặc theo ngày)',
+  })
   @ApiQuery({
     name: 'type',
     required: false,
@@ -79,21 +81,23 @@ export class DailyIntakesController {
     @Query('type') type: string | undefined,
     @Res() res: Response,
   ): Promise<void> {
-    const normalizedType = type?.toUpperCase() === 'INGREDIENT_ONLY' ? 'INGREDIENT_ONLY' : 'BY_MEAL';
-    const fileName = normalizedType === 'INGREDIENT_ONLY'
-      ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
-      : 'Template_import_khau_phan_24h_theo_bua.xlsx';
+    const normalizedType =
+      type?.toUpperCase() === 'INGREDIENT_ONLY' ? 'INGREDIENT_ONLY' : 'BY_MEAL';
+    const fileName =
+      normalizedType === 'INGREDIENT_ONLY'
+        ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
+        : 'Template_import_khau_phan_24h_theo_bua.xlsx';
     const safeFileName = path.basename(fileName);
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    setExcelResponseHeaders(res, safeFileName);
+    setExcelResponseHeaders({ res, filename: safeFileName });
 
     if (fs.existsSync(filePath)) {
       fs.createReadStream(filePath).pipe(res);
       return;
     }
 
-    const buffer = await this.excelService.generateTemplate(type);
+    const buffer = await this.excelService.generateTemplate({ type });
     res.end(buffer);
   }
 
@@ -110,7 +114,7 @@ export class DailyIntakesController {
     @Param('patientId') patientId: string,
     @CurrentUser() user: any,
   ): Promise<DailyIntakeListDto[]> {
-    return this.service.getByPatient(patientId, user);
+    return this.service.getByPatient({ patientId, currentUser: user });
   }
 
   @Get(':id')
@@ -125,7 +129,7 @@ export class DailyIntakesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<DailyIntakeResponseDto> {
-    return this.service.getById(id, user);
+    return this.service.getById({ id, currentUser: user });
   }
 
   @Post()
@@ -140,7 +144,7 @@ export class DailyIntakesController {
     @Body() dto: CreateDailyIntakeDto,
     @CurrentUser() user: any,
   ): Promise<DailyIntakeResponseDto> {
-    return this.service.create(dto, user);
+    return this.service.create({ dto, currentUser: user });
   }
 
   @Put(':id')
@@ -156,7 +160,7 @@ export class DailyIntakesController {
     @Body() dto: UpdateDailyIntakeDto,
     @CurrentUser() user: any,
   ): Promise<DailyIntakeResponseDto> {
-    return this.service.update(id, dto, user);
+    return this.service.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -167,7 +171,7 @@ export class DailyIntakesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.service.delete(id, user);
+    return this.service.delete({ id, currentUser: user });
   }
 
   @Get(':id/rda-report')
@@ -193,7 +197,11 @@ export class DailyIntakesController {
     @Query('limitSetId') limitSetId?: string,
     @Query('physiologicalStatus') physiologicalStatus?: string,
   ): Promise<any> {
-    return this.service.getRdaReport(id, user, { limitSetId, physiologicalStatus });
+    return this.service.getRdaReport({
+      id,
+      currentUser: user,
+      options: { limitSetId, physiologicalStatus },
+    });
   }
 
   @Post('import')
@@ -215,19 +223,22 @@ export class DailyIntakesController {
       );
     }
 
-    const result = await this.excelService.importDailyIntakeExcel(file.buffer, {
-      patientId: query.patientId,
-      userId: user.id,
-      userRole: user.role,
-      date: query.date,
-      overwrite: query.overwrite,
+    const result = await this.excelService.importDailyIntakeExcel({
+      fileBuffer: file.buffer,
+      options: {
+        patientId: query.patientId,
+        userId: user.id,
+        userRole: user.role,
+        date: query.date,
+        overwrite: query.overwrite,
+      },
     });
 
     if (!result.success && result.errorFileBuffer) {
-      setExcelResponseHeaders(
+      setExcelResponseHeaders({
         res,
-        result.errorFileName || 'error_import_intake.xlsx',
-      );
+        filename: result.errorFileName || 'error_import_intake.xlsx',
+      });
       res.end(result.errorFileBuffer);
       return;
     }
@@ -266,12 +277,12 @@ export class DailyIntakesController {
     const reportType =
       bodyDto?.reportType || qReportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
-    setExcelResponseHeaders(
-      res,
-      `bao_cao_lam_sang_24h_${id}_${reportType.toLowerCase()}.xlsx`,
-    );
-
-    await this.excelService.streamClinicalReport(BigInt(id), res, reportType, user?.id);
+    await this.excelService.streamClinicalReport({
+      intakeIdOrData: BigInt(id),
+      outputStream: res,
+      reportType,
+      currentUserId: user?.id,
+    });
   }
 
   @Post('export')
@@ -292,22 +303,17 @@ export class DailyIntakesController {
     if (!body?.templateType && targetId) {
       const reportType = body.reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
-      setExcelResponseHeaders(
-        res,
-        `bao_cao_lam_sang_24h_${targetId}_${reportType.toLowerCase()}.xlsx`,
-      );
-
-      await this.excelService.streamClinicalReport(
-        BigInt(targetId),
-        res,
+      await this.excelService.streamClinicalReport({
+        intakeIdOrData: BigInt(targetId),
+        outputStream: res,
         reportType,
-        user?.id,
-      );
+        currentUserId: user?.id,
+      });
       return;
     }
 
     // 2. Mẫu xuất đa bệnh nhân chuẩn Sprint 6 & đối chiếu Java Spring Boot
     const dto = Object.assign(new DailyIntakeExportRequestDto(), body);
-    await this.reportStreamService.export(dto, res, user);
+    await this.reportStreamService.export({ dto, res, user });
   }
 }

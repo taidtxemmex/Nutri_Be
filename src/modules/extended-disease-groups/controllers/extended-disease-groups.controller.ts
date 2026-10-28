@@ -51,7 +51,7 @@ export class ExtendedDiseaseGroupsController {
     description: 'Danh sách nhóm bệnh mở rộng',
   })
   async findAll(@CurrentUserId() userId: string, @Query() query: ExtendedDiseaseGroupQueryDto) {
-    return this.service.findAll(userId, query);
+    return this.service.findAll({ userId, query });
   }
 
   @Get('import-template')
@@ -61,7 +61,7 @@ export class ExtendedDiseaseGroupsController {
     const safeFileName = path.basename('Template_import_nhom_benh_mo_rong.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    setExcelResponseHeaders(res, safeFileName);
+    setExcelResponseHeaders({ res, filename: safeFileName });
 
     if (fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -84,14 +84,14 @@ export class ExtendedDiseaseGroupsController {
     @Req() req: Request,
     @Res() res: Response,
   ) {
-    const result = await this.importService.importExcel(userId, file);
+    const result = await this.importService.importExcel({ userId, file });
 
     // Có lỗi -> trả file Excel kèm cột "Kết quả import" cho frontend download
     if (!result.success && result.errorFileBytes) {
-      setExcelResponseHeaders(
+      setExcelResponseHeaders({
         res,
-        result.errorFileName || 'extended_disease_group_import_result.xlsx',
-      );
+        filename: result.errorFileName || 'extended_disease_group_import_result.xlsx',
+      });
       return res.send(result.errorFileBytes);
     }
 
@@ -125,7 +125,7 @@ export class ExtendedDiseaseGroupsController {
     description: 'Chi tiết nhóm bệnh mở rộng',
   })
   async findById(@Param('id', ParseIntPipe) id: number, @CurrentUserId() userId: string) {
-    return this.service.findById(id, userId);
+    return this.service.findById({ id, userId });
   }
 
   @Post('')
@@ -136,7 +136,7 @@ export class ExtendedDiseaseGroupsController {
     description: 'Tạo nhóm bệnh mở rộng thành công',
   })
   async create(@CurrentUserId() userId: string, @Body() dto: CreateExtendedDiseaseGroupDto) {
-    return this.service.create(userId, dto);
+    return this.service.create({ userId, dto });
   }
 
   @Put(':id')
@@ -151,7 +151,7 @@ export class ExtendedDiseaseGroupsController {
     @CurrentUserId() userId: string,
     @Body() dto: UpdateExtendedDiseaseGroupDto,
   ) {
-    return this.service.update(id, userId, dto);
+    return this.service.update({ id, userId, dto });
   }
 
   @Delete(':id')
@@ -161,6 +161,6 @@ export class ExtendedDiseaseGroupsController {
     description: 'Xóa nhóm bệnh mở rộng thành công',
   })
   async delete(@Param('id', ParseIntPipe) id: number, @CurrentUserId() userId: string) {
-    return this.service.delete(id, userId);
+    return this.service.delete({ id, userId });
   }
 }

@@ -2,18 +2,22 @@ import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import {
-  CreatePatientDto,
-  UpdatePatientDto,
-  PatientQueryDto,
   PatientResponseDto,
-  CreateAnthropometryDto,
-  AnthropometryQueryDto,
   AnthropometryResponseDto,
-  CreateMedicalRecordDto,
-  MedicalRecordQueryDto,
   MedicalRecordResponseDto,
+  FindAllPatientsParamDto,
+  FindPatientByIdParamDto,
+  CreatePatientParamDto,
+  UpdatePatientParamDto,
+  DeletePatientParamDto,
+  PreviewPatientCodeParamDto,
+  GetAnthropometryHistoryParamDto,
+  CreateAnthropometryParamDto,
+  GetMedicalRecordsParamDto,
+  CreateMedicalRecordParamDto,
+  GetPatientEntityParamDto,
 } from '../dto';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import { isAdminRole } from '../../../config/enums/role.enum';
 import { AnthropometryEngine } from './anthropometry.service';
 import { PatientCodeAllocatorService } from './patient-code-allocator.service';
 import {
@@ -25,6 +29,12 @@ import {
 
 const ERR_PATIENT_NOT_FOUND = 'Không tìm thấy thông tin bệnh nhân';
 const ERR_PATIENT_FORBIDDEN = 'Bạn không có quyền truy cập hồ sơ bệnh nhân này';
+
+export interface FindPatientParamDto {
+  id: bigint;
+  currentUser: { id: string; role?: string };
+  forbiddenMessage?: string;
+}
 
 @Injectable()
 export class PatientsService {
@@ -44,8 +54,10 @@ export class PatientsService {
    * Tái sử dụng Cache thực thể Bệnh nhân (Identity Map Pattern)
    * Cho phép MenusService, DailyIntakesService truy vấn 0ms không qua CSDL
    */
-  async getPatientEntity(id: bigint | string | number): Promise<any> {
-    const patientId = BigInt(id);
+  async getPatientEntity(param: GetPatientEntityParamDto | bigint | string | number): Promise<any> {
+    const rawId =
+      typeof param === 'object' && param !== null && 'id' in param ? (param as any).id : param;
+    const patientId = BigInt(rawId);
     const fetchPatient = async () => {
       return this.prisma.benh_nhan.findFirst({
         where: { id: patientId, deleted_at: null },
@@ -65,10 +77,24 @@ export class PatientsService {
   }
 
   private async findPatientOrThrow(
-    id: bigint,
-    currentUser: { id: string; role?: string },
-    forbiddenMessage = ERR_PATIENT_FORBIDDEN,
+    paramOrId: FindPatientParamDto | bigint,
+    legacyCurrentUser?: { id: string; role?: string },
+    legacyForbiddenMessage = ERR_PATIENT_FORBIDDEN,
   ) {
+    let id: bigint;
+    let currentUser: { id: string; role?: string };
+    let forbiddenMessage: string;
+
+    if (paramOrId && typeof paramOrId === 'object' && 'id' in paramOrId) {
+      id = paramOrId.id;
+      currentUser = paramOrId.currentUser;
+      forbiddenMessage = paramOrId.forbiddenMessage || ERR_PATIENT_FORBIDDEN;
+    } else {
+      id = paramOrId as bigint;
+      currentUser = legacyCurrentUser!;
+      forbiddenMessage = legacyForbiddenMessage;
+    }
+
     const patient = await this.getPatientEntity(id);
 
     if (!patient) {
@@ -96,20 +122,29 @@ export class PatientsService {
       birthYearOnly =
         Boolean(patient.chi_nam_sinh) ||
         (birth.getMonth() === 0 && birth.getDate() === 1 && dobStr.endsWith('-01-01'));
-      age = AnthropometryEngine.calculateExactAge(birth, birthYearOnly);
+      age = AnthropometryEngine.calculateExactAge({ dobInput: birth, birthYearOnly });
     }
 
     const weight = patient.can_nang != null ? Number(patient.can_nang) : null;
     const height = patient.chieu_cao != null ? Number(patient.chieu_cao) : null;
     const activityFactor = patient.he_so_hoat_dong != null ? Number(patient.he_so_hoat_dong) : 1.2;
 
-    const { bmi, bmiLevel, bmiStatus } = AnthropometryEngine.calculateBmi(weight, height);
+    const { bmi, bmiLevel, bmiStatus } = AnthropometryEngine.calculateBmi({
+      weightKg: weight,
+      heightCm: height,
+    });
 
     let tdee: number | null = null;
     if (weight && height && age != null && age > 0) {
       const gender = (patient.gioi_tinh || 'NAM').toUpperCase();
       const isMale = gender === 'NAM' || gender === 'MALE';
-      tdee = AnthropometryEngine.calculateTdee(isMale, weight, height, age, activityFactor);
+      tdee = AnthropometryEngine.calculateTdee({
+        isMale,
+        weightKg: weight,
+        heightCm: height,
+        age,
+        activityFactor,
+      });
     }
 
     return {
@@ -144,7 +179,10 @@ export class PatientsService {
     const height = Number(r.chieu_cao);
     const bmi = Number(r.bmi);
 
-    const { bmiLevel, bmiStatus } = AnthropometryEngine.calculateBmi(weight, height);
+    const { bmiLevel, bmiStatus } = AnthropometryEngine.calculateBmi({
+      weightKg: weight,
+      heightCm: height,
+    });
 
     return {
       id: r.id.toString(),
@@ -200,19 +238,24 @@ export class PatientsService {
   /**
    * 1. GET /api/patients: Danh sách bệnh nhân phân trang & tìm kiếm
    */
-  async findAll(
-    query: PatientQueryDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ items: PatientResponseDto[]; total: number; page: number; limit: number }> {
+  async findAll({ query, currentUser }: FindAllPatientsParamDto): Promise<{
+    items: PatientResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
     const skip = (page - 1) * limit;
 
-    const cacheKey = this.cacheService?.generateKey('patients:list', {
-      page,
-      limit,
-      search: query.search || (query as any).keyword,
-      userId: this.isAdmin(currentUser) ? 'admin' : currentUser.id,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'patients:list',
+      params: {
+        page,
+        limit,
+        search: query.search || (query as any).keyword,
+        userId: this.isAdmin(currentUser) ? 'admin' : currentUser.id,
+      },
     });
 
     if (this.cacheService && cacheKey) {
@@ -272,22 +315,16 @@ export class PatientsService {
   /**
    * 2. GET /api/patients/:id: Lấy chi tiết bệnh nhân
    */
-  async findById(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<PatientResponseDto> {
+  async findById({ id, currentUser }: FindPatientByIdParamDto): Promise<PatientResponseDto> {
     const patientId = BigInt(id);
-    const patient = await this.findPatientOrThrow(patientId, currentUser);
+    const patient = await this.findPatientOrThrow({ id: patientId, currentUser });
     return this.mapToResponse(patient);
   }
 
   /**
    * 3. POST /api/patients: Tạo mới bệnh nhân
    */
-  async create(
-    dto: CreatePatientDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<PatientResponseDto> {
+  async create({ dto, currentUser }: CreatePatientParamDto): Promise<PatientResponseDto> {
     const rawDob = dto.dob || dto.dateOfBirth;
     let birthDate: Date | null = null;
     let isBirthYearOnly = dto.birthYearOnly !== undefined ? dto.birthYearOnly : false;
@@ -309,19 +346,19 @@ export class PatientsService {
         let patientCode: string;
 
         if (dto.patientCode && dto.patientCode.trim()) {
-          patientCode = await this.codeAllocatorService.allocateCodeInTx(
+          patientCode = await this.codeAllocatorService.allocateCodeInTx({
             tx,
-            currentUser.id,
-            dto.phoneNumber,
-            dto.patientCode,
-          );
+            userId: currentUser.id,
+            phone: dto.phoneNumber,
+            customCode: dto.patientCode,
+          });
         } else if ((dto as any).autoGenerateCode === true || (dto as any).autoCode === true) {
-          patientCode = await this.codeAllocatorService.allocateCodeInTx(
+          patientCode = await this.codeAllocatorService.allocateCodeInTx({
             tx,
-            currentUser.id,
-            dto.phoneNumber,
-            null,
-          );
+            userId: currentUser.id,
+            phone: dto.phoneNumber,
+            customCode: null,
+          });
         } else {
           patientCode = `BN-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
         }
@@ -358,17 +395,13 @@ export class PatientsService {
   /**
    * 4. PUT /api/patients/:id: Cập nhật thông tin bệnh nhân
    */
-  async update(
-    id: string | number | bigint,
-    dto: UpdatePatientDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<PatientResponseDto> {
+  async update({ id, dto, currentUser }: UpdatePatientParamDto): Promise<PatientResponseDto> {
     const patientId = BigInt(id);
-    const existingPatient = await this.findPatientOrThrow(
-      patientId,
+    const existingPatient = await this.findPatientOrThrow({
+      id: patientId,
       currentUser,
-      'Bạn không có quyền chỉnh sửa hồ sơ này',
-    );
+      forbiddenMessage: 'Bạn không có quyền chỉnh sửa hồ sơ này',
+    });
 
     if (dto.patientCode && dto.patientCode.trim()) {
       const codeTrimmed = dto.patientCode.trim();
@@ -446,12 +479,16 @@ export class PatientsService {
   /**
    * 5. DELETE /api/patients/:id: Xóa bệnh nhân an toàn (kiểm tra FK trước)
    */
-  async delete(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ success: boolean; message: string }> {
+  async delete({
+    id,
+    currentUser,
+  }: DeletePatientParamDto): Promise<{ success: boolean; message: string }> {
     const patientId = BigInt(id);
-    await this.findPatientOrThrow(patientId, currentUser, 'Bạn không có quyền xóa bệnh nhân này');
+    await this.findPatientOrThrow({
+      id: patientId,
+      currentUser,
+      forbiddenMessage: 'Bạn không có quyền xóa bệnh nhân này',
+    });
 
     // Kiểm tra ràng buộc thực đơn và khẩu phần 24h
     const [menuCount, intakeCount] = await Promise.all([
@@ -492,25 +529,30 @@ export class PatientsService {
   /**
    * 6. GET /api/patients/code-preview: Tự sinh mã bệnh nhân gợi ý
    */
-  async previewCode(
-    phone?: string,
-    excludeId?: string,
-    currentUser?: { id?: string },
-  ): Promise<{ previewCode: string; code: string; sharedWith: string[] }> {
+  async previewCode({ phone, excludeId, currentUser }: PreviewPatientCodeParamDto = {}): Promise<{
+    previewCode: string;
+    code: string;
+    sharedWith: string[];
+  }> {
     const userId = currentUser?.id || '';
-    return this.codeAllocatorService.previewCode(userId, phone, excludeId);
+    return this.codeAllocatorService.previewCode({ userId, phone, excludeId });
   }
 
   /**
    * 7. GET /api/patients/:id/anthropometry: Lấy lịch sử biến thiên nhân trắc học
    */
-  async getAnthropometryHistory(
-    id: string | number | bigint,
-    query: AnthropometryQueryDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ items: AnthropometryResponseDto[]; total: number; page: number; limit: number }> {
+  async getAnthropometryHistory({
+    id,
+    query,
+    currentUser,
+  }: GetAnthropometryHistoryParamDto): Promise<{
+    items: AnthropometryResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const patientId = BigInt(id);
-    await this.findPatientOrThrow(patientId, currentUser);
+    await this.findPatientOrThrow({ id: patientId, currentUser });
 
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
@@ -558,26 +600,29 @@ export class PatientsService {
   /**
    * 8. POST /api/patients/:id/anthropometry: Ghi nhận biến thiên thể trạng
    */
-  async createAnthropometry(
-    id: string | number | bigint,
-    dto: CreateAnthropometryDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<AnthropometryResponseDto> {
+  async createAnthropometry({
+    id,
+    dto,
+    currentUser,
+  }: CreateAnthropometryParamDto): Promise<AnthropometryResponseDto> {
     const patientId = BigInt(id);
-    const patient = await this.findPatientOrThrow(
-      patientId,
+    const patient = await this.findPatientOrThrow({
+      id: patientId,
       currentUser,
-      'Bạn không có quyền ghi nhận thể trạng cho bệnh nhân này',
-    );
+      forbiddenMessage: 'Bạn không có quyền ghi nhận thể trạng cho bệnh nhân này',
+    });
 
     const weight = Number(dto.weight);
     const height = Number(dto.height);
-    const { bmi, bmiLevel } = AnthropometryEngine.calculateBmi(weight, height);
+    const { bmi, bmiLevel } = AnthropometryEngine.calculateBmi({
+      weightKg: weight,
+      heightCm: height,
+    });
 
-    const age = AnthropometryEngine.calculateExactAge(
-      patient.ngay_sinh,
-      Boolean(patient.chi_nam_sinh),
-    );
+    const age = AnthropometryEngine.calculateExactAge({
+      dobInput: patient.ngay_sinh,
+      birthYearOnly: Boolean(patient.chi_nam_sinh),
+    });
     const isMale =
       (patient.gioi_tinh || 'NAM').toUpperCase() === 'NAM' ||
       (patient.gioi_tinh || '').toUpperCase() === 'MALE';
@@ -587,8 +632,19 @@ export class PatientsService {
         : patient.he_so_hoat_dong
           ? Number(patient.he_so_hoat_dong)
           : 1.2;
-    const bmr = AnthropometryEngine.calculateBmr(isMale, weight, height, age);
-    const tdee = AnthropometryEngine.calculateTdee(isMale, weight, height, age, actFactor);
+    const bmr = AnthropometryEngine.calculateBmr({
+      isMale,
+      weightKg: weight,
+      heightCm: height,
+      age,
+    });
+    const tdee = AnthropometryEngine.calculateTdee({
+      isMale,
+      weightKg: weight,
+      heightCm: height,
+      age,
+      activityFactor: actFactor,
+    });
 
     const measuredDate = dto.measuredDate
       ? new Date(dto.measuredDate)
@@ -646,13 +702,14 @@ export class PatientsService {
   /**
    * 9. GET /api/patients/:id/medical-records: Lấy danh sách hồ sơ bệnh án lâm sàng
    */
-  async getMedicalRecords(
-    id: string | number | bigint,
-    query: MedicalRecordQueryDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ items: MedicalRecordResponseDto[]; total: number; page: number; limit: number }> {
+  async getMedicalRecords({ id, query, currentUser }: GetMedicalRecordsParamDto): Promise<{
+    items: MedicalRecordResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const patientId = BigInt(id);
-    await this.findPatientOrThrow(patientId, currentUser);
+    await this.findPatientOrThrow({ id: patientId, currentUser });
 
     const page = Math.max(Number(query.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
@@ -700,17 +757,17 @@ export class PatientsService {
   /**
    * 10. POST /api/patients/:id/medical-records: Lưu hồ sơ khám bệnh, chẩn đoán, ICD-10
    */
-  async createMedicalRecord(
-    id: string | number | bigint,
-    dto: CreateMedicalRecordDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<MedicalRecordResponseDto> {
+  async createMedicalRecord({
+    id,
+    dto,
+    currentUser,
+  }: CreateMedicalRecordParamDto): Promise<MedicalRecordResponseDto> {
     const patientId = BigInt(id);
-    await this.findPatientOrThrow(
-      patientId,
+    await this.findPatientOrThrow({
+      id: patientId,
       currentUser,
-      'Bạn không có quyền thêm bệnh án cho bệnh nhân này',
-    );
+      forbiddenMessage: 'Bạn không có quyền thêm bệnh án cho bệnh nhân này',
+    });
 
     let menuId: bigint | null = null;
     if (dto.interventionMenuId) {

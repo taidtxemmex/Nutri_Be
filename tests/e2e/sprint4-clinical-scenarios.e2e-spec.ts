@@ -4,10 +4,7 @@ dotenv.config({ path: '.env.test', override: true });
 import * as request from 'supertest';
 import { TestAppHelper } from '../helpers/test-app.helper';
 import { UserRole } from '../../src/config/enums/role.enum';
-import {
-  IntakeInputType,
-  NutritionLimitWarning,
-} from '../../src/config/enums/domain.enum';
+import { IntakeInputType, NutritionLimitWarning } from '../../src/config/enums/domain.enum';
 import { IntakeCalculationEngine } from '../../src/modules/daily-intakes/engines/intake-calculation.engine';
 import {
   RdaComparisonEngine,
@@ -17,7 +14,6 @@ import {
   DemographicProfile,
   RdaTargetMap,
 } from '../../src/modules/daily-intakes/engines/rda-reference-data';
-import { NutritionEngine } from '../../src/core/nutrition-engine/nutrition.engine';
 
 // Nâng timeout E2E suite để chống flaky khi khởi tạo NestJS + MariaDB/MySQL
 jest.setTimeout(60000);
@@ -534,7 +530,9 @@ describe('Sprint 4: Deep Clinical Pathology E2E Scenarios (3-Layer Assertion Law
       expect(potassiumEval?.fulfillmentPercent).toBeGreaterThan(150); // > 160%
       expect(potassiumEval?.status).toBe(RdaComplianceStatus.WARNING_TOXIC_OR_UL_EXCEEDED);
       expect(potassiumEval?.alertLevel).toBe('DANGER');
-      expect(potassiumEval?.clinicalNote).toContain('Cần cắt giảm ngay để tránh biến chứng/ngộ độc');
+      expect(potassiumEval?.clinicalNote).toContain(
+        'Cần cắt giảm ngay để tránh biến chứng/ngộ độc',
+      );
 
       // Layer 3: Assert DB persistence
       const prisma = helper.getPrisma();
@@ -686,7 +684,7 @@ describe('Sprint 4: Deep Clinical Pathology E2E Scenarios (3-Layer Assertion Law
       const totalNutrients = intakeData.totalDayNutrients;
 
       expect(totalNutrients.protein).toBeCloseTo(39.15, 1);
-      expect(totalNutrients.proteinAnimal).toBeCloseTo(22.80, 1);
+      expect(totalNutrients.proteinAnimal).toBeCloseTo(22.8, 1);
       expect(totalNutrients.proteinPlant).toBeCloseTo(16.35, 1);
 
       // Khẳng định đạm động vật KHÔNG bị tính khống theo 200g nguyên con (38g)
@@ -708,8 +706,7 @@ describe('Sprint 4: Deep Clinical Pathology E2E Scenarios (3-Layer Assertion Law
         },
       });
 
-      const dbIngredients =
-        dbIntake?.khau_phan_24h_bua_an[0]?.khau_phan_24h_nguyen_lieu || [];
+      const dbIngredients = dbIntake?.khau_phan_24h_bua_an[0]?.khau_phan_24h_nguyen_lieu || [];
       expect(dbIngredients.length).toBe(2);
 
       const dbShrimp = dbIngredients.find((i) => i.nguyen_lieu_id === BigInt(shrimpIngId));
@@ -891,9 +888,9 @@ describe('Sprint 4: Deep Clinical Pathology E2E Scenarios (3-Layer Assertion Law
         },
       });
       expect(dbIntake).not.toBeNull();
-      expect(dbIntake?.khau_phan_24h_bua_an[0]?.khau_phan_24h_nguyen_lieu[0]?.khoi_luong_song_sach).toBe(
-        500,
-      );
+      expect(
+        dbIntake?.khau_phan_24h_bua_an[0]?.khau_phan_24h_nguyen_lieu[0]?.khoi_luong_song_sach,
+      ).toBe(500);
     });
   });
 

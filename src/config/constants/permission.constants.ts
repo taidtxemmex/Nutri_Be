@@ -88,13 +88,39 @@ ROLE_PERMISSIONS[UserRole.DOCTOR] = ROLE_PERMISSIONS[UserRole.USERPRO];
 ROLE_PERMISSIONS[UserRole.EXPERT] = ROLE_PERMISSIONS[UserRole.USERPRO];
 ROLE_PERMISSIONS[UserRole.BENH_NHAN] = ROLE_PERMISSIONS[UserRole.USER];
 
+export interface HasPermissionParamDto {
+  userRole: UserRole | string;
+  requiredPermission: Permission;
+}
+
+export interface HasAnyPermissionParamDto {
+  userRole: UserRole | string;
+  requiredPermissions: Permission[];
+}
+
 /**
  * Check if a role possesses a specific permission
  */
 export function hasPermission(
-  userRole: UserRole | string,
-  requiredPermission: Permission,
+  paramOrRole: HasPermissionParamDto | UserRole | string,
+  legacyPermission?: Permission,
 ): boolean {
+  let userRole: UserRole | string;
+  let requiredPermission: Permission;
+
+  if (
+    paramOrRole &&
+    typeof paramOrRole === 'object' &&
+    'userRole' in paramOrRole &&
+    'requiredPermission' in paramOrRole
+  ) {
+    userRole = (paramOrRole as HasPermissionParamDto).userRole;
+    requiredPermission = (paramOrRole as HasPermissionParamDto).requiredPermission;
+  } else {
+    userRole = paramOrRole as UserRole | string;
+    requiredPermission = legacyPermission!;
+  }
+
   const role = userRole as UserRole;
   const permissions = ROLE_PERMISSIONS[role] || [];
   return permissions.includes(requiredPermission);
@@ -104,9 +130,25 @@ export function hasPermission(
  * Check if a role possesses any of the required permissions
  */
 export function hasAnyPermission(
-  userRole: UserRole | string,
-  requiredPermissions: Permission[],
+  paramOrRole: HasAnyPermissionParamDto | UserRole | string,
+  legacyPermissions?: Permission[],
 ): boolean {
+  let userRole: UserRole | string;
+  let requiredPermissions: Permission[];
+
+  if (
+    paramOrRole &&
+    typeof paramOrRole === 'object' &&
+    'userRole' in paramOrRole &&
+    'requiredPermissions' in paramOrRole
+  ) {
+    userRole = (paramOrRole as HasAnyPermissionParamDto).userRole;
+    requiredPermissions = (paramOrRole as HasAnyPermissionParamDto).requiredPermissions;
+  } else {
+    userRole = paramOrRole as UserRole | string;
+    requiredPermissions = legacyPermissions!;
+  }
+
   const role = userRole as UserRole;
   const permissions = ROLE_PERMISSIONS[role] || [];
   return requiredPermissions.some((p) => permissions.includes(p));

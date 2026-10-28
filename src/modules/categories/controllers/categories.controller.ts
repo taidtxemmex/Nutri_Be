@@ -52,7 +52,7 @@ export class CategoriesController {
     description: 'Danh sách danh mục có phân trang chuẩn',
   })
   async findAll(@Query() query: CategoryQueryDto) {
-    return this.categoriesService.findAll(query);
+    return this.categoriesService.findAll({ query });
   }
 
   @Public()
@@ -64,7 +64,7 @@ export class CategoriesController {
     description: 'Chi tiết danh mục',
   })
   async findById(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.findById(id);
+    return this.categoriesService.findById({ id });
   }
 
   @Auth()
@@ -76,7 +76,7 @@ export class CategoriesController {
     description: 'Tạo danh mục thành công',
   })
   async create(@Body() dto: CreateCategoryDto) {
-    return this.categoriesService.create(dto);
+    return this.categoriesService.create({ dto });
   }
 
   @Auth()
@@ -88,7 +88,7 @@ export class CategoriesController {
     description: 'Cập nhật danh mục thành công',
   })
   async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCategoryDto) {
-    return this.categoriesService.update(id, dto);
+    return this.categoriesService.update({ id, dto });
   }
 
   @Auth()
@@ -99,6 +99,6 @@ export class CategoriesController {
     description: 'Xóa danh mục thành công',
   })
   async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.delete(id);
+    return this.categoriesService.delete({ id });
   }
 }

@@ -1,8 +1,6 @@
 import {
   AnthropometryEngine,
   BmiCategoryWPRO,
-  STANDARD_PAL_FACTORS,
-  BIOLOGICAL_RANGES,
 } from '../../src/modules/patients/services/anthropometry.service';
 import { PatientCodeAllocator } from '../../src/modules/patients/services/patient-code-allocator.service';
 
@@ -263,7 +261,7 @@ describe('AnthropometryEngine & PatientCodeAllocator Domain Algorithm Suite', ()
 
   describe('4. TDEE Calculation, Standard PAL & Clinical Stress Factor', () => {
     const MALE_BMR = 1648.75;
-    const FEMALE_BMR = 1264.0;
+    const _FEMALE_BMR = 1264.0;
 
     it('Case 4.1: Nam ít vận động (Sedentary: PAL = 1.2) -> TDEE = round(1648.75 * 1.2) = 1979', () => {
       const tdee = AnthropometryEngine.calculateTdee(true, 70, 175, 30, 1.2);

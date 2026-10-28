@@ -1,6 +1,6 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { PreviewCodeAllocatorParamDto, AllocateCodeInTxParamDto } from '../dto';
 
 /**
  * Thuật toán Cấp Mã Bệnh Nhân Tự Động Theo SĐT (PatientCodeAllocator)
@@ -82,9 +82,24 @@ export class PatientCodeAllocator {
    * Preview kết quả chuẩn hóa theo API envelope
    */
   public preview(
-    phone?: string | null,
-    sharedWith: string[] = [],
+    paramOrPhone?: { phone?: string | null; sharedWith?: string[] } | string | null,
+    legacySharedWith: string[] = [],
   ): { code: string; sharedWith: string[]; previewCode: string } {
+    let phone: string | null | undefined;
+    let sharedWith: string[];
+
+    if (
+      paramOrPhone &&
+      typeof paramOrPhone === 'object' &&
+      ('phone' in paramOrPhone || 'sharedWith' in paramOrPhone)
+    ) {
+      phone = paramOrPhone.phone;
+      sharedWith = paramOrPhone.sharedWith || [];
+    } else {
+      phone = paramOrPhone as string | null | undefined;
+      sharedWith = legacySharedWith;
+    }
+
     const code = this.peek(phone);
     return {
       code,
@@ -92,6 +107,11 @@ export class PatientCodeAllocator {
       previewCode: code,
     };
   }
+}
+
+export interface MutexLockParamDto<T> {
+  key: string;
+  fn: () => Promise<T>;
 }
 
 /**
@@ -106,7 +126,21 @@ export class PatientCodeAllocatorService {
   /**
    * Khóa phân luồng FIFO bất đồng bộ theo key (bác sĩ + SĐT) triệt tiêu hoàn toàn Race Condition
    */
-  public async withLock<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  public async withLock<T>(
+    paramOrKey: MutexLockParamDto<T> | string,
+    legacyFn?: () => Promise<T>,
+  ): Promise<T> {
+    let key: string;
+    let fn: () => Promise<T>;
+
+    if (paramOrKey && typeof paramOrKey === 'object' && 'key' in paramOrKey && 'fn' in paramOrKey) {
+      key = paramOrKey.key;
+      fn = paramOrKey.fn;
+    } else {
+      key = paramOrKey as string;
+      fn = legacyFn!;
+    }
+
     const prev = PatientCodeAllocatorService.lockQueues.get(key) || Promise.resolve();
     let release: () => void;
     const next = new Promise<void>((resolve) => {
@@ -133,11 +167,11 @@ export class PatientCodeAllocatorService {
   /**
    * Preview mã sẽ sinh theo SĐT kèm danh sách người đang dùng chung SĐT
    */
-  async previewCode(
-    userId: string,
-    phone?: string | null,
-    excludeId?: string | number | bigint,
-  ): Promise<{ code: string; sharedWith: string[]; previewCode: string }> {
+  async previewCode({ userId, phone, excludeId }: PreviewCodeAllocatorParamDto): Promise<{
+    code: string;
+    sharedWith: string[];
+    previewCode: string;
+  }> {
     if (!phone || !phone.trim()) {
       const fallbackCode = `BN-${Date.now().toString().slice(-6)}`;
       return { code: fallbackCode, sharedWith: [], previewCode: fallbackCode };
@@ -180,12 +214,13 @@ export class PatientCodeAllocatorService {
   /**
    * Cấp mã tuần tự an toàn chống Race Condition trong Transaction
    */
-  async allocateCodeInTx(
-    tx: Prisma.TransactionClient,
-    userId: string,
-    phone?: string | null,
-    manualCode?: string | null,
-  ): Promise<string> {
+  async allocateCodeInTx({
+    tx,
+    userId,
+    phone,
+    customCode,
+  }: AllocateCodeInTxParamDto): Promise<string> {
+    const manualCode = customCode;
     // 1. Nếu người dùng nhập mã tay -> Kiểm tra tính duy nhất trong phạm vi tài khoản bác sĩ
     if (manualCode && manualCode.trim()) {
       const cleanCode = manualCode.trim();

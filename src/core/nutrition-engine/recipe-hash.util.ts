@@ -21,6 +21,16 @@ export interface RecipeHashOptions {
   mergeDuplicates?: boolean;
 }
 
+export interface BuildCanonicalRecipeStringParamDto {
+  components?: RecipeComponentInput[] | null;
+  options?: RecipeHashOptions;
+}
+
+export interface ComputeRecipeHashParamDto {
+  components?: RecipeComponentInput[] | null;
+  options?: RecipeHashOptions;
+}
+
 /**
  * Normalizes a recipe ingredient weight to a deterministic 4-decimal place string.
  * Strictly uses '.' as decimal separator, invariant across all OS locales (solves Java Locale bug).
@@ -64,9 +74,26 @@ export function normalizeRecipeWeight(
  * @returns Canonical recipe string or empty string
  */
 export function buildCanonicalRecipeString(
-  components?: RecipeComponentInput[] | null,
-  options: RecipeHashOptions = { mergeDuplicates: true },
+  paramOrComponents?: BuildCanonicalRecipeStringParamDto | RecipeComponentInput[] | null,
+  legacyOptions: RecipeHashOptions = { mergeDuplicates: true },
 ): string {
+  let components: RecipeComponentInput[] | null | undefined;
+  let options: RecipeHashOptions;
+
+  if (
+    paramOrComponents &&
+    typeof paramOrComponents === 'object' &&
+    !Array.isArray(paramOrComponents) &&
+    'components' in paramOrComponents
+  ) {
+    const dto = paramOrComponents as BuildCanonicalRecipeStringParamDto;
+    components = dto.components;
+    options = dto.options || { mergeDuplicates: true };
+  } else {
+    components = paramOrComponents as RecipeComponentInput[] | null | undefined;
+    options = legacyOptions;
+  }
+
   if (!components || !Array.isArray(components) || components.length === 0) {
     return '';
   }
@@ -166,10 +193,27 @@ export function buildCanonicalRecipeString(
  * @returns 64-character lowercase hex SHA-256 hash, or empty string `""` if empty.
  */
 export function computeRecipeHash(
-  components?: RecipeComponentInput[] | null,
-  options?: RecipeHashOptions,
+  paramOrComponents?: ComputeRecipeHashParamDto | RecipeComponentInput[] | null,
+  legacyOptions?: RecipeHashOptions,
 ): string {
-  const canonical = buildCanonicalRecipeString(components, options);
+  let components: RecipeComponentInput[] | null | undefined;
+  let options: RecipeHashOptions | undefined;
+
+  if (
+    paramOrComponents &&
+    typeof paramOrComponents === 'object' &&
+    !Array.isArray(paramOrComponents) &&
+    'components' in paramOrComponents
+  ) {
+    const dto = paramOrComponents as ComputeRecipeHashParamDto;
+    components = dto.components;
+    options = dto.options;
+  } else {
+    components = paramOrComponents as RecipeComponentInput[] | null | undefined;
+    options = legacyOptions;
+  }
+
+  const canonical = buildCanonicalRecipeString({ components, options });
   if (!canonical) {
     return '';
   }

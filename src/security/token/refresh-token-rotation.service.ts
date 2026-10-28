@@ -28,6 +28,21 @@ export interface RotationResult {
   familyId: string;
 }
 
+export interface StoreRefreshTokenParamDto {
+  userId: string;
+  rawToken: string;
+  familyId?: string;
+  ipAddress?: string;
+  userAgent?: string;
+  ttlMs?: number;
+}
+
+export interface RotateRefreshTokenParamDto {
+  oldRawToken: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
 @Injectable()
 export class RefreshTokenRotationService {
   private readonly logger = new Logger(RefreshTokenRotationService.name);
@@ -54,15 +69,41 @@ export class RefreshTokenRotationService {
    * Persist a new refresh token and associate with a token family
    */
   async storeRefreshToken(
-    userId: string,
-    rawToken: string,
-    options?: {
+    paramOrUserId: StoreRefreshTokenParamDto | string,
+    legacyRawToken?: string,
+    legacyOptions?: {
       familyId?: string;
       ipAddress?: string;
       userAgent?: string;
       ttlMs?: number;
     },
   ): Promise<StoredRefreshToken> {
+    let userId: string;
+    let rawToken: string;
+    let options:
+      | {
+          familyId?: string;
+          ipAddress?: string;
+          userAgent?: string;
+          ttlMs?: number;
+        }
+      | undefined;
+
+    if (paramOrUserId && typeof paramOrUserId === 'object' && 'userId' in paramOrUserId) {
+      userId = paramOrUserId.userId;
+      rawToken = paramOrUserId.rawToken;
+      options = {
+        familyId: paramOrUserId.familyId,
+        ipAddress: paramOrUserId.ipAddress,
+        userAgent: paramOrUserId.userAgent,
+        ttlMs: paramOrUserId.ttlMs,
+      };
+    } else {
+      userId = paramOrUserId as string;
+      rawToken = legacyRawToken!;
+      options = legacyOptions;
+    }
+
     const tokenHash = this.hashToken(rawToken);
     const ttlMs = options?.ttlMs || REFRESH_TOKEN_TTL_MS;
     const expiresAt = new Date(Date.now() + ttlMs);
@@ -114,9 +155,23 @@ export class RefreshTokenRotationService {
    * Validate old refresh token, detect replay attacks, revoke old token and issue a new one
    */
   async validateAndRotateRefreshToken(
-    oldRawToken: string,
-    options?: { ipAddress?: string; userAgent?: string },
+    paramOrToken: RotateRefreshTokenParamDto | string,
+    legacyOptions?: { ipAddress?: string; userAgent?: string },
   ): Promise<RotationResult> {
+    let oldRawToken: string;
+    let options: { ipAddress?: string; userAgent?: string } | undefined;
+
+    if (paramOrToken && typeof paramOrToken === 'object' && 'oldRawToken' in paramOrToken) {
+      oldRawToken = paramOrToken.oldRawToken;
+      options = {
+        ipAddress: paramOrToken.ipAddress,
+        userAgent: paramOrToken.userAgent,
+      };
+    } else {
+      oldRawToken = paramOrToken as string;
+      options = legacyOptions;
+    }
+
     if (!oldRawToken || typeof oldRawToken !== 'string') {
       throw new UnauthorizedException({
         code: AUTH_ERROR_UNAUTHORIZED,

@@ -69,7 +69,6 @@ describe('Cross-Sprint Integration E2E: Full Clinical Nutrition Lifecycle (Sprin
 
   // Sprint 3 Cooking Coefficients, Dishes & Meals
   let milkCoeffId: number;
-  let oatCoeffId: number;
   let dish1Id: number;
   let dish1RecipeHash: string;
   let dish2Id: number;
@@ -972,7 +971,9 @@ describe('Cross-Sprint Integration E2E: Full Clinical Nutrition Lifecycle (Sprin
       it('5.3 Tải file Excel báo cáo lâm sàng tổng hợp (ALL_IN_ONE) -> Layer 3 verify', async () => {
         // Layer 1: HTTP Status Code 200 OK
         const res = await request(helper.getHttpServer())
-          .get(`/api/daily-intakes/${day1IntakeId}/export?reportType=${DailyIntakeClinicalReportType.ALL_IN_ONE}`)
+          .get(
+            `/api/daily-intakes/${day1IntakeId}/export?reportType=${DailyIntakeClinicalReportType.ALL_IN_ONE}`,
+          )
           .set('Authorization', `Bearer ${doctorToken}`)
           .buffer(true)
           .parse(binaryBufferParser)
@@ -1151,7 +1152,9 @@ describe('Cross-Sprint Integration E2E: Full Clinical Nutrition Lifecycle (Sprin
 
       // Layer 1: HTTP Status Code 200 OK
       const res = await request(helper.getHttpServer())
-        .get(`/api/daily-intakes/${day7IntakeId}/export?reportType=${DailyIntakeClinicalReportType.RDA_COMPARISON}`)
+        .get(
+          `/api/daily-intakes/${day7IntakeId}/export?reportType=${DailyIntakeClinicalReportType.RDA_COMPARISON}`,
+        )
         .set('Authorization', `Bearer ${doctorToken}`)
         .buffer(true)
         .parse(binaryBufferParser)

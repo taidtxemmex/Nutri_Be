@@ -21,4 +21,3 @@ if (require.main === module) {
   const { runStandaloneSeed } = require('./standalone-runner');
   runStandaloneSeed('sequences', (p: PrismaClient) => seedSequences(p));
 }
-

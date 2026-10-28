@@ -23,8 +23,18 @@ import {
   DailyIntakeExcelRowSchema,
   DailyIntakeRowValidationError,
 } from '../schemas/daily-intake-row.schema';
-import { ExcelStreamReader, ErrorRowItem } from '../../../core/excel-engine';
+import {
+  ExcelStreamReader,
+  ErrorRowItem,
+  setExcelResponseHeaders,
+} from '../../../core/excel-engine';
 import { Writable } from 'stream';
+import {
+  GenerateDailyIntakeTemplateParamDto,
+  ImportDailyIntakeExcelParamDto,
+  ExportClinicalReportParamDto,
+  StreamClinicalReportParamDto,
+} from '../dto';
 
 export interface DailyIntakeImportResult {
   success: boolean;
@@ -113,21 +123,26 @@ export class DailyIntakeExcelService {
    * Tạo template Excel mẫu để nhập khẩu phần 24h kèm bộ đệm CacheService (0ms)
    * Hỗ trợ 2 định dạng: BY_MEAL (theo bữa) và INGREDIENT_ONLY (theo ngày)
    */
-  async generateTemplate(type?: string): Promise<Buffer> {
-    const normalizedType = type?.toUpperCase() === 'INGREDIENT_ONLY' ? 'INGREDIENT_ONLY' : 'BY_MEAL';
+  async generateTemplate(param?: GenerateDailyIntakeTemplateParamDto | string): Promise<Buffer> {
+    const rawType = typeof param === 'string' ? param : param?.type;
+    const normalizedType =
+      rawType?.toUpperCase() === 'INGREDIENT_ONLY' ? 'INGREDIENT_ONLY' : 'BY_MEAL';
     const cacheKey = `daily-intake:template:${normalizedType}`;
 
     if (this.cacheService) {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
-        this.logger.debug(`🚀 [Cache Hit] Trả về template khẩu phần 24h (${normalizedType}) từ bộ nhớ đệm (0ms)`);
+        this.logger.debug(
+          `🚀 [Cache Hit] Trả về template khẩu phần 24h (${normalizedType}) từ bộ nhớ đệm (0ms)`,
+        );
         return Buffer.from(cached, 'base64');
       }
     }
 
-    const fileName = normalizedType === 'INGREDIENT_ONLY'
-      ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
-      : 'Template_import_khau_phan_24h_theo_bua.xlsx';
+    const fileName =
+      normalizedType === 'INGREDIENT_ONLY'
+        ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
+        : 'Template_import_khau_phan_24h_theo_bua.xlsx';
     const safeFileName = path.basename(fileName);
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
@@ -137,7 +152,9 @@ export class DailyIntakeExcelService {
     }
 
     if (!buffer) {
-      this.logger.debug(`🔄 [Cache Miss] Đang tạo mới template Excel khẩu phần 24h (${normalizedType}) từ DB...`);
+      this.logger.debug(
+        `🔄 [Cache Miss] Đang tạo mới template Excel khẩu phần 24h (${normalizedType}) từ DB...`,
+      );
       buffer = await this.buildTemplateWorkbook();
     }
 
@@ -148,7 +165,9 @@ export class DailyIntakeExcelService {
         DailyIntakeExcelService.TEMPLATE_CACHE_TTL,
         DailyIntakeExcelService.TEMPLATE_CACHE_TAG,
       );
-      this.logger.debug(`💾 Đã lưu template khẩu phần 24h (${normalizedType}) vào CacheService (tag=ingredients)`);
+      this.logger.debug(
+        `💾 Đã lưu template khẩu phần 24h (${normalizedType}) vào CacheService (tag=ingredients)`,
+      );
     }
 
     return buffer;
@@ -356,10 +375,10 @@ export class DailyIntakeExcelService {
    * Nếu có lỗi: trả về danh sách lỗi chi tiết kèm file Excel đánh dấu dòng lỗi.
    * Nếu hợp lệ: commit toàn bộ trong 1 transaction an toàn tuyệt đối.
    */
-  async importDailyIntakeExcel(
-    fileBuffer: Buffer,
-    options: ImportDailyIntakeOptions,
-  ): Promise<DailyIntakeImportResult> {
+  async importDailyIntakeExcel({
+    fileBuffer,
+    options,
+  }: ImportDailyIntakeExcelParamDto): Promise<DailyIntakeImportResult> {
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new HttpException(
         {
@@ -502,7 +521,6 @@ export class DailyIntakeExcelService {
 
     let curMealRaw: string | null = null;
     let curMealOrder: number | null = null;
-    let curMealTime: string | null = null;
     let mealRow = 0;
     let mealOk = false;
 
@@ -519,9 +537,12 @@ export class DailyIntakeExcelService {
 
           // Header Detection tại dòng 1
           if (rowNumber === 1) {
-            const h1 = ExcelStreamReader.readCellString(row.getCell(1), false) || '';
-            const h2 = ExcelStreamReader.readCellString(row.getCell(2), false) || '';
-            const h3 = ExcelStreamReader.readCellString(row.getCell(3), false) || '';
+            const h1 =
+              ExcelStreamReader.readCellString({ cell: row.getCell(1), sanitize: false }) || '';
+            const _h2 =
+              ExcelStreamReader.readCellString({ cell: row.getCell(2), sanitize: false }) || '';
+            const h3 =
+              ExcelStreamReader.readCellString({ cell: row.getCell(3), sanitize: false }) || '';
 
             const h1Norm = ExcelStreamReader.normalizeKey(h1);
             const h3Norm = ExcelStreamReader.normalizeKey(h3);
@@ -577,11 +598,23 @@ export class DailyIntakeExcelService {
           // XỬ LÝ DỮ LIỆU THEO TỪNG LAYOUT
           // ==============================
           if (detectedLayout === 'SINGLE_BY_MEAL') {
-            const rawMealName = ExcelStreamReader.readCellString(row.getCell(1), false);
-            const rawMealTime = ExcelStreamReader.readCellString(row.getCell(2), false);
-            const rawIngName = ExcelStreamReader.readCellString(row.getCell(3), true);
+            const rawMealName = ExcelStreamReader.readCellString({
+              cell: row.getCell(1),
+              sanitize: false,
+            });
+            const rawMealTime = ExcelStreamReader.readCellString({
+              cell: row.getCell(2),
+              sanitize: false,
+            });
+            const rawIngName = ExcelStreamReader.readCellString({
+              cell: row.getCell(3),
+              sanitize: true,
+            });
             const rawWeight = ExcelStreamReader.readCellNumber(row.getCell(4));
-            const rawNotes = ExcelStreamReader.readCellString(row.getCell(5), true);
+            const rawNotes = ExcelStreamReader.readCellString({
+              cell: row.getCell(5),
+              sanitize: true,
+            });
 
             if (
               !rawMealName &&
@@ -683,20 +716,44 @@ export class DailyIntakeExcelService {
             const colWeight = isByMeal ? 7 : 4;
             const colNote = isByMeal ? 8 : 5;
 
-            const patientRaw = ExcelStreamReader.readCellString(row.getCell(colPatient), false);
-            const dateRaw = ExcelStreamReader.readCellString(row.getCell(colDate), false);
+            const patientRaw = ExcelStreamReader.readCellString({
+              cell: row.getCell(colPatient),
+              sanitize: false,
+            });
+            const dateRaw = ExcelStreamReader.readCellString({
+              cell: row.getCell(colDate),
+              sanitize: false,
+            });
             const mealRaw = isByMeal
-              ? ExcelStreamReader.readCellString(row.getCell(colMeal), false)
+              ? ExcelStreamReader.readCellString({
+                  cell: row.getCell(colMeal),
+                  sanitize: false,
+                })
               : null;
             const startRaw = isByMeal
-              ? ExcelStreamReader.readCellString(row.getCell(colStart), false)
+              ? ExcelStreamReader.readCellString({
+                  cell: row.getCell(colStart),
+                  sanitize: false,
+                })
               : null;
             const endRaw = isByMeal
-              ? ExcelStreamReader.readCellString(row.getCell(colEnd), false)
+              ? ExcelStreamReader.readCellString({
+                  cell: row.getCell(colEnd),
+                  sanitize: false,
+                })
               : null;
-            const ingRaw = ExcelStreamReader.readCellString(row.getCell(colIng), true);
-            const weightRaw = ExcelStreamReader.readCellString(row.getCell(colWeight), false);
-            const noteRaw = ExcelStreamReader.readCellString(row.getCell(colNote), true);
+            const ingRaw = ExcelStreamReader.readCellString({
+              cell: row.getCell(colIng),
+              sanitize: true,
+            });
+            const weightRaw = ExcelStreamReader.readCellString({
+              cell: row.getCell(colWeight),
+              sanitize: false,
+            });
+            const noteRaw = ExcelStreamReader.readCellString({
+              cell: row.getCell(colNote),
+              sanitize: true,
+            });
 
             // Kiểm tra dòng trống
             if (!patientRaw && !dateRaw && !ingRaw && !weightRaw && !noteRaw) {
@@ -817,9 +874,10 @@ export class DailyIntakeExcelService {
                       currentErrors.push('Giờ kết thúc phải sau hoặc bằng giờ bắt đầu');
                     } else if (startTime || endTime) {
                       formattedTime =
-                        startTime && endTime ? `${startTime} - ${endTime}` : (startTime || endTime)!;
+                        startTime && endTime
+                          ? `${startTime} - ${endTime}`
+                          : (startTime || endTime)!;
                     }
-                    curMealTime = formattedTime;
                     curIntakeDraft.meals.set(order!, {
                       order: order!,
                       mealName: `Bữa ${order}`,
@@ -943,7 +1001,7 @@ export class DailyIntakeExcelService {
       this.logger.error(`Lỗi phân tích stream Excel: ${err.message}`, err.stack);
       throw new HttpException(
         {
-          code: 'IMPORT_STREAM_ERROR',
+          code: 'IMPORT_FILE_CORRUPTED',
           message: `Lỗi đọc dữ liệu: ${err.message}`,
         },
         HttpStatus.BAD_REQUEST,
@@ -1245,10 +1303,23 @@ export class DailyIntakeExcelService {
    * 5. ALL_IN_ONE: Tập hợp cả 4 báo cáo vào 1 Workbook hoàn chỉnh
    */
   async exportClinicalReport(
-    dailyIntakeIdOrData: string | number | bigint | any,
-    reportType: DailyIntakeClinicalReportType = DailyIntakeClinicalReportType.ALL_IN_ONE,
-    userId?: string,
+    paramOrData: ExportClinicalReportParamDto | any,
+    legacyReportType?: DailyIntakeClinicalReportType,
+    legacyUserId?: string,
   ): Promise<Buffer> {
+    let dailyIntakeIdOrData: any;
+    let reportType: DailyIntakeClinicalReportType;
+    let userId: string | undefined;
+
+    if (paramOrData && typeof paramOrData === 'object' && 'intakeIdOrData' in paramOrData) {
+      dailyIntakeIdOrData = paramOrData.intakeIdOrData;
+      reportType = paramOrData.reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
+      userId = paramOrData.currentUserId;
+    } else {
+      dailyIntakeIdOrData = paramOrData;
+      reportType = legacyReportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
+      userId = legacyUserId;
+    }
     const isIdQuery =
       typeof dailyIntakeIdOrData === 'string' ||
       typeof dailyIntakeIdOrData === 'number' ||
@@ -1272,10 +1343,13 @@ export class DailyIntakeExcelService {
     // 2. Kiểm tra cache có gắn userId để cô lập dữ liệu tuyệt đối giữa các bác sĩ
     let cacheKey = '';
     if (isIdQuery && this.cacheService) {
-      cacheKey = this.cacheService.generateKey('daily_intake:report', {
-        id: String(dailyIntakeIdOrData),
-        reportType,
-        userId: userId || 'anonymous',
+      cacheKey = this.cacheService.generateKey({
+        prefix: 'daily_intake:report',
+        params: {
+          id: String(dailyIntakeIdOrData),
+          reportType,
+          userId: userId || 'anonymous',
+        },
       });
 
       const cached = await this.cacheService.get<string>(cacheKey);
@@ -1343,12 +1417,43 @@ export class DailyIntakeExcelService {
    * Stream báo cáo lâm sàng trực tiếp ra HTTP response stream (Anti-OOM)
    */
   async streamClinicalReport(
-    dailyIntakeIdOrData: string | number | bigint | any,
-    outputStream: Writable,
-    reportType: DailyIntakeClinicalReportType = DailyIntakeClinicalReportType.ALL_IN_ONE,
-    userId?: string,
+    paramOrData: StreamClinicalReportParamDto | any,
+    legacyOutputStream?: Writable,
+    legacyReportType?: DailyIntakeClinicalReportType,
+    legacyUserId?: string,
   ): Promise<void> {
-    const buffer = await this.exportClinicalReport(dailyIntakeIdOrData, reportType, userId);
+    let dailyIntakeIdOrData: any;
+    let outputStream: Writable;
+    let reportType: DailyIntakeClinicalReportType;
+    let userId: string | undefined;
+
+    if (paramOrData && typeof paramOrData === 'object' && 'outputStream' in paramOrData) {
+      dailyIntakeIdOrData = paramOrData.intakeIdOrData;
+      outputStream = paramOrData.outputStream;
+      reportType = paramOrData.reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
+      userId = paramOrData.currentUserId;
+    } else {
+      dailyIntakeIdOrData = paramOrData;
+      outputStream = legacyOutputStream!;
+      reportType = legacyReportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
+      userId = legacyUserId;
+    }
+
+    const buffer = await this.exportClinicalReport({
+      intakeIdOrData: dailyIntakeIdOrData,
+      reportType,
+      currentUserId: userId,
+    });
+    if (
+      outputStream &&
+      'setHeader' in outputStream &&
+      typeof (outputStream as any).setHeader === 'function'
+    ) {
+      setExcelResponseHeaders({
+        res: outputStream as any,
+        filename: `bao_cao_lam_sang_24h_${dailyIntakeIdOrData}_${reportType.toLowerCase()}.xlsx`,
+      });
+    }
     outputStream.write(buffer);
     outputStream.end();
   }
@@ -2202,7 +2307,9 @@ export class DailyIntakeExcelService {
     if (!row) return false;
     for (let i = 0; i < 4; i++) {
       const cell = row.getCell ? row.getCell(i + 1) : null;
-      const cellVal = (ExcelStreamReader.readCellString(cell, false) || '').toLowerCase();
+      const cellVal = (
+        ExcelStreamReader.readCellString({ cell, sanitize: false }) || ''
+      ).toLowerCase();
       const expected = DailyIntakeExcelService.EXPECTED_HEADERS[i].toLowerCase();
       // Chấp nhận tương đối các header tiếng Việt
       if (!cellVal.includes(expected.split(' ')[0])) {
@@ -2267,7 +2374,10 @@ export class DailyIntakeExcelService {
 
   private parseMealOrder(raw: string): number | null {
     if (!raw) return null;
-    const cleaned = raw.replace(/^(?:bữa|bua)\s*/i, '').trim().replace(',', '.');
+    const cleaned = raw
+      .replace(/^(?:bữa|bua)\s*/i, '')
+      .trim()
+      .replace(',', '.');
     const num = Number(cleaned);
     if (isNaN(num) || !Number.isInteger(num)) return null;
     if (num < 1 || num > 20) return null;

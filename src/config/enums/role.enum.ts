@@ -45,4 +45,3 @@ export function isDoctorRole(roleOrUser?: string | { role?: string } | null): bo
   if (!role) return false;
   return (DOCTOR_ROLES as readonly string[]).includes(role);
 }
-

@@ -2,8 +2,16 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { NutritionCalculatorService, MealInput } from '../../../core/nutrition-engine';
-import { CreateMealDto, UpdateMealDto, MealResponseDto, MealDishResponseDto } from '../dto';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import {
+  MealResponseDto,
+  MealDishResponseDto,
+  CreateMealParamsDto,
+  FindAllMealsParamsDto,
+  FindMealByIdParamsDto,
+  UpdateMealParamsDto,
+  DeleteMealParamsDto,
+} from '../dto';
+import { isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class MealsService {
@@ -68,10 +76,7 @@ export class MealsService {
     };
   }
 
-  async create(
-    dto: CreateMealDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<MealResponseDto> {
+  async create({ dto, currentUser }: CreateMealParamsDto): Promise<MealResponseDto> {
     // 1. Kiểm tra sự tồn tại của tất cả các món ăn
     const dishesList = dto.dishes || [];
     for (const d of dishesList) {
@@ -131,7 +136,7 @@ export class MealsService {
     return this.mapMealEntityToResponse(createdMeal);
   }
 
-  async findAll(currentUser?: { id?: string; role?: string }): Promise<MealResponseDto[]> {
+  async findAll({ currentUser }: FindAllMealsParamsDto = {}): Promise<MealResponseDto[]> {
     const isAdminUser = this.isAdmin(currentUser);
 
     const whereClause: any = isAdminUser
@@ -170,10 +175,7 @@ export class MealsService {
     return meals.map((meal) => this.mapMealEntityToResponse(meal));
   }
 
-  async findById(
-    id: string | number,
-    currentUser?: { id?: string; role?: string },
-  ): Promise<MealResponseDto> {
+  async findById({ id, currentUser }: FindMealByIdParamsDto): Promise<MealResponseDto> {
     const meal = await this.prisma.bua_an.findUnique({
       where: { id: BigInt(id) },
       include: {
@@ -212,11 +214,7 @@ export class MealsService {
     return this.mapMealEntityToResponse(meal);
   }
 
-  async update(
-    id: string | number,
-    dto: UpdateMealDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<MealResponseDto> {
+  async update({ id, dto, currentUser }: UpdateMealParamsDto): Promise<MealResponseDto> {
     const existing = await this.prisma.bua_an.findUnique({
       where: { id: BigInt(id) },
       include: { chi_tiet_bua_an: true },
@@ -321,10 +319,7 @@ export class MealsService {
     return this.mapMealEntityToResponse(updatedMeal);
   }
 
-  async delete(
-    id: string | number,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ message: string }> {
+  async delete({ id, currentUser }: DeleteMealParamsDto): Promise<{ message: string }> {
     const existing = await this.prisma.bua_an.findUnique({
       where: { id: BigInt(id) },
     });

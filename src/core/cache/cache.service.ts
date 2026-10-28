@@ -7,8 +7,28 @@ export interface CacheEntry<T = any> {
   value: T;
   expiresAt: number; // Unix timestamp (ms) - 0 = perpetual
   createdAt: number; // Unix timestamp (ms) of creation
-  tag?: string;      // Backwards compatibility: primary tag
-  tags?: string[];   // All tags associated with this entry
+  tag?: string; // Backwards compatibility: primary tag
+  tags?: string[]; // All tags associated with this entry
+}
+
+export interface CacheSetParamDto<T> {
+  key: string;
+  value: T;
+  ttlSeconds: number;
+  tagOrTags?: string | string[];
+  createdAt?: number;
+}
+
+export interface CacheGetOrSetParamDto<T> {
+  key: string;
+  ttlSeconds: number;
+  factory: () => Promise<T>;
+  tagOrTags?: string | string[];
+}
+
+export interface CacheGenerateKeyParamDto {
+  prefix: string;
+  params?: Record<string, any>;
 }
 
 @Injectable()
@@ -38,9 +58,7 @@ export class CacheService implements OnModuleDestroy {
       return trimmed ? [trimmed] : [];
     }
     if (Array.isArray(tagOrTags)) {
-      return tagOrTags
-        .map((t) => (typeof t === 'string' ? t.trim() : String(t)))
-        .filter(Boolean);
+      return tagOrTags.map((t) => (typeof t === 'string' ? t.trim() : String(t))).filter(Boolean);
     }
     return [];
   }
@@ -59,7 +77,21 @@ export class CacheService implements OnModuleDestroy {
    * - Sắp xếp các tham số truy vấn theo thứ tự alphabet (page, limit, search, role, status...)
    * - Băm SHA-256 để sinh mã hash định danh duy nhất
    */
-  generateKey(prefix: string, params?: Record<string, any>): string {
+  generateKey(
+    paramOrPrefix: CacheGenerateKeyParamDto | string,
+    legacyParams?: Record<string, any>,
+  ): string {
+    let prefix: string;
+    let params: Record<string, any> | undefined;
+
+    if (paramOrPrefix && typeof paramOrPrefix === 'object' && 'prefix' in paramOrPrefix) {
+      prefix = paramOrPrefix.prefix;
+      params = paramOrPrefix.params;
+    } else {
+      prefix = paramOrPrefix as string;
+      params = legacyParams;
+    }
+
     if (!params || Object.keys(params).length === 0) {
       return `cache:${prefix}:all`;
     }
@@ -155,11 +187,33 @@ export class CacheService implements OnModuleDestroy {
    *    lưu cache vĩnh viễn (hoặc theo TTL) kèm tag(s) rồi trả về.
    */
   async getOrSet<T>(
-    key: string,
-    ttlSeconds: number,
-    factory: () => Promise<T>,
-    tagOrTags?: string | string[],
+    paramOrKey: CacheGetOrSetParamDto<T> | string,
+    legacyTtlSeconds?: number,
+    legacyFactory?: () => Promise<T>,
+    legacyTagOrTags?: string | string[],
   ): Promise<T> {
+    let key: string;
+    let ttlSeconds: number;
+    let factory: () => Promise<T>;
+    let tagOrTags: string | string[] | undefined;
+
+    if (
+      paramOrKey &&
+      typeof paramOrKey === 'object' &&
+      'key' in paramOrKey &&
+      'factory' in paramOrKey
+    ) {
+      key = paramOrKey.key;
+      ttlSeconds = paramOrKey.ttlSeconds;
+      factory = paramOrKey.factory;
+      tagOrTags = paramOrKey.tagOrTags;
+    } else {
+      key = paramOrKey as string;
+      ttlSeconds = legacyTtlSeconds!;
+      factory = legacyFactory!;
+      tagOrTags = legacyTagOrTags;
+    }
+
     const cached = await this.get<T>(key);
     if (cached !== null && cached !== undefined) {
       return cached;
@@ -167,7 +221,7 @@ export class CacheService implements OnModuleDestroy {
     const queryStartTime = Date.now();
     const result = await factory();
     if (result !== null && result !== undefined) {
-      await this.set(key, result, ttlSeconds, tagOrTags, queryStartTime);
+      await this.set({ key, value: result, ttlSeconds, tagOrTags, createdAt: queryStartTime });
     }
     return result;
   }
@@ -178,12 +232,37 @@ export class CacheService implements OnModuleDestroy {
    * (lastInvalidatedAt >= entryCreatedAt) -> TỪ CHỐI ghi cache để ngăn ngừa race condition & Cache Poisoning!
    */
   async set<T>(
-    key: string,
-    value: T,
-    ttlSeconds: number,
-    tagOrTags?: string | string[],
-    createdAt?: number,
+    paramOrKey: CacheSetParamDto<T> | string,
+    legacyValue?: T,
+    legacyTtlSeconds?: number,
+    legacyTagOrTags?: string | string[],
+    legacyCreatedAt?: number,
   ): Promise<void> {
+    let key: string;
+    let value: T;
+    let ttlSeconds: number;
+    let tagOrTags: string | string[] | undefined;
+    let createdAt: number | undefined;
+
+    if (
+      paramOrKey &&
+      typeof paramOrKey === 'object' &&
+      'key' in paramOrKey &&
+      'value' in paramOrKey
+    ) {
+      key = paramOrKey.key;
+      value = paramOrKey.value;
+      ttlSeconds = paramOrKey.ttlSeconds;
+      tagOrTags = paramOrKey.tagOrTags;
+      createdAt = paramOrKey.createdAt;
+    } else {
+      key = paramOrKey as string;
+      value = legacyValue as T;
+      ttlSeconds = legacyTtlSeconds!;
+      tagOrTags = legacyTagOrTags;
+      createdAt = legacyCreatedAt;
+    }
+
     const normalizedTags = this.normalizeTags(tagOrTags);
     const entryCreatedAt = createdAt || Date.now();
 

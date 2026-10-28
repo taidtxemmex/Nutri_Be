@@ -44,10 +44,10 @@ describe('IngredientsService', () => {
         { id: BigInt(1), ten_nguyen_lieu: 'Dừa xiêm' },
       ]);
 
-      const exists = await service.existsByMaterial('Dứa');
+      const exists = await service.existsByMaterial({ material: 'Dứa' });
       expect(exists).toBe(false);
 
-      const existsSame = await service.existsByMaterial('Dừa xiêm');
+      const existsSame = await service.existsByMaterial({ material: 'Dừa xiêm' });
       expect(existsSame).toBe(true);
     });
 
@@ -73,7 +73,7 @@ describe('IngredientsService', () => {
       ]);
       mockPrisma.nguyen_lieu.count.mockResolvedValue(1);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ query: { page: 1, limit: 20 } });
 
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
@@ -118,7 +118,7 @@ describe('IngredientsService', () => {
       mockPrisma.nguyen_lieu.findFirst.mockResolvedValue(null);
 
       try {
-        await service.findById(999);
+        await service.findById({ id: 999 });
         fail('Should have thrown PROP_006');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -147,7 +147,7 @@ describe('IngredientsService', () => {
         danh_muc_nguyen_lieu_danh_mucTodanh_muc: { id: 1, ten_danh_muc: 'Ngũ cốc' },
       });
 
-      const detail = await service.findById(1);
+      const detail = await service.findById({ id: 1 });
 
       expect(detail.id).toBe('1');
       expect(detail.material).toBe('Gạo tẻ');
@@ -167,7 +167,10 @@ describe('IngredientsService', () => {
       ]);
 
       try {
-        await service.create({ material: 'Gạo tẻ' }, { id: 'user-1', role: UserRole.ADMIN });
+        await service.create({
+          dto: { material: 'Gạo tẻ' } as any,
+          currentUser: { id: 'user-1', role: UserRole.ADMIN },
+        });
         fail('Should have thrown PROP_014');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -187,17 +190,17 @@ describe('IngredientsService', () => {
       );
 
       // 1. Regular user
-      await service.create(
-        { material: 'Rau cải xanh mới' },
-        { id: 'user-uuid', role: UserRole.USER },
-      );
+      await service.create({
+        dto: { material: 'Rau cải xanh mới' } as any,
+        currentUser: { id: 'user-uuid', role: UserRole.USER },
+      });
       expect(mockPrisma.nguyen_lieu.create.mock.calls[0][0].data.trang_thai).toBe('CHO_DUYET');
 
       // 2. Admin
-      await service.create(
-        { material: 'Thịt đà điểu' },
-        { id: 'admin-uuid', role: UserRole.ADMIN },
-      );
+      await service.create({
+        dto: { material: 'Thịt đà điểu' } as any,
+        currentUser: { id: 'admin-uuid', role: UserRole.ADMIN },
+      });
       expect(mockPrisma.nguyen_lieu.create.mock.calls[1][0].data.trang_thai).toBe('DA_DUYET');
     });
   });
@@ -211,7 +214,11 @@ describe('IngredientsService', () => {
       });
 
       try {
-        await service.update(1, { material: 'Tên mới' }, { id: 'admin-1', role: UserRole.ADMIN });
+        await service.update({
+          id: 1,
+          dto: { material: 'Tên mới' } as any,
+          currentUser: { id: 'admin-1', role: UserRole.ADMIN },
+        });
         fail('Should have thrown ING_001');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -238,11 +245,11 @@ describe('IngredientsService', () => {
         danh_muc_nguyen_lieu_danh_mucTodanh_muc: null,
       });
 
-      const result = await service.update(
-        1,
-        { material: 'Gạo tẻ sửa đổi', edible: 95 },
-        { id: 'user-uuid', role: UserRole.USER },
-      );
+      const result = await service.update({
+        id: 1,
+        dto: { material: 'Gạo tẻ sửa đổi', edible: 95 } as any,
+        currentUser: { id: 'user-uuid', role: UserRole.USER },
+      });
 
       expect(mockPrisma.nguyen_lieu.create).toHaveBeenCalled();
       const createData = mockPrisma.nguyen_lieu.create.mock.calls[0][0].data;
@@ -268,11 +275,11 @@ describe('IngredientsService', () => {
         danh_muc_nguyen_lieu_danh_mucTodanh_muc: null,
       });
 
-      await service.update(
-        1,
-        { material: 'Gạo tẻ thơm' },
-        { id: 'admin-uuid', role: UserRole.ADMIN },
-      );
+      await service.update({
+        id: 1,
+        dto: { material: 'Gạo tẻ thơm' } as any,
+        currentUser: { id: 'admin-uuid', role: UserRole.ADMIN },
+      });
 
       expect(mockPrisma.nguyen_lieu.update).toHaveBeenCalled();
       const updateData = mockPrisma.nguyen_lieu.update.mock.calls[0][0].data;
@@ -290,7 +297,7 @@ describe('IngredientsService', () => {
       mockPrisma.chi_tiet_mon_an.count.mockResolvedValue(2);
 
       try {
-        await service.delete(5);
+        await service.delete({ id: 5 });
         fail('Should have thrown ING_002');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -308,7 +315,7 @@ describe('IngredientsService', () => {
       mockPrisma.khau_phan_24h_nguyen_lieu.count.mockResolvedValue(1);
 
       try {
-        await service.delete(5);
+        await service.delete({ id: 5 });
         fail('Should have thrown ING_002');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -327,7 +334,7 @@ describe('IngredientsService', () => {
       mockPrisma.he_so_song_chin.count.mockResolvedValue(3);
 
       try {
-        await service.delete(5);
+        await service.delete({ id: 5 });
         fail('Should have thrown ING_002');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -345,7 +352,7 @@ describe('IngredientsService', () => {
       mockPrisma.khau_phan_24h_nguyen_lieu.count.mockResolvedValue(0);
       mockPrisma.he_so_song_chin.count.mockResolvedValue(0);
 
-      const res = await service.delete(5);
+      const res = await service.delete({ id: 5 });
 
       expect(res.message).toContain('Đã xóa nguyên liệu thành công');
       expect(mockPrisma.nguyen_lieu.update).toHaveBeenCalledWith({
@@ -411,7 +418,7 @@ describe('IngredientsService', () => {
         ],
       };
 
-      const result = await service.calculateSummary(dto as any);
+      const result = await service.calculateSummary({ dto: dto as any });
 
       // Verify single database query with { in: [...] }
       expect(mockPrisma.nguyen_lieu.findMany).toHaveBeenCalledTimes(1);
@@ -459,7 +466,7 @@ describe('IngredientsService', () => {
         items: [{ ingredientId: 3, weight: 100, isNetWeight: false, coefficient: 1 }],
       };
 
-      const result = await service.calculateSummary(dto as any);
+      const result = await service.calculateSummary({ dto: dto as any });
 
       // grossWeight = 100g, edibleWeight = 100 * 0.7 = 70g
       expect(result.totalGrossWeight).toBe(100);
@@ -480,7 +487,7 @@ describe('IngredientsService', () => {
         items: [{ ingredientId: 3, weight: 70, isNetWeight: true, coefficient: 1 }],
       };
 
-      const result = await service.calculateSummary(dto as any);
+      const result = await service.calculateSummary({ dto: dto as any });
 
       // edibleWeight = 70g, grossWeight needed = 70 / 0.7 = 100g
       expect(result.totalGrossWeight).toBe(100);
@@ -500,7 +507,7 @@ describe('IngredientsService', () => {
         items: [{ id: 1, weightGrams: 200, isNetWeight: true }],
       };
 
-      const result = await service.calculateSummary(dto as any);
+      const result = await service.calculateSummary({ dto: dto as any });
 
       expect(result.totalGrossWeight).toBe(200);
       expect(result.totalEdibleWeight).toBe(200);
@@ -521,7 +528,7 @@ describe('IngredientsService', () => {
       };
 
       try {
-        await service.calculateSummary(dto as any);
+        await service.calculateSummary({ dto: dto as any });
         fail('Should have thrown NOT_FOUND');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -533,7 +540,7 @@ describe('IngredientsService', () => {
 
     it('should throw BAD_REQUEST when items array is empty or missing', async () => {
       try {
-        await service.calculateSummary({ items: [] } as any);
+        await service.calculateSummary({ dto: { items: [] } as any });
         fail('Should have thrown BAD_REQUEST');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -544,7 +551,7 @@ describe('IngredientsService', () => {
 
     it('should throw BAD_REQUEST when an item has missing ID or non-positive weight', async () => {
       try {
-        await service.calculateSummary({ items: [{ weight: 100 }] } as any);
+        await service.calculateSummary({ dto: { items: [{ weight: 100 }] } as any });
         fail('Should have thrown BAD_REQUEST for missing ID');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -553,7 +560,9 @@ describe('IngredientsService', () => {
       }
 
       try {
-        await service.calculateSummary({ items: [{ ingredientId: 1, weight: -10 }] } as any);
+        await service.calculateSummary({
+          dto: { items: [{ ingredientId: 1, weight: -10 }] } as any,
+        });
         fail('Should have thrown BAD_REQUEST for negative weight');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);

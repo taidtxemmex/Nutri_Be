@@ -40,7 +40,7 @@ export class AuthController {
   @ApiErrorResponse(400, 'Dữ liệu đầu vào không hợp lệ')
   @ApiErrorResponse(409, 'Tên đăng nhập hoặc email đã tồn tại')
   async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+    return this.authService.register({ dto });
   }
 
   @Public()
@@ -53,7 +53,7 @@ export class AuthController {
   })
   @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc đã hết hạn')
   async verifyEmail(@Body() dto: VerifyEmailDto) {
-    return this.authService.verifyEmail(dto.token);
+    return this.authService.verifyEmail({ token: dto.token });
   }
 
   @Public()
@@ -67,7 +67,7 @@ export class AuthController {
   })
   @ApiErrorResponse(401, 'Sai tên đăng nhập hoặc mật khẩu')
   async login(@Body() dto: LoginDto, @ClientIp() ip: string, @UserAgent() userAgent: string) {
-    return this.authService.login(dto, ip, userAgent);
+    return this.authService.login({ dto, ip, userAgent });
   }
 
   @Public()
@@ -85,7 +85,7 @@ export class AuthController {
     @ClientIp() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    return this.authService.refreshToken(dto, ip, userAgent);
+    return this.authService.refreshToken({ dto, ip, userAgent });
   }
 
   @Auth()
@@ -111,7 +111,7 @@ export class AuthController {
     @Body('refreshToken') refreshToken?: string,
     @Body('sessionId') sessionId?: string,
   ) {
-    return this.authService.logout(user, refreshToken, sessionId);
+    return this.authService.logout({ user, refreshToken, sessionId });
   }
 
   @Public()
@@ -129,7 +129,7 @@ export class AuthController {
     @ClientIp() ip: string,
     @UserAgent() userAgent: string,
   ) {
-    return this.authService.googleLogin(dto, ip, userAgent);
+    return this.authService.googleLogin({ dto, ip, userAgent });
   }
 
   @Public()
@@ -141,7 +141,7 @@ export class AuthController {
     description: 'Yêu cầu đặt lại mật khẩu đã được tiếp nhận',
   })
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+    return this.authService.forgotPassword({ dto });
   }
 
   @Public()
@@ -154,6 +154,6 @@ export class AuthController {
   })
   @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc mật khẩu không đúng chuẩn')
   async resetPassword(@Body() dto: ResetPasswordDto) {
-    return this.authService.resetPassword(dto);
+    return this.authService.resetPassword({ dto });
   }
 }

@@ -39,6 +39,8 @@ export const buildCategoryDetailCacheKey = (id: string | number | bigint): strin
   `category:detail:${id}`;
 export const buildIngredientDetailCacheKey = (id: string | number | bigint): string =>
   `ingredient:detail:${id}`;
+export const buildIngredientExistsCacheKey = (id: string | number | bigint): string =>
+  `ingredient:exists:${id}`;
 export const buildDishDetailCacheKey = (id: string | number | bigint): string =>
   `dish:detail:${id}`;
 export const buildDiseaseGroupCacheTag = (id: string | number | bigint): string =>

@@ -161,12 +161,10 @@ describe('ExcelSecurity & Validation Engine Unit Tests (CWE-1236 & Magic Bytes)'
 
     it('should reject missing file or empty buffer (0 bytes) with 400 Bad Request', async () => {
       await expect(pipe.transform(null as any)).rejects.toThrow(BadRequestException);
-      await expect(
-        pipe.transform({ buffer: null } as any),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        pipe.transform({ buffer: Buffer.from([]) } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(pipe.transform({ buffer: null } as any)).rejects.toThrow(BadRequestException);
+      await expect(pipe.transform({ buffer: Buffer.from([]) } as any)).rejects.toThrow(
+        BadRequestException,
+      );
       await expect(
         pipe.transform({ buffer: Buffer.alloc(0), originalname: 'empty.xlsx' } as any),
       ).rejects.toThrow(BadRequestException);
@@ -174,16 +172,16 @@ describe('ExcelSecurity & Validation Engine Unit Tests (CWE-1236 & Magic Bytes)'
 
     it('should reject files exceeding 10MB', async () => {
       const largeBuffer = Buffer.alloc(10 * 1024 * 1024 + 10);
-      await expect(
-        pipe.transform({ buffer: largeBuffer } as any),
-      ).rejects.toThrow(PayloadTooLargeException);
+      await expect(pipe.transform({ buffer: largeBuffer } as any)).rejects.toThrow(
+        PayloadTooLargeException,
+      );
     });
 
     it('should reject legacy OLE2 XLS file (D0 CF 11 E0)', async () => {
       const ole2Buffer = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
-      await expect(
-        pipe.transform({ buffer: ole2Buffer } as any),
-      ).rejects.toThrow(UnsupportedMediaTypeException);
+      await expect(pipe.transform({ buffer: ole2Buffer } as any)).rejects.toThrow(
+        UnsupportedMediaTypeException,
+      );
     });
 
     it('should reject fake .xlsx containing Linux ELF binary executable', async () => {
@@ -208,9 +206,9 @@ describe('ExcelSecurity & Validation Engine Unit Tests (CWE-1236 & Magic Bytes)'
 
     it('should reject non-ZIP files (e.g. text or random binary)', async () => {
       const textBuffer = Buffer.from('Plain text file not excel');
-      await expect(
-        pipe.transform({ buffer: textBuffer } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(pipe.transform({ buffer: textBuffer } as any)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should accept valid OpenXML zip archive (PK\\x03\\x04)', async () => {

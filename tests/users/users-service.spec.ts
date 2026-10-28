@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ForbiddenException } from '@nestjs/common';
 import { UsersService } from '../../src/modules/users/services/users.service';
 import { IdorDefenseService } from '../../src/security/idor/idor-defense.service';
 import { UserRole } from '../../src/config/enums/role.enum';
@@ -51,7 +51,7 @@ describe('UsersService', () => {
 
   describe('findAll', () => {
     it('should return bounded paginated users with explicit fields', async () => {
-      const result = await usersService.findAll({ page: 1, limit: 10 });
+      const result = await usersService.findAll({ query: { page: 1, limit: 10 } });
 
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
@@ -95,7 +95,10 @@ describe('UsersService', () => {
         nguoi_de_xuat: null,
       });
 
-      const result = await usersService.getUserInfo('uuid-regular-user', regularUser);
+      const result = await usersService.getUserInfo({
+        targetUserId: 'uuid-regular-user',
+        currentUser: regularUser,
+      });
 
       expect(result).toHaveProperty('viewUser');
       expect(result).toHaveProperty('viewJob');
@@ -104,9 +107,12 @@ describe('UsersService', () => {
     });
 
     it('should block regular user from accessing another user data with ForbiddenException (IDOR Defense)', async () => {
-      await expect(usersService.getUserInfo('uuid-victim-user', regularUser)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        usersService.getUserInfo({
+          targetUserId: 'uuid-victim-user',
+          currentUser: regularUser,
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow ADMIN to view any target user profile', async () => {
@@ -133,7 +139,10 @@ describe('UsersService', () => {
         },
       });
 
-      const result = await usersService.getUserInfo('uuid-target-user', adminUser);
+      const result = await usersService.getUserInfo({
+        targetUserId: 'uuid-target-user',
+        currentUser: adminUser,
+      });
 
       expect(result.viewUser.fullName).toBe('Trần Thị B');
       expect(result.viewJob.education).toBe('Thạc sĩ');
@@ -162,7 +171,11 @@ describe('UsersService', () => {
         vai_tro: UserRole.USER,
       });
 
-      const result = await usersService.updateRole('target-id', UserRole.USERPRO, adminUser);
+      const result = await usersService.updateRole({
+        targetUserId: 'target-id',
+        newRole: UserRole.USERPRO,
+        currentUser: adminUser,
+      });
 
       expect(result.success).toBe(true);
       expect(result.role).toBe(UserRole.USERPRO);
@@ -176,14 +189,22 @@ describe('UsersService', () => {
 
     it('should throw ForbiddenException if non-admin attempts to update role', async () => {
       await expect(
-        usersService.updateRole('target-id', UserRole.ADMIN, regularUser),
+        usersService.updateRole({
+          targetUserId: 'target-id',
+          newRole: UserRole.ADMIN,
+          currentUser: regularUser,
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow admin to update active status', async () => {
       mockPrisma.nguoi_dung.findUnique.mockResolvedValue({ id: 'target-id' });
 
-      const result = await usersService.updateStatus('target-id', false, adminUser);
+      const result = await usersService.updateStatus({
+        targetUserId: 'target-id',
+        isActive: false,
+        currentUser: adminUser,
+      });
 
       expect(result.success).toBe(true);
       expect(result.active).toBe(false);
@@ -218,7 +239,7 @@ describe('UsersService', () => {
         deleted_at: null,
       });
 
-      const result = await usersService.checkProfile('user-id');
+      const result = await usersService.checkProfile({ userId: 'user-id' });
       expect(result.profileComplete).toBe(true);
     });
 
@@ -229,7 +250,10 @@ describe('UsersService', () => {
         deleted_at: null,
       });
 
-      const result = await usersService.softDeleteUser('victim-id', adminUser);
+      const result = await usersService.softDeleteUser({
+        targetUserId: 'victim-id',
+        currentUser: adminUser,
+      });
 
       expect(result.success).toBe(true);
       expect(mockPrisma.nguoi_dung.update).toHaveBeenCalledWith(
@@ -244,9 +268,12 @@ describe('UsersService', () => {
     });
 
     it('should throw ForbiddenException when non-admin attempts soft delete', async () => {
-      await expect(usersService.softDeleteUser('victim-id', regularUser)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        usersService.softDeleteUser({
+          targetUserId: 'victim-id',
+          currentUser: regularUser,
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should batch soft delete multiple users using updateMany (Rule 20)', async () => {
@@ -256,7 +283,10 @@ describe('UsersService', () => {
       ]);
       mockPrisma.nguoi_dung.updateMany.mockResolvedValue({ count: 2 });
 
-      const result = await usersService.softDeleteBatch(['user-1', 'user-2'], adminUser);
+      const result = await usersService.softDeleteBatch({
+        userIds: ['user-1', 'user-2'],
+        currentUser: adminUser,
+      });
 
       expect(result.success).toBe(true);
       expect(result.affectedCount).toBe(2);
@@ -271,7 +301,10 @@ describe('UsersService', () => {
 
     it('should prevent user from self-deleting in batch soft delete', async () => {
       await expect(
-        usersService.softDeleteBatch(['user-1', adminUser.id], adminUser),
+        usersService.softDeleteBatch({
+          userIds: ['user-1', adminUser.id],
+          currentUser: adminUser,
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -280,9 +313,12 @@ describe('UsersService', () => {
         { id: 'super-admin-id', vai_tro: UserRole.SUPERADMIN },
       ]);
 
-      await expect(usersService.softDeleteBatch(['super-admin-id'], adminUser)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        usersService.softDeleteBatch({
+          userIds: ['super-admin-id'],
+          currentUser: adminUser,
+        }),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should batch update user status using updateMany (Rule 20)', async () => {
@@ -292,7 +328,11 @@ describe('UsersService', () => {
       ]);
       mockPrisma.nguoi_dung.updateMany.mockResolvedValue({ count: 2 });
 
-      const result = await usersService.updateStatusBatch(['user-1', 'user-2'], false, adminUser);
+      const result = await usersService.updateStatusBatch({
+        userIds: ['user-1', 'user-2'],
+        isActive: false,
+        currentUser: adminUser,
+      });
 
       expect(result.success).toBe(true);
       expect(result.affectedCount).toBe(2);
@@ -320,7 +360,10 @@ describe('UsersService', () => {
         },
       ];
 
-      const result = await usersService.createBatch(newUsers, adminUser);
+      const result = await usersService.createBatch({
+        dtoList: newUsers,
+        currentUser: adminUser,
+      });
 
       expect(result.success).toBe(true);
       expect(result.createdCount).toBe(2);
@@ -333,7 +376,12 @@ describe('UsersService', () => {
         { username: 'same_name', fullName: 'User B', email: 'b@nutritest.com' },
       ];
 
-      await expect(usersService.createBatch(duplicateUsers, adminUser)).rejects.toThrow();
+      await expect(
+        usersService.createBatch({
+          dtoList: duplicateUsers,
+          currentUser: adminUser,
+        }),
+      ).rejects.toThrow();
     });
   });
 });

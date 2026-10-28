@@ -17,6 +17,11 @@ export class SubscriptionDocumentResponseDto {
   externalLink?: string | null;
 }
 
+export interface FromEntityParamDto {
+  entity: any;
+  userProfile?: { username?: string; fullName?: string };
+}
+
 export class SubscriptionResponseDto {
   @ApiProperty({ example: '1', description: 'ID yêu cầu thanh toán' })
   id: string;
@@ -84,7 +89,21 @@ export class SubscriptionResponseDto {
   @ApiPropertyOptional({ type: [SubscriptionDocumentResponseDto] })
   documents?: SubscriptionDocumentResponseDto[];
 
-  static fromEntity(entity: any, userProfile?: { username?: string; fullName?: string }): SubscriptionResponseDto {
+  static fromEntity(
+    paramOrEntity: FromEntityParamDto | any,
+    legacyUserProfile?: { username?: string; fullName?: string },
+  ): SubscriptionResponseDto {
+    let entity: any;
+    let userProfile: { username?: string; fullName?: string } | undefined;
+
+    if (paramOrEntity && typeof paramOrEntity === 'object' && 'entity' in paramOrEntity) {
+      entity = (paramOrEntity as FromEntityParamDto).entity;
+      userProfile = (paramOrEntity as FromEntityParamDto).userProfile;
+    } else {
+      entity = paramOrEntity;
+      userProfile = legacyUserProfile;
+    }
+
     const id = entity.id ? entity.id.toString() : '';
     const code = entity.ma_giao_dich || '';
     const maGoi = entity.ma_goi || '';

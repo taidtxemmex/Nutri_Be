@@ -168,11 +168,31 @@ describe('EmbeddedQueueWorker & QueueService Tests (Task 7.4)', () => {
 
       // 2. Bơm 5 jobs email vào bảng _system_jobs
       const emailJobs = [
-        { to: 'bs_minhanh@benhvien.vn', subject: 'Thực đơn lâm sàng BN #101', body: 'Chi tiết can thiệp calo 1800 kcal' },
-        { to: 'bs_hoangnam@benhvien.vn', subject: 'Cảnh báo giới hạn Kali BN #102', body: 'Chỉ số Kali vượt ngưỡng an toàn' },
-        { to: 'bn_thanhhang@gmail.com', subject: 'Thực đơn tuần 4', body: 'Thực đơn giảm muối cho bệnh nhân tăng huyết áp' },
-        { to: 'admin@truenutri.com', subject: 'Báo cáo tổng hợp ngày', body: 'Tổng số 42 thực đơn đã xuất bản hôm nay' },
-        { to: 'support@nutri.vn', subject: 'Đăng ký PRO thành công', body: 'Tài khoản của bạn đã được nâng cấp lên PRO 12 tháng' },
+        {
+          to: 'bs_minhanh@benhvien.vn',
+          subject: 'Thực đơn lâm sàng BN #101',
+          body: 'Chi tiết can thiệp calo 1800 kcal',
+        },
+        {
+          to: 'bs_hoangnam@benhvien.vn',
+          subject: 'Cảnh báo giới hạn Kali BN #102',
+          body: 'Chỉ số Kali vượt ngưỡng an toàn',
+        },
+        {
+          to: 'bn_thanhhang@gmail.com',
+          subject: 'Thực đơn tuần 4',
+          body: 'Thực đơn giảm muối cho bệnh nhân tăng huyết áp',
+        },
+        {
+          to: 'admin@truenutri.com',
+          subject: 'Báo cáo tổng hợp ngày',
+          body: 'Tổng số 42 thực đơn đã xuất bản hôm nay',
+        },
+        {
+          to: 'support@nutri.vn',
+          subject: 'Đăng ký PRO thành công',
+          body: 'Tài khoản của bạn đã được nâng cấp lên PRO 12 tháng',
+        },
       ];
 
       for (const mail of emailJobs) {
@@ -221,7 +241,11 @@ describe('EmbeddedQueueWorker & QueueService Tests (Task 7.4)', () => {
       });
 
       // Enqueue job với maxAttempts = 3
-      const enqueued = await queueService.enqueue('failing:job', { reportId: 456 }, { maxAttempts: 3 });
+      const enqueued = await queueService.enqueue(
+        'failing:job',
+        { reportId: 456 },
+        { maxAttempts: 3 },
+      );
 
       // Lần chạy 1: Job thất bại (attempts = 1 < 3) -> chuyển lại pending, lùi run_at
       const nowBefore = Date.now();
@@ -247,7 +271,11 @@ describe('EmbeddedQueueWorker & QueueService Tests (Task 7.4)', () => {
       });
 
       // Tạo job với maxAttempts = 2 và đã có attempts = 1
-      const created = await queueService.enqueue('fatal:task', { orderId: 789 }, { maxAttempts: 2 });
+      const created = await queueService.enqueue(
+        'fatal:task',
+        { orderId: 789 },
+        { maxAttempts: 2 },
+      );
       const jobInDb = jobsTable.find((j) => j.id.toString() === created.id.toString());
       jobInDb.attempts = 1;
 

@@ -25,12 +25,7 @@ export const FILE_SECURITY_CONFIG = {
   },
 
   // Danh mục định dạng cho phép
-  ALLOWED_IMAGE_MIME_TYPES: [
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-  ] as const,
+  ALLOWED_IMAGE_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const,
 
   ALLOWED_DOCUMENT_MIME_TYPES: ['application/pdf'] as const,
 

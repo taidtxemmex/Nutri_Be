@@ -44,36 +44,47 @@ describe('DishesController', () => {
   it('getUserDishes should call service.getUserDishes', async () => {
     const res = await controller.getUserDishes('RIENG_TU', { id: 'u1' });
     expect(res).toHaveLength(1);
-    expect(service.getUserDishes).toHaveBeenCalledWith('RIENG_TU', { id: 'u1' });
+    expect(service.getUserDishes).toHaveBeenCalledWith({
+      currentUser: { id: 'u1' },
+      statuses: 'RIENG_TU',
+    });
   });
 
   it('proposeDish should call service.proposeDish', async () => {
     const res = await controller.proposeDish('1', { id: 'u1' });
     expect(res.message).toBe('Đã gửi đề xuất');
-    expect(service.proposeDish).toHaveBeenCalledWith('1', { id: 'u1' });
+    expect(service.proposeDish).toHaveBeenCalledWith({ dishId: '1', currentUser: { id: 'u1' } });
   });
 
   it('approveDish should call service.approveDish', async () => {
     const res = await controller.approveDish('1', { id: 'admin-1' });
     expect(res.message).toBe('Đã duyệt');
-    expect(service.approveDish).toHaveBeenCalledWith('1', { id: 'admin-1' });
+    expect(service.approveDish).toHaveBeenCalledWith({ id: '1', adminUser: { id: 'admin-1' } });
   });
 
   it('rejectDish should call service.rejectDish', async () => {
     const res = await controller.rejectDish('1', { reason: 'Lý do' }, { id: 'admin-1' });
     expect(res.message).toBe('Đã từ chối đề xuất');
-    expect(service.rejectDish).toHaveBeenCalledWith('1', 'Lý do', { id: 'admin-1' });
+    expect(service.rejectDish).toHaveBeenCalledWith({
+      id: '1',
+      reason: 'Lý do',
+      adminUser: { id: 'admin-1' },
+    });
   });
 
   it('cloneDish should call service.cloneDish', async () => {
     const res = await controller.cloneDish('1', { newName: 'Món clone' }, { id: 'u1' });
     expect(res.id).toBe('4');
-    expect(service.cloneDish).toHaveBeenCalledWith('1', { newName: 'Món clone' }, { id: 'u1' });
+    expect(service.cloneDish).toHaveBeenCalledWith({
+      dishId: '1',
+      request: { newName: 'Món clone' },
+      currentUser: { id: 'u1' },
+    });
   });
 
   it('delete should call service.delete', async () => {
     const res = await controller.delete('1', { id: 'u1' });
     expect(res.message).toBe('Xoá thành công món ăn');
-    expect(service.delete).toHaveBeenCalledWith('1', { id: 'u1' });
+    expect(service.delete).toHaveBeenCalledWith({ id: '1', currentUser: { id: 'u1' } });
   });
 });

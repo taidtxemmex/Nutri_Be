@@ -1,10 +1,6 @@
 import { UnauthorizedException, BadRequestException, ConflictException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from '../../src/modules/auth/services/auth.service';
-import { RefreshTokenRotationService } from '../../src/security/token/refresh-token-rotation.service';
-import { UserRole } from '../../src/config/enums/role.enum';
 
 describe('AuthService', () => {
   let authService: AuthService;

@@ -39,7 +39,7 @@ export class DiseaseGroupsController {
     description: 'Danh sách nhóm bệnh',
   })
   async findAll(@Query() query: DiseaseGroupQueryDto) {
-    return this.diseaseGroupsService.findAll(query);
+    return this.diseaseGroupsService.findAll({ query });
   }
 
   @Public()
@@ -51,7 +51,7 @@ export class DiseaseGroupsController {
     description: 'Chi tiết nhóm bệnh',
   })
   async findById(@Param('id', ParseIntPipe) id: number) {
-    return this.diseaseGroupsService.findById(id);
+    return this.diseaseGroupsService.findById({ id });
   }
 
   @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -63,7 +63,7 @@ export class DiseaseGroupsController {
     description: 'Tạo nhóm bệnh thành công',
   })
   async create(@Body() dto: CreateDiseaseGroupDto) {
-    return this.diseaseGroupsService.create(dto);
+    return this.diseaseGroupsService.create({ dto });
   }
 
   @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -75,7 +75,7 @@ export class DiseaseGroupsController {
     description: 'Cập nhật nhóm bệnh thành công',
   })
   async update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDiseaseGroupDto) {
-    return this.diseaseGroupsService.update(id, dto);
+    return this.diseaseGroupsService.update({ id, dto });
   }
 
   @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
@@ -86,6 +86,6 @@ export class DiseaseGroupsController {
     description: 'Xóa nhóm bệnh thành công',
   })
   async delete(@Param('id', ParseIntPipe) id: number) {
-    return this.diseaseGroupsService.delete(id);
+    return this.diseaseGroupsService.delete({ id });
   }
 }

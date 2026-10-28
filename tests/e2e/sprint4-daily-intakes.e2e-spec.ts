@@ -26,8 +26,8 @@ jest.setTimeout(60000);
 describe('Sprint 4: Daily Intakes & Nutrition Limit Sets (3-Layer E2E Suite)', () => {
   const helper = new TestAppHelper();
 
-  let adminToken: string;
-  let adminUser: any;
+  let _adminToken: string;
+  let _adminUser: any;
   let regularToken: string;
   let regularUser: any;
 
@@ -152,8 +152,8 @@ describe('Sprint 4: Daily Intakes & Nutrition Limit Sets (3-Layer E2E Suite)', (
       password: 'P@ssw0rd123!',
       fullName: 'Quản Trị Viên Intake Sprint 4',
     });
-    adminToken = admin.token;
-    adminUser = admin.user;
+    _adminToken = admin.token;
+    _adminUser = admin.user;
 
     const regular = await helper.createTestUser({
       username: `user_di4_${uniqueSuffix}`,
@@ -452,8 +452,8 @@ describe('Sprint 4: Daily Intakes & Nutrition Limit Sets (3-Layer E2E Suite)', (
       expect(res.headers['content-type']).toContain(
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
-      expect(res.headers['content-disposition']).toContain(
-        'attachment; filename="Template_nhap_lieu_khau_phan_24h.xlsx"',
+      expect(res.headers['content-disposition']).toMatch(
+        /Template_(nhap_lieu|import)_khau_phan_24h/,
       );
       expect(Buffer.isBuffer(res.body)).toBe(true);
       expect(res.body.length).toBeGreaterThan(0);

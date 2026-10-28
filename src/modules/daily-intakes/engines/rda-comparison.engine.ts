@@ -1,16 +1,10 @@
 import Decimal from 'decimal.js';
 import {
-  ALL_INDICATOR_CODES,
   AllIndicatorCode,
   NUTRIENT_METADATA_MAP,
 } from '../../../core/nutrition-engine/nutrition.constants';
 import { DecimalMap, RoundedNutrientMap } from '../../../core/nutrition-engine/nutrition.engine';
-import {
-  DemographicProfile,
-  getStandardRdaTargetMap,
-  NutrientReferenceTarget,
-  RdaTargetMap,
-} from './rda-reference-data';
+import { DemographicProfile, getStandardRdaTargetMap, RdaTargetMap } from './rda-reference-data';
 
 // Cấu hình Decimal chuẩn độ chính xác cao
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
@@ -70,6 +64,12 @@ export interface RdaComparisonResult {
   nutrients: NutrientComparisonDetail[];
 }
 
+export class CompareRdaParamDto {
+  actualIntake: RoundedNutrientMap | DecimalMap | Record<string, number | Decimal>;
+  demographic: DemographicProfile;
+  customTargets?: RdaTargetMap;
+}
+
 /**
  * PURE RDA COMPARISON ENGINE
  * Động cơ đối chiếu dinh dưỡng khẩu phần 24h với chuẩn khuyến nghị RDA/DRI
@@ -87,10 +87,32 @@ export class RdaComparisonEngine {
    * @param customTargets Mục tiêu dinh dưỡng tùy chỉnh (từ giới hạn bệnh lý hoặc chỉ định bác sĩ)
    */
   public static compare(
-    actualIntake: RoundedNutrientMap | DecimalMap | Record<string, number | Decimal>,
-    demographic: DemographicProfile,
-    customTargets?: RdaTargetMap,
+    paramOrActual:
+      CompareRdaParamDto | RoundedNutrientMap | DecimalMap | Record<string, number | Decimal>,
+    legacyDemographic?: DemographicProfile,
+    legacyCustomTargets?: RdaTargetMap,
   ): RdaComparisonResult {
+    let actualIntake: RoundedNutrientMap | DecimalMap | Record<string, number | Decimal>;
+    let demographic: DemographicProfile;
+    let customTargets: RdaTargetMap | undefined;
+
+    if (
+      paramOrActual &&
+      typeof paramOrActual === 'object' &&
+      'demographic' in paramOrActual &&
+      'actualIntake' in paramOrActual
+    ) {
+      const dto = paramOrActual as CompareRdaParamDto;
+      actualIntake = dto.actualIntake;
+      demographic = dto.demographic;
+      customTargets = dto.customTargets;
+    } else {
+      actualIntake = paramOrActual as
+        RoundedNutrientMap | DecimalMap | Record<string, number | Decimal>;
+      demographic = legacyDemographic!;
+      customTargets = legacyCustomTargets;
+    }
+
     // 1. Lấy bảng khuyến nghị RDA chuẩn
     const baseTargetMap = getStandardRdaTargetMap(demographic);
     const finalTargets: RdaTargetMap = { ...baseTargetMap, ...(customTargets || {}) };

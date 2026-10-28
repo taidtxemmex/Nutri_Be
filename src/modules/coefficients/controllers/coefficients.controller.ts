@@ -2,7 +2,7 @@ import { Get, Post, Put, Delete, Body, Param, HttpCode, HttpStatus } from '@nest
 import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { CoefficientsService } from '../services/coefficients.service';
 import { CreateCoefficientDto, UpdateCoefficientDto, CoefficientResponseDto } from '../dto';
-import { ApiController, ApiStandardResponse, Auth, CurrentUser } from '../../../common/decorators';
+import { ApiController, ApiStandardResponse, CurrentUser } from '../../../common/decorators';
 
 @ApiController('Coefficients', 'coefficients', { auth: true })
 export class CoefficientsController {
@@ -21,7 +21,7 @@ export class CoefficientsController {
     @Body() dto: CreateCoefficientDto,
     @CurrentUser() user: any,
   ): Promise<CoefficientResponseDto> {
-    return this.coefficientsService.create(dto, user);
+    return this.coefficientsService.create({ dto, currentUser: user });
   }
 
   @Get()
@@ -32,7 +32,7 @@ export class CoefficientsController {
     description: 'Lấy danh sách hệ số thành công',
   })
   async getAll(@CurrentUser() user: any): Promise<CoefficientResponseDto[]> {
-    return this.coefficientsService.findAll(user);
+    return this.coefficientsService.findAll({ currentUser: user });
   }
 
   @Get('public')
@@ -54,7 +54,7 @@ export class CoefficientsController {
     description: 'Lấy danh sách hệ số cá nhân thành công',
   })
   async getMy(@CurrentUser() user: any): Promise<CoefficientResponseDto[]> {
-    return this.coefficientsService.findMy(user);
+    return this.coefficientsService.findMy({ currentUser: user });
   }
 
   @Get(':id')
@@ -65,7 +65,7 @@ export class CoefficientsController {
     description: 'Lấy chi tiết hệ số thành công',
   })
   async getById(@Param('id') id: string): Promise<CoefficientResponseDto> {
-    return this.coefficientsService.findById(id);
+    return this.coefficientsService.findById({ id });
   }
 
   @Put(':id')
@@ -80,7 +80,7 @@ export class CoefficientsController {
     @Body() dto: UpdateCoefficientDto,
     @CurrentUser() user: any,
   ): Promise<CoefficientResponseDto> {
-    return this.coefficientsService.update(id, dto, user);
+    return this.coefficientsService.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -90,6 +90,6 @@ export class CoefficientsController {
     description: 'Xóa hệ số thành công',
   })
   async delete(@Param('id') id: string, @CurrentUser() user: any): Promise<{ message: string }> {
-    return this.coefficientsService.delete(id, user);
+    return this.coefficientsService.delete({ id, currentUser: user });
   }
 }

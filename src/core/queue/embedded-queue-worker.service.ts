@@ -1,10 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-  Optional,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { MysqlQueueService } from './mysql-queue.service';
@@ -43,13 +37,19 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
     // 1. Đăng ký default processor cho email nếu có InMemoryMailerService
     if (this.inMemoryMailer) {
       if (!this.queueService.hasHandler('mail:send')) {
-        this.queueService.process('mail:send', async (payload: any) => {
-          await this.inMemoryMailer!.sendMail(payload);
+        this.queueService.process({
+          queueName: 'mail:send',
+          handler: async (payload: any) => {
+            await this.inMemoryMailer!.sendMail(payload);
+          },
         });
       }
       if (!this.queueService.hasHandler('mail')) {
-        this.queueService.process('mail', async (payload: any) => {
-          await this.inMemoryMailer!.sendMail(payload);
+        this.queueService.process({
+          queueName: 'mail',
+          handler: async (payload: any) => {
+            await this.inMemoryMailer!.sendMail(payload);
+          },
         });
       }
     }

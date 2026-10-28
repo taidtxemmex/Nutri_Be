@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { EvidencesService } from '../../src/modules/evidences/services/evidences.service';
 import { EvidenceStorageService } from '../../src/modules/evidences/services/evidence-storage.service';
 import { UserRole } from '../../src/config/enums/role.enum';
@@ -18,13 +18,15 @@ describe('EvidencesService', () => {
     mockStorageService = {
       generatePreviewUrl: jest
         .fn()
-        .mockImplementation((key) =>
-          Promise.resolve(`http://localhost:8080/uploads/evidence/${key}?token=mock`),
+        .mockImplementation(({ objectKey }) =>
+          Promise.resolve(`http://localhost:8080/uploads/evidence/${objectKey}?token=mock`),
         ),
       generateDownloadUrl: jest
         .fn()
-        .mockImplementation((key, name) =>
-          Promise.resolve(`http://localhost:8080/uploads/evidence/${key}?token=mock&download=1`),
+        .mockImplementation(({ objectKey }) =>
+          Promise.resolve(
+            `http://localhost:8080/uploads/evidence/${objectKey}?token=mock&download=1`,
+          ),
         ),
     } as any;
 
@@ -35,7 +37,9 @@ describe('EvidencesService', () => {
     it('should throw EVID_001 if evidence not found', async () => {
       mockPrisma.minh_chung.findUnique.mockResolvedValue(null);
 
-      await expect(service.generatePreviewUrl(999, { id: 'user-1' })).rejects.toThrow(
+      await expect(
+        service.generatePreviewUrl({ id: 999, currentUser: { id: 'user-1' } }),
+      ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'EVID_001' }),
           status: HttpStatus.NOT_FOUND,
@@ -52,7 +56,7 @@ describe('EvidencesService', () => {
       });
 
       await expect(
-        service.generatePreviewUrl(1, { id: 'user-1', role: UserRole.USER }),
+        service.generatePreviewUrl({ id: 1, currentUser: { id: 'user-1', role: UserRole.USER } }),
       ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'AUTH_002' }),
@@ -69,9 +73,14 @@ describe('EvidencesService', () => {
         dung_luong: BigInt(500000),
       });
 
-      const url = await service.generatePreviewUrl(1, { id: 'user-1', role: UserRole.USER });
+      const url = await service.generatePreviewUrl({
+        id: 1,
+        currentUser: { id: 'user-1', role: UserRole.USER },
+      });
       expect(url).toContain('medical-doc-123.pdf');
-      expect(mockStorageService.generatePreviewUrl).toHaveBeenCalledWith('medical-doc-123.pdf');
+      expect(mockStorageService.generatePreviewUrl).toHaveBeenCalledWith({
+        objectKey: 'medical-doc-123.pdf',
+      });
     });
 
     it('should return external link directly if available and no object_key', async () => {
@@ -82,7 +91,10 @@ describe('EvidencesService', () => {
         nguoi_upload_id: 'user-1',
       });
 
-      const url = await service.generatePreviewUrl(2, { id: 'user-1', role: UserRole.USER });
+      const url = await service.generatePreviewUrl({
+        id: 2,
+        currentUser: { id: 'user-1', role: UserRole.USER },
+      });
       expect(url).toBe('https://cdn.example.com/certificate.pdf');
     });
   });
@@ -96,12 +108,15 @@ describe('EvidencesService', () => {
         nguoi_upload_id: 'someone-else',
       });
 
-      const url = await service.generateDownloadUrl(1, { id: 'admin-1', role: UserRole.ADMIN });
+      const url = await service.generateDownloadUrl({
+        id: 1,
+        currentUser: { id: 'admin-1', role: UserRole.ADMIN },
+      });
       expect(url).toContain('medical-doc-123.pdf');
-      expect(mockStorageService.generateDownloadUrl).toHaveBeenCalledWith(
-        'medical-doc-123.pdf',
-        'giay_kham.pdf',
-      );
+      expect(mockStorageService.generateDownloadUrl).toHaveBeenCalledWith({
+        objectKey: 'medical-doc-123.pdf',
+        originalFileName: 'giay_kham.pdf',
+      });
     });
   });
 });

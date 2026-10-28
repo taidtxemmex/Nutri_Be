@@ -38,8 +38,8 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
 
   let categoryId: number;
   let beefIngId: number;
-  let celeryIngId: number;
-  let riceIngId: number;
+  let _celeryIngId: number;
+  let _riceIngId: number;
   let patientXId: string;
   let patientYId: string;
 
@@ -116,7 +116,7 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
         trang_thai: 'DA_DUYET',
       },
     });
-    celeryIngId = Number(celery.id);
+    _celeryIngId = Number(celery.id);
 
     const rice = await prisma.nguyen_lieu.create({
       data: {
@@ -137,7 +137,7 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
         trang_thai: 'DA_DUYET',
       },
     });
-    riceIngId = Number(rice.id);
+    _riceIngId = Number(rice.id);
 
     // 4. Khởi tạo tài khoản kiểm thử bảo mật
     const uniqueSuffix = `${Date.now()}_${Math.floor(Math.random() * 100000)}`;
@@ -475,7 +475,9 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
     it('2.4 IDOR Export: Bác sĩ B cố gắng xuất báo cáo lâm sàng của D_X -> Bị chặn 404 NOT_FOUND', async () => {
       // Layer 1: HTTP Status Code
       const res = await request(helper.getHttpServer())
-        .get(`/api/daily-intakes/${intakeXId}/export?reportType=${DailyIntakeClinicalReportType.ALL_IN_ONE}`)
+        .get(
+          `/api/daily-intakes/${intakeXId}/export?reportType=${DailyIntakeClinicalReportType.ALL_IN_ONE}`,
+        )
         .set('Authorization', `Bearer ${doctorBToken}`)
         .expect(404);
 
@@ -743,9 +745,7 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
       expect(Array.isArray(res.body.data)).toBe(true);
 
       // Khẳng định Bác sĩ A KHÔNG THỂ nhìn thấy thực đơn của Bác sĩ B dù đã inject SQL!
-      const leakedItems = res.body.data.filter((item: any) =>
-        item.menuName.includes('Bác sĩ B'),
-      );
+      const leakedItems = res.body.data.filter((item: any) => item.menuName.includes('Bác sĩ B'));
       expect(leakedItems.length).toBe(0);
 
       // Tấn công SQLi dạng DROP TABLE thuc_don; --
@@ -788,7 +788,9 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
         where: { id: BigInt(intakeId) },
         include: { khau_phan_24h_bua_an: true },
       });
-      expect(dbIntake?.ghi_chu).toBe("<script>alert('XSS_ATTACK')</script>'; DROP TABLE benh_nhan; --");
+      expect(dbIntake?.ghi_chu).toBe(
+        "<script>alert('XSS_ATTACK')</script>'; DROP TABLE benh_nhan; --",
+      );
       expect(dbIntake?.khau_phan_24h_bua_an[0].ten_bua).toBe("<img src=x onerror=alert('XSS')>");
 
       const totalPatients = await helper.getPrisma().benh_nhan.count();
@@ -797,15 +799,11 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
 
     it('5.3 Missing Authorization Header: Không gửi Header Authorization -> Bị chặn 401 UNAUTHORIZED', async () => {
       // 1. Thử vào /api/menus
-      const resMenu = await request(helper.getHttpServer())
-        .get('/api/menus')
-        .expect(401);
+      const resMenu = await request(helper.getHttpServer()).get('/api/menus').expect(401);
       expect(resMenu.body.error.code).toBe('AUTH_001');
 
       // 2. Thử vào /api/daily-intakes
-      const resIntake = await request(helper.getHttpServer())
-        .get('/api/daily-intakes')
-        .expect(401);
+      const resIntake = await request(helper.getHttpServer()).get('/api/daily-intakes').expect(401);
       expect(resIntake.body.error.code).toBe('AUTH_001');
 
       // 3. Thử vào /api/nutrition-limit-sets
@@ -818,7 +816,10 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
     it('5.4 Malformed / Fake JWT Token: Gửi token rác/giả mạo -> Bị chặn 401 UNAUTHORIZED', async () => {
       const res = await request(helper.getHttpServer())
         .get('/api/menus')
-        .set('Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid_tampered_payload.signature')
+        .set(
+          'Authorization',
+          'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid_tampered_payload.signature',
+        )
         .expect(401);
 
       expect(res.body.error.code).toBe('AUTH_001');

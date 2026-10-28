@@ -95,7 +95,9 @@ async function bootstrap() {
     });
     logger.log(`📚 Swagger Docs mounted (Secured by Basic Auth) at: /${globalPrefix}/docs`);
   } else {
-    logger.log('🔒 Swagger Docs disabled in production environment (Zero Information Disclosure Gate)');
+    logger.log(
+      '🔒 Swagger Docs disabled in production environment (Zero Information Disclosure Gate)',
+    );
   }
 
   const port = process.env.PORT || 8080;

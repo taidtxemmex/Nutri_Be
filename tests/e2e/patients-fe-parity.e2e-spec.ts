@@ -326,7 +326,7 @@ describe('Sprint 5 Suite 1: NutriFE Parity & Contract Compatibility (Task 5.1)',
         gender: 'NAM',
         weight: 65.0,
         height: 170.0,
-        note: '\'; DROP TABLE benh_nhan; --',
+        note: "'; DROP TABLE benh_nhan; --",
       };
 
       const res = await request(helper.getHttpServer())
@@ -336,7 +336,7 @@ describe('Sprint 5 Suite 1: NutriFE Parity & Contract Compatibility (Task 5.1)',
         .expect(201);
 
       expect(res.body.data.fullName).toBe('<script>alert("XSS")</script>');
-      expect(res.body.data.note).toBe('\'; DROP TABLE benh_nhan; --');
+      expect(res.body.data.note).toBe("'; DROP TABLE benh_nhan; --");
 
       // Layer 3 DB check: Bảng `benh_nhan` còn nguyên vẹn, bản ghi lưu dạng text an toàn
       const count = await helper.getPrisma().benh_nhan.count();
@@ -346,14 +346,14 @@ describe('Sprint 5 Suite 1: NutriFE Parity & Contract Compatibility (Task 5.1)',
         where: { id: BigInt(res.body.data.id) },
       });
       expect(dbRow?.ho_ten).toBe('<script>alert("XSS")</script>');
-      expect(dbRow?.ghi_chu).toBe('\'; DROP TABLE benh_nhan; --');
+      expect(dbRow?.ghi_chu).toBe("'; DROP TABLE benh_nhan; --");
     });
 
     it('3.2 Stupid Bot: Gửi 15 request dồn dập đọc danh sách /api/patients -> Server đáp ứng ổn định 200 OK', async () => {
       const requests = Array.from({ length: 15 }, () =>
         request(helper.getHttpServer())
           .get('/api/patients')
-          .set('Authorization', `Bearer ${doctorToken}`)
+          .set('Authorization', `Bearer ${doctorToken}`),
       );
 
       const responses = await Promise.all(requests);

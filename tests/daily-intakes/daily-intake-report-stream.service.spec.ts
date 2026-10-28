@@ -1,9 +1,6 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { DailyIntakeReportStreamService } from '../../src/modules/daily-intakes/services/daily-intake-report-stream.service';
-import {
-  DailyIntakeExportRequestDto,
-  DailyIntakeExportTemplateType,
-} from '../../src/modules/daily-intakes/dto/daily-intake-export-request.dto';
+import { DailyIntakeExportRequestDto } from '../../src/modules/daily-intakes/dto/daily-intake-export-request.dto';
 import { DailyIntakesController } from '../../src/modules/daily-intakes/controllers/daily-intakes.controller';
 import { MenusController } from '../../src/modules/menus/controllers/menus.controller';
 import { IngredientsController } from '../../src/modules/ingredients/controllers/ingredients.controller';
@@ -127,9 +124,7 @@ describe('Task 6.4: Daily Intake Multi-Patient Export & Route Aliases', () => {
 
       const res = createMockResponse();
 
-      await expect(
-        service.streamTotalFoodGroupMultiPatients(dto, res, mockUser),
-      ).rejects.toThrow(
+      await expect(service.streamTotalFoodGroupMultiPatients(dto, res, mockUser)).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'EXPORT_NO_DATA' }),
         }),
@@ -266,9 +261,7 @@ describe('Task 6.4: Daily Intake Multi-Patient Export & Route Aliases', () => {
       dto.mode = 'BY_MEAL';
 
       const res = createMockResponse();
-      await expect(
-        service.streamPatientDailyNutrition(dto, res, mockUser),
-      ).rejects.toThrow(
+      await expect(service.streamPatientDailyNutrition(dto, res, mockUser)).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'PATIENT_NOT_FOUND' }),
         }),
@@ -326,9 +319,7 @@ describe('Task 6.4: Daily Intake Multi-Patient Export & Route Aliases', () => {
       dto.mode = 'BY_MEAL';
 
       const res = createMockResponse();
-      await expect(
-        service.streamPatientDailyNutrition(dto, res, mockUser),
-      ).resolves.not.toThrow();
+      await expect(service.streamPatientDailyNutrition(dto, res, mockUser)).resolves.not.toThrow();
     });
   });
 

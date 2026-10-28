@@ -3,8 +3,8 @@ dotenv.config({ path: '.env.test', override: true });
 
 import * as request from 'supertest';
 import { TestAppHelper } from '../helpers/test-app.helper';
-import { UserRole } from '../../src/config/enums/role.enum';
 import { IntakeInputType } from '../../src/config/enums/domain.enum';
+import { ExcelThrottleGuard } from '../../src/security/excel/excel-throttle.guard';
 
 jest.setTimeout(60000);
 
@@ -125,22 +125,46 @@ describe('Sprint 6: Multi-Patient Excel Export & Route Aliases E2E Suite', () =>
     try {
       await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 0;');
       if (intakeRecord) {
-        await prisma.$executeRawUnsafe(`DELETE FROM \`khau_phan_24h_nguyen_lieu\` WHERE \`khau_phan_24h_bua_an_id\` IN (SELECT \`id\` FROM \`khau_phan_24h_bua_an\` WHERE \`khau_phan_24h_id\` = ${intakeRecord.id});`).catch(() => {});
-        await prisma.$executeRawUnsafe(`DELETE FROM \`khau_phan_24h_bua_an\` WHERE \`khau_phan_24h_id\` = ${intakeRecord.id};`).catch(() => {});
-        await prisma.$executeRawUnsafe(`DELETE FROM \`khau_phan_24h\` WHERE \`id\` = ${intakeRecord.id};`).catch(() => {});
+        await prisma
+          .$executeRawUnsafe(
+            `DELETE FROM \`khau_phan_24h_nguyen_lieu\` WHERE \`khau_phan_24h_bua_an_id\` IN (SELECT \`id\` FROM \`khau_phan_24h_bua_an\` WHERE \`khau_phan_24h_id\` = ${intakeRecord.id});`,
+          )
+          .catch(() => {});
+        await prisma
+          .$executeRawUnsafe(
+            `DELETE FROM \`khau_phan_24h_bua_an\` WHERE \`khau_phan_24h_id\` = ${intakeRecord.id};`,
+          )
+          .catch(() => {});
+        await prisma
+          .$executeRawUnsafe(`DELETE FROM \`khau_phan_24h\` WHERE \`id\` = ${intakeRecord.id};`)
+          .catch(() => {});
       }
       if (testPatient) {
-        await prisma.$executeRawUnsafe(`DELETE FROM \`benh_nhan\` WHERE \`id\` = ${testPatient.id};`).catch(() => {});
+        await prisma
+          .$executeRawUnsafe(`DELETE FROM \`benh_nhan\` WHERE \`id\` = ${testPatient.id};`)
+          .catch(() => {});
       }
       if (ingredient1 && ingredient2) {
-        await prisma.$executeRawUnsafe(`DELETE FROM \`nguyen_lieu\` WHERE \`id\` IN (${ingredient1.id}, ${ingredient2.id});`).catch(() => {});
+        await prisma
+          .$executeRawUnsafe(
+            `DELETE FROM \`nguyen_lieu\` WHERE \`id\` IN (${ingredient1.id}, ${ingredient2.id});`,
+          )
+          .catch(() => {});
       }
       if (category) {
-        await prisma.$executeRawUnsafe(`DELETE FROM \`danh_muc\` WHERE \`id\` = ${category.id};`).catch(() => {});
+        await prisma
+          .$executeRawUnsafe(`DELETE FROM \`danh_muc\` WHERE \`id\` = ${category.id};`)
+          .catch(() => {});
       }
       if (regularUser) {
-        await prisma.$executeRawUnsafe(`DELETE FROM \`ho_so_ca_nhan\` WHERE \`nguoi_dung_id\` = '${regularUser.id}';`).catch(() => {});
-        await prisma.$executeRawUnsafe(`DELETE FROM \`nguoi_dung\` WHERE \`id\` = '${regularUser.id}';`).catch(() => {});
+        await prisma
+          .$executeRawUnsafe(
+            `DELETE FROM \`ho_so_ca_nhan\` WHERE \`nguoi_dung_id\` = '${regularUser.id}';`,
+          )
+          .catch(() => {});
+        await prisma
+          .$executeRawUnsafe(`DELETE FROM \`nguoi_dung\` WHERE \`id\` = '${regularUser.id}';`)
+          .catch(() => {});
       }
       await prisma.$executeRawUnsafe('SET FOREIGN_KEY_CHECKS = 1;');
     } catch {}
@@ -151,7 +175,6 @@ describe('Sprint 6: Multi-Patient Excel Export & Route Aliases E2E Suite', () =>
   const getClientIp = () => `10.0.9.${ipCounter++}`;
 
   beforeEach(() => {
-    const { ExcelThrottleGuard } = require('../../src/security/excel/excel-throttle.guard');
     ExcelThrottleGuard.resetActiveJobs();
   });
 
@@ -303,9 +326,7 @@ describe('Sprint 6: Multi-Patient Excel Export & Route Aliases E2E Suite', () =>
 
       expect(res.status).toBe(200);
       expect(res.headers['content-type']).toContain('spreadsheetml.sheet');
-      expect(res.headers['content-disposition']).toContain(
-        'tong_khoi_luong_nhom_thuc_pham.xlsx',
-      );
+      expect(res.headers['content-disposition']).toContain('tong_khoi_luong_nhom_thuc_pham.xlsx');
     });
   });
 

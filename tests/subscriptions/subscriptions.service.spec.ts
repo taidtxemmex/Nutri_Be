@@ -7,7 +7,12 @@ import {
   CACHE_TAG_USERS,
   buildUserCacheTag,
 } from '../../src/config/constants/cache.constants';
-import { CreatePlanDto, UpdatePlanDto, SubscriptionRequestDto, SubscriptionApproveDto } from '../../src/modules/subscriptions/dto';
+import {
+  CreatePlanDto,
+  UpdatePlanDto,
+  SubscriptionRequestDto,
+  SubscriptionApproveDto,
+} from '../../src/modules/subscriptions/dto';
 
 describe('SubscriptionsService', () => {
   let service: SubscriptionsService;
@@ -100,7 +105,10 @@ describe('SubscriptionsService', () => {
       expect(result.ma_goi).toBe('PRO_1M');
       expect(result.packageCode).toBe('PRO_1M');
       expect(result.gia_tien).toBe(199000);
-      expect(mockCacheService.invalidateTags).toHaveBeenCalledWith([CACHE_TAG_PACKAGES, CACHE_TAG_PLANS]);
+      expect(mockCacheService.invalidateTags).toHaveBeenCalledWith([
+        CACHE_TAG_PACKAGES,
+        CACHE_TAG_PLANS,
+      ]);
     });
 
     it('should throw ConflictException if package code already exists', async () => {
@@ -363,7 +371,9 @@ describe('SubscriptionsService', () => {
       await service.approveSubscription('51', 'admin-id');
 
       // CRITICAL ASSERTION: New expiry must be 10 days + 30 days = 40 days from now!
-      const expectedCumulativeExpiry = new Date(existingExpiry.getTime() + 30 * 24 * 60 * 60 * 1000);
+      const expectedCumulativeExpiry = new Date(
+        existingExpiry.getTime() + 30 * 24 * 60 * 60 * 1000,
+      );
       expect(mockPrisma.nguoi_dung.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'user-active-pro' },
@@ -454,7 +464,9 @@ describe('SubscriptionsService', () => {
         trang_thai: 'APPROVED',
       });
 
-      await expect(service.approveSubscription('52', 'admin-id')).rejects.toThrow(BadRequestException);
+      await expect(service.approveSubscription('52', 'admin-id')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should reject payment request and record reason', async () => {
@@ -485,7 +497,9 @@ describe('SubscriptionsService', () => {
       });
 
       const dto = new SubscriptionApproveDto();
-      await expect(service.rejectSubscription('54', 'admin-id', dto)).rejects.toThrow(BadRequestException);
+      await expect(service.rejectSubscription('54', 'admin-id', dto)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

@@ -116,7 +116,9 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
 
   await prisma.$transaction(upsertOps);
 
-  console.log(`   ✅ Đã khởi tạo/cập nhật thành công ${initialUsers.length} tài khoản người dùng theo chuẩn Enum.`);
+  console.log(
+    `   ✅ Đã khởi tạo/cập nhật thành công ${initialUsers.length} tài khoản người dùng theo chuẩn Enum.`,
+  );
 }
 
 if (require.main === module) {
@@ -124,4 +126,3 @@ if (require.main === module) {
   const { runStandaloneSeed } = require('./standalone-runner');
   runStandaloneSeed('users', (p: PrismaClient) => seedUsers(p));
 }
-

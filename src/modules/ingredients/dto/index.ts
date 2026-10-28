@@ -5,3 +5,4 @@ export * from './ingredient-summary.dto';
 export * from './ingredient-response.dto';
 export * from './export-ingredient.dto';
 export * from './calculate-summary.dto';
+export * from './ingredient-params.dto';

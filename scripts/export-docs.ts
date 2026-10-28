@@ -1579,7 +1579,9 @@ async function main() {
   // Bổ sung các endpoint vào document nếu cần
   const openApiSpecPath = path.join(docsDir, 'openapi-spec.json');
   fs.writeFileSync(openApiSpecPath, JSON.stringify(openApiDoc, null, 2), 'utf-8');
-  console.log(`✅ Exported OpenAPI Spec to: ${openApiSpecPath} (${(fs.statSync(openApiSpecPath).size / 1024).toFixed(1)} KB)`);
+  console.log(
+    `✅ Exported OpenAPI Spec to: ${openApiSpecPath} (${(fs.statSync(openApiSpecPath).size / 1024).toFixed(1)} KB)`,
+  );
 
   await app.close();
 
@@ -1826,7 +1828,9 @@ async function main() {
   };
 
   fs.writeFileSync(postmanCollectionPath, JSON.stringify(postmanCollection, null, 2), 'utf-8');
-  console.log(`✅ Exported Postman Collection to: ${postmanCollectionPath} (25 Controllers, 132 APIs)`);
+  console.log(
+    `✅ Exported Postman Collection to: ${postmanCollectionPath} (25 Controllers, 132 APIs)`,
+  );
 
   console.log('🎉 Task 8.2 Swagger & Postman generation completed successfully!');
 }

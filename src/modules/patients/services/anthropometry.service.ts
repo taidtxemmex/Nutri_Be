@@ -37,6 +37,39 @@ export interface BmiResult {
   bmiStatus: string | null;
 }
 
+export interface CalculateAgeParamDto {
+  dobInput?: Date | string | null;
+  birthYearOnly?: boolean;
+  referenceDate?: Date | string | null;
+}
+
+export interface CalculateBmiParamDto {
+  weightKg?: number | null;
+  heightCm?: number | null;
+}
+
+export interface CalculateBmrParamDto {
+  isMale: boolean;
+  weightKg?: number | null;
+  heightCm?: number | null;
+  age?: number | null;
+}
+
+export interface CalculateTdeeParamDto {
+  isMale: boolean;
+  weightKg?: number | null;
+  heightCm?: number | null;
+  age?: number | null;
+  activityFactor?: number | null;
+  stressFactor?: number;
+}
+
+export interface CalculateTdeeFromBmrParamDto {
+  bmr: number;
+  activityFactor?: number | null;
+  stressFactor?: number;
+}
+
 export interface AnthropometryEvaluation {
   age: number | null;
   bmi: number | null;
@@ -101,10 +134,29 @@ export class AnthropometryEngine {
    * - Giới hạn Biological Safety Range: [0, 130]. Nếu < 0 (ngày sinh ở tương lai) hoặc > 130 trả về null.
    */
   public static calculateExactAge(
-    dobInput?: Date | string | null,
-    birthYearOnly = false,
-    referenceDate?: Date | string | null,
+    paramOrDob?: CalculateAgeParamDto | Date | string | null,
+    legacyBirthYearOnly = false,
+    legacyReferenceDate?: Date | string | null,
   ): number | null {
+    let dobInput: Date | string | null | undefined;
+    let birthYearOnly: boolean;
+    let referenceDate: Date | string | null | undefined;
+
+    if (
+      paramOrDob &&
+      typeof paramOrDob === 'object' &&
+      !(paramOrDob instanceof Date) &&
+      ('dobInput' in paramOrDob || 'birthYearOnly' in paramOrDob || 'referenceDate' in paramOrDob)
+    ) {
+      dobInput = paramOrDob.dobInput;
+      birthYearOnly = Boolean(paramOrDob.birthYearOnly);
+      referenceDate = paramOrDob.referenceDate;
+    } else {
+      dobInput = paramOrDob as Date | string | null | undefined;
+      birthYearOnly = legacyBirthYearOnly;
+      referenceDate = legacyReferenceDate;
+    }
+
     if (!dobInput) return null;
 
     const birth = this.parseDateParts(dobInput);
@@ -148,7 +200,25 @@ export class AnthropometryEngine {
    * Biological Safety Range: W in [0.5, 500], H in [20, 300].
    * Nếu W <= 0 hoặc H <= 0 -> trả về null, TUYỆT ĐỐI không chia cho 0 sinh NaN/Infinity.
    */
-  public static calculateBmi(weightKg?: number | null, heightCm?: number | null): BmiResult {
+  public static calculateBmi(
+    paramOrWeight?: CalculateBmiParamDto | number | null,
+    legacyHeightCm?: number | null,
+  ): BmiResult {
+    let weightKg: number | null | undefined;
+    let heightCm: number | null | undefined;
+
+    if (
+      paramOrWeight &&
+      typeof paramOrWeight === 'object' &&
+      ('weightKg' in paramOrWeight || 'heightCm' in paramOrWeight)
+    ) {
+      weightKg = paramOrWeight.weightKg;
+      heightCm = paramOrWeight.heightCm;
+    } else {
+      weightKg = paramOrWeight as number | null | undefined;
+      heightCm = legacyHeightCm;
+    }
+
     if (
       weightKg == null ||
       heightCm == null ||
@@ -205,11 +275,28 @@ export class AnthropometryEngine {
    * Ràng buộc sinh học: W in [0.5, 500], H in [20, 300], A in [0, 130].
    */
   public static calculateBmr(
-    isMale: boolean,
-    weightKg?: number | null,
-    heightCm?: number | null,
-    age?: number | null,
+    paramOrIsMale: CalculateBmrParamDto | boolean,
+    legacyWeightKg?: number | null,
+    legacyHeightCm?: number | null,
+    legacyAge?: number | null,
   ): number {
+    let isMale: boolean;
+    let weightKg: number | null | undefined;
+    let heightCm: number | null | undefined;
+    let age: number | null | undefined;
+
+    if (paramOrIsMale && typeof paramOrIsMale === 'object' && 'isMale' in paramOrIsMale) {
+      isMale = paramOrIsMale.isMale;
+      weightKg = paramOrIsMale.weightKg;
+      heightCm = paramOrIsMale.heightCm;
+      age = paramOrIsMale.age;
+    } else {
+      isMale = paramOrIsMale as boolean;
+      weightKg = legacyWeightKg;
+      heightCm = legacyHeightCm;
+      age = legacyAge;
+    }
+
     if (
       weightKg == null ||
       heightCm == null ||
@@ -248,14 +335,37 @@ export class AnthropometryEngine {
    * Hỗ trợ StressFactor (mặc định 1.0, phẫu thuật, nhiễm trùng, bỏng)
    */
   public static calculateTdee(
-    isMale: boolean,
-    weightKg?: number | null,
-    heightCm?: number | null,
-    age?: number | null,
-    activityFactor?: number | null,
-    stressFactor = 1.0,
+    paramOrIsMale: CalculateTdeeParamDto | boolean,
+    legacyWeightKg?: number | null,
+    legacyHeightCm?: number | null,
+    legacyAge?: number | null,
+    legacyActivityFactor?: number | null,
+    legacyStressFactor = 1.0,
   ): number {
-    const bmr = this.calculateBmr(isMale, weightKg, heightCm, age);
+    let isMale: boolean;
+    let weightKg: number | null | undefined;
+    let heightCm: number | null | undefined;
+    let age: number | null | undefined;
+    let activityFactor: number | null | undefined;
+    let stressFactor: number;
+
+    if (paramOrIsMale && typeof paramOrIsMale === 'object' && 'isMale' in paramOrIsMale) {
+      isMale = paramOrIsMale.isMale;
+      weightKg = paramOrIsMale.weightKg;
+      heightCm = paramOrIsMale.heightCm;
+      age = paramOrIsMale.age;
+      activityFactor = paramOrIsMale.activityFactor;
+      stressFactor = paramOrIsMale.stressFactor ?? 1.0;
+    } else {
+      isMale = paramOrIsMale as boolean;
+      weightKg = legacyWeightKg;
+      heightCm = legacyHeightCm;
+      age = legacyAge;
+      activityFactor = legacyActivityFactor;
+      stressFactor = legacyStressFactor;
+    }
+
+    const bmr = this.calculateBmr({ isMale, weightKg, heightCm, age });
     if (bmr <= 0) return 0;
 
     const pal =
@@ -275,10 +385,24 @@ export class AnthropometryEngine {
    * Tính TDEE trực tiếp từ giá trị BMR đã tính trước
    */
   public static calculateTdeeFromBmr(
-    bmr: number,
-    activityFactor?: number | null,
-    stressFactor = 1.0,
+    paramOrBmr: CalculateTdeeFromBmrParamDto | number,
+    legacyActivityFactor?: number | null,
+    legacyStressFactor = 1.0,
   ): number {
+    let bmr: number;
+    let activityFactor: number | null | undefined;
+    let stressFactor: number;
+
+    if (paramOrBmr && typeof paramOrBmr === 'object' && 'bmr' in paramOrBmr) {
+      bmr = paramOrBmr.bmr;
+      activityFactor = paramOrBmr.activityFactor;
+      stressFactor = paramOrBmr.stressFactor ?? 1.0;
+    } else {
+      bmr = paramOrBmr as number;
+      activityFactor = legacyActivityFactor;
+      stressFactor = legacyStressFactor;
+    }
+
     if (bmr <= 0 || isNaN(bmr)) return 0;
 
     const pal =

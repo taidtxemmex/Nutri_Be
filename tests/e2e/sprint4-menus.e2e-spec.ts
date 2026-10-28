@@ -334,7 +334,7 @@ describe('Sprint 4: Menus & Menu Proposals (3-Layer E2E Suite)', () => {
 
     it('1.3 Lấy danh sách thực đơn qua cả hai định tuyến /api/menus và /api/menu (GET)', async () => {
       // Tạo trước 1 thực đơn
-      const menu = await helper.getPrisma().thuc_don.create({
+      await helper.getPrisma().thuc_don.create({
         data: {
           nguoi_dung_id: regularUser.id,
           ten_thuc_don: 'Thực đơn lấy danh sách',

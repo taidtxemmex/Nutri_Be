@@ -1,5 +1,5 @@
 import { DiseaseGroupsService } from '../../src/modules/disease-groups/services/disease-groups.service';
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 
 describe('DiseaseGroupsService', () => {
   let service: DiseaseGroupsService;
@@ -36,7 +36,7 @@ describe('DiseaseGroupsService', () => {
         { id: 1, ma_nhom: 'A', ten_nhom: 'Bệnh tim mạch' },
       ]);
 
-      const result = await service.findAll({ page: 1, limit: 10 });
+      const result = await service.findAll({ query: { page: 1, limit: 10 } });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0].code).toBe('A');
@@ -48,7 +48,7 @@ describe('DiseaseGroupsService', () => {
     it('should throw DG_001 if disease group not found', async () => {
       mockPrisma.nhom_benh.findUnique.mockResolvedValue(null);
 
-      await expect(service.findById(999)).rejects.toThrow(NotFoundException);
+      await expect(service.findById({ id: 999 })).rejects.toThrow(NotFoundException);
     });
 
     it('should return disease group details if found', async () => {
@@ -58,7 +58,7 @@ describe('DiseaseGroupsService', () => {
         ten_nhom: 'Bệnh tim mạch',
       });
 
-      const result = await service.findById(1);
+      const result = await service.findById({ id: 1 });
 
       expect(result.id).toBe(1);
       expect(result.code).toBe('A');
@@ -69,7 +69,7 @@ describe('DiseaseGroupsService', () => {
     it('should throw DG_001 if disease group not found', async () => {
       mockPrisma.nhom_benh.findUnique.mockResolvedValue(null);
 
-      await expect(service.delete(999)).rejects.toThrow(NotFoundException);
+      await expect(service.delete({ id: 999 })).rejects.toThrow(NotFoundException);
     });
 
     it('should throw DG_002 if disease group has child extended groups', async () => {
@@ -80,7 +80,7 @@ describe('DiseaseGroupsService', () => {
         },
       });
 
-      await expect(service.delete(1)).rejects.toThrow(ConflictException);
+      await expect(service.delete({ id: 1 })).rejects.toThrow(ConflictException);
     });
 
     it('should successfully delete if no child groups attached', async () => {
@@ -92,7 +92,7 @@ describe('DiseaseGroupsService', () => {
       });
       mockPrisma.nhom_benh.delete.mockResolvedValue({ id: 1 });
 
-      const result = await service.delete(1);
+      const result = await service.delete({ id: 1 });
 
       expect(result.success).toBe(true);
       expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith([

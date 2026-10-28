@@ -11,6 +11,7 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
   const helper = new TestAppHelper();
   let localStorageService: LocalStorageService;
   let baseUploadDir: string;
+  let authToken: string;
 
   // Real magic bytes buffers
   const validJpegBuffer = Buffer.from([
@@ -24,6 +25,13 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
     await helper.init();
     localStorageService = helper.getApp().get<LocalStorageService>(LocalStorageService);
     baseUploadDir = localStorageService.getBaseDir();
+
+    const user = await helper.createTestUser({
+      username: `uploader_${Date.now()}`,
+      password: 'Password123!',
+      fullName: 'Test Uploader',
+    });
+    authToken = user.token;
   });
 
   afterAll(async () => {
@@ -35,6 +43,7 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
     it('1.1 should successfully upload authentic JPEG image and assert Layer 3 Disk State', async () => {
       const res = await request(helper.getHttpServer())
         .post('/api/v1/files/upload')
+        .set('Authorization', `Bearer ${authToken}`)
         .attach('file', validJpegBuffer, 'patient_avatar.jpg')
         .expect(200);
 
@@ -62,6 +71,7 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
     it('1.2 should successfully upload via legacy alias POST /api/files and assert Layer 3 Disk State', async () => {
       const res = await request(helper.getHttpServer())
         .post('/api/files')
+        .set('Authorization', `Bearer ${authToken}`)
         .attach('file', validPngBuffer, 'chart.png')
         .expect(200);
 
@@ -85,6 +95,7 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
 
       const res = await request(helper.getHttpServer())
         .post('/api/v1/files/upload')
+        .set('Authorization', `Bearer ${authToken}`)
         .attach('file', fakeJpgWithPhp, 'avatar_exploit.jpg')
         .expect(400);
 
@@ -100,6 +111,7 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
 
       const res = await request(helper.getHttpServer())
         .post('/api/v1/files/upload')
+        .set('Authorization', `Bearer ${authToken}`)
         .attach('file', fakePngWithHtml, 'xss_payload.png')
         .expect(400);
 
@@ -111,6 +123,7 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
 
       const res = await request(helper.getHttpServer())
         .post('/api/v1/files/upload')
+        .set('Authorization', `Bearer ${authToken}`)
         .attach('file', fakeJpgShell, 'script.jpg')
         .expect(400);
 
@@ -156,7 +169,9 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
         fullName: 'Bác Sĩ Tải Minh Chứng',
       });
 
-      const validPdfBuffer = Buffer.from('%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<\n/Type /Catalog\n>>\nendobj\ntrailer\n<<\n>>\n%%EOF');
+      const validPdfBuffer = Buffer.from(
+        '%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<\n/Type /Catalog\n>>\nendobj\ntrailer\n<<\n>>\n%%EOF',
+      );
 
       const res = await request(helper.getHttpServer())
         .post('/api/v1/files/upload-evidence')

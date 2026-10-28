@@ -19,20 +19,27 @@ import {
   CACHE_TAG_PROFILES,
   CACHE_TAG_USERS,
   CACHE_TTL_DETAIL_SECONDS,
-  CACHE_TTL_LIST_SECONDS,
   CACHE_TTL_PERPETUAL,
   buildUserAuthCacheKey,
   buildUserCacheTag,
   buildUserDetailCacheKey,
 } from '../../../config/constants/cache.constants';
-import {
-  DEFAULT_LIMIT,
-  DEFAULT_PAGE,
-  MAX_LIMIT,
-} from '../../../config/constants/pagination.constants';
 import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
-import { QueryUsersDto, UpdateUserInfoReqDto, CreateUserItemDto } from '../dto';
-import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
+import {
+  QueryUsersDto,
+  FindAllUsersParamsDto,
+  FindUserByIdParamsDto,
+  GetMeParamsDto,
+  GetUserInfoParamsDto,
+  UpdateUserInfoParamsDto,
+  UpdateUserRoleParamsDto,
+  UpdateUserStatusParamsDto,
+  CheckProfileParamsDto,
+  SoftDeleteUserParamsDto,
+  SoftDeleteBatchParamsDto,
+  UpdateStatusBatchParamsDto,
+  CreateBatchUsersParamsDto,
+} from '../dto';
 import { UserInfoViewResponse } from '../interfaces/user-info-view.interface';
 
 export interface PaginatedUsersResult {
@@ -94,15 +101,18 @@ export class UsersService {
    * Danh sách người dùng có phân trang (Admin only) - Anti-Overfetching: Explicit select
    * Tích hợp Caching 15s và chuẩn hóa query params (Rule 23 & Rule 25)
    */
-  async findAll(query: QueryUsersDto): Promise<PaginatedUsersResult> {
-    const { page, limit, skip } = normalizePagination(query);
+  async findAll({ query = {} }: FindAllUsersParamsDto = {}): Promise<PaginatedUsersResult> {
+    const { page, limit, skip } = normalizePagination(query as QueryUsersDto);
 
-    const cacheKey = this.cacheService?.generateKey('users:list', {
-      page,
-      limit,
-      search: query.search,
-      role: query.role,
-      active: query.active,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'users:list',
+      params: {
+        page,
+        limit,
+        search: query.search,
+        role: query.role,
+        active: query.active,
+      },
     });
 
     if (this.cacheService && cacheKey) {
@@ -195,7 +205,7 @@ export class UsersService {
   /**
    * Lấy chi tiết tài khoản theo ID - Tích hợp Shared Entity Cache (Identity Map) vĩnh viễn
    */
-  async findById(id: string): Promise<UserDetailResult> {
+  async findById({ id }: FindUserByIdParamsDto): Promise<UserDetailResult> {
     const fetchUser = async () => {
       const user = await this.prisma.nguoi_dung.findUnique({
         where: { id },
@@ -250,8 +260,8 @@ export class UsersService {
   /**
    * Lấy chi tiết thông tin của người dùng hiện tại (/users/me)
    */
-  async getMe(currentUserId: string) {
-    const user = await this.findById(currentUserId);
+  async getMe({ currentUserId }: GetMeParamsDto) {
+    const user = await this.findById({ id: currentUserId });
     const dobStr = user.ho_so_ca_nhan?.ngay_sinh
       ? new Date(user.ho_so_ca_nhan.ngay_sinh).toISOString().split('T')[0]
       : '';
@@ -285,18 +295,21 @@ export class UsersService {
   /**
    * Vá lỗ hổng IDOR PII - Trả đúng schema { viewUser, viewJob } cho InfomationUser.jsx
    */
-  async getUserInfo(
-    targetUserId: string,
-    currentUser: AuthenticatedUser,
-  ): Promise<UserInfoViewResponse> {
+  async getUserInfo({
+    targetUserId,
+    currentUser,
+  }: GetUserInfoParamsDto): Promise<UserInfoViewResponse> {
     // 1. Kiểm tra IDOR Defense
-    this.idorDefenseService.assertUserOwnershipOrAdmin(
-      currentUser.id,
-      currentUser.role,
+    this.idorDefenseService.assertUserOwnershipOrAdmin({
+      currentUserId: currentUser.id,
+      currentUserRole: currentUser.role,
       targetUserId,
-    );
+    });
 
-    const cacheKey = this.cacheService?.generateKey('users:info', { targetUserId });
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'users:info',
+      params: { targetUserId },
+    });
     if (this.cacheService && cacheKey) {
       const cached = await this.cacheService.get<UserInfoViewResponse>(cacheKey);
       if (cached) {
@@ -382,14 +395,18 @@ export class UsersService {
   /**
    * Cập nhật thông tin cá nhân & nghề nghiệp (Hỗ trợ cả /users/me và alias /api/users/update-info)
    */
-  async updateUserInfo(
-    dto: UpdateUserInfoReqDto,
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string }> {
+  async updateUserInfo({
+    dto,
+    currentUser,
+  }: UpdateUserInfoParamsDto): Promise<{ success: boolean; message: string }> {
     const targetId = dto.userId || dto.keycloakUserId || currentUser.id;
 
     // Kiểm tra IDOR Defense
-    this.idorDefenseService.assertUserOwnershipOrAdmin(currentUser.id, currentUser.role, targetId);
+    this.idorDefenseService.assertUserOwnershipOrAdmin({
+      currentUserId: currentUser.id,
+      currentUserRole: currentUser.role,
+      targetUserId: targetId,
+    });
 
     const user = await this.prisma.nguoi_dung.findUnique({
       where: { id: targetId },
@@ -473,11 +490,11 @@ export class UsersService {
   /**
    * Cập nhật vai trò người dùng (Admin only)
    */
-  async updateRole(
-    targetUserId: string,
-    newRole: UserRole,
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string; role: string }> {
+  async updateRole({
+    targetUserId,
+    newRole,
+    currentUser,
+  }: UpdateUserRoleParamsDto): Promise<{ success: boolean; message: string; role: string }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     const user = await this.prisma.nguoi_dung.findUnique({
@@ -516,11 +533,11 @@ export class UsersService {
   /**
    * Cập nhật trạng thái hoạt động (active) của người dùng (Admin only)
    */
-  async updateStatus(
-    targetUserId: string,
-    isActive: boolean,
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string; active: boolean }> {
+  async updateStatus({
+    targetUserId,
+    isActive,
+    currentUser,
+  }: UpdateUserStatusParamsDto): Promise<{ success: boolean; message: string; active: boolean }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     const user = await this.prisma.nguoi_dung.findUnique({
@@ -559,7 +576,7 @@ export class UsersService {
   /**
    * Kiểm tra người dùng đã hoàn thiện hồ sơ chưa (Tương thích FE cũ: check-profile)
    */
-  async checkProfile(userId: string): Promise<{ profileComplete: boolean }> {
+  async checkProfile({ userId }: CheckProfileParamsDto): Promise<{ profileComplete: boolean }> {
     const user = await this.prisma.nguoi_dung.findUnique({
       where: { id: userId },
       select: { profile_completed: true, deleted_at: true },
@@ -577,10 +594,10 @@ export class UsersService {
   /**
    * Xóa mềm người dùng và thu hồi toàn bộ Refresh Token (Admin only)
    */
-  async softDeleteUser(
-    targetUserId: string,
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string }> {
+  async softDeleteUser({
+    targetUserId,
+    currentUser,
+  }: SoftDeleteUserParamsDto): Promise<{ success: boolean; message: string }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     const user = await this.prisma.nguoi_dung.findUnique({
@@ -624,10 +641,11 @@ export class UsersService {
   /**
    * Xóa mềm hàng loạt người dùng theo batch (Rule 20 - Chunked Atomic Commit & Batching)
    */
-  async softDeleteBatch(
-    userIds: string[],
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string; affectedCount: number }> {
+  async softDeleteBatch({ userIds, currentUser }: SoftDeleteBatchParamsDto): Promise<{
+    success: boolean;
+    message: string;
+    affectedCount: number;
+  }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     if (!userIds || userIds.length === 0) {
@@ -703,11 +721,11 @@ export class UsersService {
   /**
    * Cập nhật trạng thái hoạt động (active/inactive) hàng loạt người dùng theo batch
    */
-  async updateStatusBatch(
-    userIds: string[],
-    isActive: boolean,
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string; affectedCount: number }> {
+  async updateStatusBatch({ userIds, isActive, currentUser }: UpdateStatusBatchParamsDto): Promise<{
+    success: boolean;
+    message: string;
+    affectedCount: number;
+  }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     if (!userIds || userIds.length === 0) {
@@ -770,10 +788,11 @@ export class UsersService {
   /**
    * Tạo hàng loạt người dùng theo batch transaction (Rule 20 - Chunked Atomic Commit & Batching)
    */
-  async createBatch(
-    dtoList: CreateUserItemDto[],
-    currentUser: AuthenticatedUser,
-  ): Promise<{ success: boolean; message: string; createdCount: number }> {
+  async createBatch({ dtoList, currentUser }: CreateBatchUsersParamsDto): Promise<{
+    success: boolean;
+    message: string;
+    createdCount: number;
+  }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     if (!dtoList || dtoList.length === 0) {

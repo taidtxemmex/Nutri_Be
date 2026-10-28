@@ -92,10 +92,12 @@ export class SubscriptionGuard implements CanActivate {
     }
 
     // 3. Nếu user là USERPRO: Kiểm tra pro_expired_at
-    if (userRole === UserRole.USERPRO || userRole === 'USERPRO') {
-      if (proExpiredAt && new Date(proExpiredAt).getTime() >= Date.now()) {
-        return true;
-      }
+    if (
+      (userRole === UserRole.USERPRO || userRole === 'USERPRO') &&
+      proExpiredAt &&
+      new Date(proExpiredAt).getTime() >= Date.now()
+    ) {
+      return true;
     }
 
     // 4. Ngược lại (nếu là USER hoặc pro_expired_at < new Date() hoặc không hợp lệ):

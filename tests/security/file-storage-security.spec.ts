@@ -1,8 +1,4 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ConfigService } from '@nestjs/config';
@@ -11,7 +7,6 @@ import { FileMagicBytePipe } from '../../src/modules/files/pipes/file-magic-byte
 import { LocalStorageService } from '../../src/modules/files/services/local-storage.service';
 import { FilesController } from '../../src/modules/files/controllers/files.controller';
 import { PrismaService } from '../../src/core/database/prisma.service';
-import { FILE_SECURITY_CONFIG } from '../../src/config/constants/file.constants';
 
 describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-22, CWE-113)', () => {
   // Test sandbox directories
@@ -84,10 +79,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
       } as any,
     };
 
-    filesController = new FilesController(
-      storageService,
-      prismaService as PrismaService,
-    );
+    filesController = new FilesController(storageService, prismaService as PrismaService);
   });
 
   // =========================================================================
@@ -234,12 +226,12 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
 
     it('1.10 should REJECT empty files, null files, or corrupted buffers (< 4 bytes) with 400 Bad Request', async () => {
       await expect(filePipe.transform(null as any)).rejects.toThrow(BadRequestException);
-      await expect(
-        filePipe.transform({ buffer: null } as any),
-      ).rejects.toThrow(BadRequestException);
-      await expect(
-        filePipe.transform({ buffer: Buffer.from([]) } as any),
-      ).rejects.toThrow(BadRequestException);
+      await expect(filePipe.transform({ buffer: null } as any)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(filePipe.transform({ buffer: Buffer.from([]) } as any)).rejects.toThrow(
+        BadRequestException,
+      );
       await expect(
         filePipe.transform({ buffer: Buffer.from([0xff, 0xd8]) } as any),
       ).rejects.toThrow(BadRequestException);
@@ -345,33 +337,22 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
       ];
 
       for (const traversalPath of maliciousTraversalPaths) {
-        await expect(storageService.getFile(traversalPath)).rejects.toThrow(
-          BadRequestException,
-        );
-        await expect(storageService.delete(traversalPath)).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(storageService.getFile(traversalPath)).rejects.toThrow(BadRequestException);
+        await expect(storageService.delete(traversalPath)).rejects.toThrow(BadRequestException);
       }
     });
 
     it('2.3 should HARD BLOCK Null Byte Injection (%00, \\0) with 400 Bad Request', async () => {
-      const nullBytePaths = [
-        'valid_image.jpg\0.php',
-        '2026/10/file.jpg%00.sh',
-      ];
+      const nullBytePaths = ['valid_image.jpg\0.php', '2026/10/file.jpg%00.sh'];
 
       for (const nullPath of nullBytePaths) {
-        await expect(storageService.getFile(nullPath)).rejects.toThrow(
-          BadRequestException,
-        );
+        await expect(storageService.getFile(nullPath)).rejects.toThrow(BadRequestException);
       }
     });
 
     it('2.4 should throw 404 NotFoundException when querying non-existent file inside baseDir', async () => {
       const nonExistentKey = '2026/10/non-existent-uuid-12345.jpg';
-      await expect(storageService.getFile(nonExistentKey)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(storageService.getFile(nonExistentKey)).rejects.toThrow(NotFoundException);
     });
 
     it('2.5 should delete file cleanly from disk upon safe deletion request', async () => {
@@ -394,11 +375,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
 
     it('2.6 should generate and cryptographically verify time-limited HMAC signatures', () => {
       const testObjectKey = '2026/10/confidential_record.pdf';
-      const previewUrl = storageService.generateSignedUrl(
-        testObjectKey,
-        'preview',
-        600,
-      );
+      const previewUrl = storageService.generateSignedUrl(testObjectKey, 'preview', 600);
 
       expect(previewUrl).toContain('objectKey=');
       expect(previewUrl).toContain('token=');
@@ -409,12 +386,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
       const expires = Number(urlObj.searchParams.get('expires')!);
 
       // 1. Chữ ký chuẩn -> Xác thực thành công
-      const isValid = storageService.verifySignedUrl(
-        testObjectKey,
-        token,
-        expires,
-        'preview',
-      );
+      const isValid = storageService.verifySignedUrl(testObjectKey, token, expires, 'preview');
       expect(isValid).toBe(true);
 
       // 2. Tấn công sửa đổi objectKey -> Bị phát hiện và từ chối
@@ -534,10 +506,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
       } as Express.Multer.File;
 
       const uploadResult = await storageService.upload(mockFile);
-      const previewUrl = storageService.generateSignedUrl(
-        uploadResult.objectKey,
-        'preview',
-      );
+      const previewUrl = storageService.generateSignedUrl(uploadResult.objectKey, 'preview');
       const url = new URL(previewUrl);
       const token = url.searchParams.get('token')!;
       const expires = url.searchParams.get('expires')!;
@@ -554,12 +523,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
         }),
       } as unknown as Response;
 
-      await filesController.previewFile(
-        uploadResult.objectKey,
-        token,
-        expires,
-        res,
-      );
+      await filesController.previewFile(uploadResult.objectKey, token, expires, res);
 
       expect(headersSet['Content-Type']).toBe('application/octet-stream');
       expect(headersSet['X-Content-Type-Options']).toBe('nosniff');
@@ -589,10 +553,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
       } as Express.Multer.File;
 
       const uploadResult = await storageService.upload(mockFile);
-      const downloadUrl = storageService.generateSignedUrl(
-        uploadResult.objectKey,
-        'download',
-      );
+      const downloadUrl = storageService.generateSignedUrl(uploadResult.objectKey, 'download');
       const url = new URL(downloadUrl);
       const token = url.searchParams.get('token')!;
       const expires = url.searchParams.get('expires')!;

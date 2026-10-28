@@ -40,10 +40,7 @@ export function createCorsOptions(): CorsOptions {
     .filter((o) => o.length > 0);
 
   // Tạo tập hợp whitelist không trùng lặp
-  const allowedOriginsSet = new Set<string>([
-    ...DEFAULT_PRODUCTION_ORIGINS,
-    ...envOrigins,
-  ]);
+  const allowedOriginsSet = new Set<string>([...DEFAULT_PRODUCTION_ORIGINS, ...envOrigins]);
 
   if (!isProduction) {
     DEVELOPMENT_ORIGINS.forEach((o) => allowedOriginsSet.add(o));
@@ -54,7 +51,10 @@ export function createCorsOptions(): CorsOptions {
   logger.log(`[CORS Whitelist] Total allowed origins: ${allowedOrigins.length}`);
 
   return {
-    origin: (requestOrigin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) => {
+    origin: (
+      requestOrigin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       // Cho phép request nội bộ, CLI, cURL hoặc Postman (không mang header Origin)
       if (!requestOrigin) {
         return callback(null, true);
@@ -68,7 +68,9 @@ export function createCorsOptions(): CorsOptions {
       // Chặn và ghi log mọi nỗ lực truy cập từ domain không được phép
       logger.warn(`[CORS BLOCKED] Rejected unauthorized origin: ${requestOrigin}`);
       return callback(
-        new ForbiddenException(`CORS Security Violation: Origin '${requestOrigin}' is not allowed by Nutri Security Policy.`),
+        new ForbiddenException(
+          `CORS Security Violation: Origin '${requestOrigin}' is not allowed by Nutri Security Policy.`,
+        ),
         false,
       );
     },
@@ -88,10 +90,10 @@ export function createCorsOptions(): CorsOptions {
     ],
     exposedHeaders: [
       'Content-Disposition', // Cần thiết để Frontend đọc tên file tải về (.xlsx, .pdf, .png)
-      'X-Total-Count',       // Phục vụ phân trang
-      'X-Cache-Version',     // Phục vụ đồng bộ cache timestamp
-      'X-Trace-Id',          // Phục vụ truy vết lỗi hệ thống
-      'Retry-After',         // Phục vụ thông báo Rate Limiting
+      'X-Total-Count', // Phục vụ phân trang
+      'X-Cache-Version', // Phục vụ đồng bộ cache timestamp
+      'X-Trace-Id', // Phục vụ truy vết lỗi hệ thống
+      'Retry-After', // Phục vụ thông báo Rate Limiting
     ],
     maxAge: 86400, // Cache kết quả Preflight request trong 24 giờ (giảm tải OPTIONS)
     preflightContinue: false,

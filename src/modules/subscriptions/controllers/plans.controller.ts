@@ -1,18 +1,14 @@
-import {
-  Get,
-  Post,
-  Put,
-  Delete,
-  Body,
-  Param,
-  HttpCode,
-  HttpStatus,
-  Query,
-} from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { Get, Post, Put, Delete, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { SubscriptionsService } from '../services/subscriptions.service';
 import { CreatePlanDto, UpdatePlanDto, PlanResponseDto } from '../dto';
-import { ApiController, ApiStandardResponse, Auth, CurrentUser, Public } from '../../../common/decorators';
+import {
+  ApiController,
+  ApiStandardResponse,
+  Auth,
+  CurrentUser,
+  Public,
+} from '../../../common/decorators';
 import { UserRole } from '../../../config/enums/role.enum';
 
 @ApiController('Plans', ['plans', 'package', 'packages'])
@@ -28,19 +24,27 @@ export class PlansController {
     description: 'Danh sách gói cước kích hoạt',
   })
   async getActivePlans(): Promise<PlanResponseDto[]> {
-    return this.subscriptionsService.findAllPlans(true);
+    return this.subscriptionsService.findAllPlans({ activeOnly: true });
   }
 
-  @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
+  @Public()
   @Get(['all', ''])
-  @ApiOperation({ summary: 'Admin lấy danh sách toàn bộ gói cước (bao gồm cả tạm ngưng)' })
+  @ApiOperation({
+    summary: 'Lấy danh sách gói cước (Admin xem tất cả, Guest/User xem gói kích hoạt)',
+  })
   @ApiStandardResponse({
     type: PlanResponseDto,
     isArray: true,
-    description: 'Toàn bộ danh sách gói cước cho quản trị viên',
+    description: 'Danh sách gói cước',
   })
-  async getAllPlansAdmin(): Promise<PlanResponseDto[]> {
-    return this.subscriptionsService.findAllPlans(false);
+  async getAllPlans(@CurrentUser() user?: any): Promise<PlanResponseDto[]> {
+    const isAdmin =
+      user &&
+      (user.role === UserRole.ADMIN ||
+        user.role === UserRole.SUPERADMIN ||
+        user.role === 'ADMIN' ||
+        user.role === 'SUPERADMIN');
+    return this.subscriptionsService.findAllPlans({ activeOnly: !isAdmin });
   }
 
   @Public()
@@ -52,7 +56,7 @@ export class PlansController {
     description: 'Chi tiết gói cước',
   })
   async getPlanById(@Param('id') id: string): Promise<PlanResponseDto> {
-    return this.subscriptionsService.findPlanById(id);
+    return this.subscriptionsService.findPlanById({ id });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -67,7 +71,7 @@ export class PlansController {
     @Body() dto: CreatePlanDto,
     @CurrentUser() admin: any,
   ): Promise<PlanResponseDto> {
-    return this.subscriptionsService.createPlan(dto, admin);
+    return this.subscriptionsService.createPlan({ dto, adminUser: admin });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -86,7 +90,7 @@ export class PlansController {
     if (!id) {
       throw new Error('ID gói cước không được để trống khi gọi update-package');
     }
-    return this.subscriptionsService.updatePlan(id, dto, admin);
+    return this.subscriptionsService.updatePlan({ id, dto, adminUser: admin });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -103,7 +107,7 @@ export class PlansController {
     @Body() dto: UpdatePlanDto,
     @CurrentUser() admin: any,
   ): Promise<PlanResponseDto> {
-    return this.subscriptionsService.updatePlan(id, dto, admin);
+    return this.subscriptionsService.updatePlan({ id, dto, adminUser: admin });
   }
 
   @Auth(UserRole.SUPERADMIN, UserRole.ADMIN)
@@ -118,6 +122,6 @@ export class PlansController {
     @Param('id') id: string,
     @CurrentUser() admin: any,
   ): Promise<{ message: string; id: string }> {
-    return this.subscriptionsService.deletePlan(id, admin);
+    return this.subscriptionsService.deletePlan({ id, adminUser: admin });
   }
 }

@@ -28,17 +28,17 @@ import {
       {
         name: 'default',
         ttl: THROTTLE_DEFAULT_TTL * 1000, // 60s -> 60000ms
-        limit: THROTTLE_DEFAULT_LIMIT,     // 100 req / min
+        limit: THROTTLE_DEFAULT_LIMIT, // 100 req / min
       },
       {
         name: 'auth',
-        ttl: THROTTLE_AUTH_TTL * 1000,       // 60s -> 60000ms
-        limit: THROTTLE_AUTH_LIMIT,         // 5 req / min cho /api/auth/login, /api/auth/register
+        ttl: THROTTLE_AUTH_TTL * 1000, // 60s -> 60000ms
+        limit: THROTTLE_AUTH_LIMIT, // 5 req / min cho /api/auth/login, /api/auth/register
       },
       {
         name: 'sensitive',
-        ttl: THROTTLE_SENSITIVE_TTL * 1000,  // 60s -> 60000ms
-        limit: THROTTLE_SENSITIVE_LIMIT,    // 3 req / min cho forgot-password, reset-password
+        ttl: THROTTLE_SENSITIVE_TTL * 1000, // 60s -> 60000ms
+        limit: THROTTLE_SENSITIVE_LIMIT, // 3 req / min cho forgot-password, reset-password
       },
     ]),
   ],

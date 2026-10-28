@@ -34,7 +34,7 @@ describe('ProfilesService', () => {
 
   describe('getAllProfiles (UserTable.jsx compatibility)', () => {
     it('should return { items: [...] } structure matching UserTable.jsx contract', async () => {
-      const result = await profilesService.getAllProfiles({ page: 0, size: 20 });
+      const result = await profilesService.getAllProfiles({ filter: { page: 0, size: 20 } });
 
       expect(result).toHaveProperty('items');
       expect(Array.isArray(result.items)).toBe(true);
@@ -72,7 +72,7 @@ describe('ProfilesService', () => {
         },
       });
 
-      const result = await profilesService.getMyProfile('uuid-1');
+      const result = await profilesService.getMyProfile({ userId: 'uuid-1' });
 
       expect(result.fullName).toBe('Nguyễn Minh Trí');
       expect(result.username).toBe('bs_minhtri');
@@ -85,9 +85,12 @@ describe('ProfilesService', () => {
         deleted_at: null,
       });
 
-      const result = await profilesService.updateMyProfile('uuid-1', {
-        fullName: 'Nguyễn Minh Trí Updated',
-        phone: '0911223344',
+      const result = await profilesService.updateMyProfile({
+        userId: 'uuid-1',
+        dto: {
+          fullName: 'Nguyễn Minh Trí Updated',
+          phone: '0911223344',
+        },
       });
 
       expect(result.success).toBe(true);

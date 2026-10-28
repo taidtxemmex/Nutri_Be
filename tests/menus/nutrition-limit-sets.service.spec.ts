@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { NutritionLimitSetsService } from '../../src/modules/nutrition-limit-sets/services/nutrition-limit-sets.service';
 import { NutritionLimitWarning } from '../../src/config/enums/domain.enum';
 
@@ -50,15 +50,15 @@ describe('NutritionLimitSetsService', () => {
         ngay_cap_nhat: new Date(),
       });
 
-      const res = await service.create(
-        {
+      const res = await service.create({
+        dto: {
           name: 'Giới hạn tiểu đường',
           warningRule: NutritionLimitWarning.GTE_5,
           reusable: true,
           limits: { energy: 2000, carbohydrate: 250 },
         },
-        mockUser,
-      );
+        currentUser: mockUser,
+      });
 
       expect(res.id).toBe('1');
       expect(res.warningRule).toBe(NutritionLimitWarning.GTE_5);
@@ -69,14 +69,14 @@ describe('NutritionLimitSetsService', () => {
       mockPrisma.gioi_han_dinh_duong.findFirst.mockResolvedValue({ id: BigInt(1) });
 
       await expect(
-        service.create(
-          {
+        service.create({
+          dto: {
             name: 'Mẫu trùng',
             reusable: true,
             limits: {},
           },
-          mockUser,
-        ),
+          currentUser: mockUser,
+        }),
       ).rejects.toThrow(HttpException);
     });
   });
@@ -90,7 +90,70 @@ describe('NutritionLimitSetsService', () => {
 
       mockPrisma.thuc_don.count.mockResolvedValue(1);
 
-      await expect(service.delete('1', mockUser)).rejects.toThrow(HttpException);
+      await expect(service.delete({ id: '1', currentUser: mockUser })).rejects.toThrow(
+        HttpException,
+      );
+    });
+  });
+
+  describe('3. getById & getAll & update', () => {
+    it('lấy danh sách bộ giới hạn dinh dưỡng của người dùng', async () => {
+      mockPrisma.gioi_han_dinh_duong.findMany.mockResolvedValue([
+        {
+          id: BigInt(1),
+          ten_gioi_han: 'Giới hạn mẫu',
+          canh_bao: NutritionLimitWarning.OFF,
+          tai_su_dung: true,
+          gioi_han_json: {},
+          ngay_tao: new Date(),
+          ngay_cap_nhat: new Date(),
+        },
+      ]);
+
+      const res = await service.getAll({ currentUser: mockUser });
+      expect(res).toHaveLength(1);
+      expect(res[0].name).toBe('Giới hạn mẫu');
+    });
+
+    it('lấy chi tiết bộ giới hạn dinh dưỡng', async () => {
+      mockPrisma.gioi_han_dinh_duong.findUnique.mockResolvedValue({
+        id: BigInt(1),
+        nguoi_dung_id: mockUser.id,
+        ten_gioi_han: 'Giới hạn mẫu',
+        canh_bao: NutritionLimitWarning.OFF,
+        tai_su_dung: false,
+        gioi_han_json: {},
+      });
+
+      const res = await service.getById({ id: '1', currentUser: mockUser });
+      expect(res.id).toBe('1');
+    });
+
+    it('cập nhật bộ giới hạn dinh dưỡng thành công', async () => {
+      mockPrisma.gioi_han_dinh_duong.findUnique.mockResolvedValue({
+        id: BigInt(1),
+        nguoi_dung_id: mockUser.id,
+        ten_gioi_han: 'Cũ',
+        canh_bao: NutritionLimitWarning.OFF,
+        tai_su_dung: false,
+        gioi_han_json: {},
+      });
+      mockPrisma.gioi_han_dinh_duong.update.mockResolvedValue({
+        id: BigInt(1),
+        nguoi_dung_id: mockUser.id,
+        ten_gioi_han: 'Mới',
+        canh_bao: NutritionLimitWarning.OFF,
+        tai_su_dung: false,
+        gioi_han_json: {},
+        ngay_cap_nhat: new Date(),
+      });
+
+      const res = await service.update({
+        id: '1',
+        dto: { name: 'Mới' },
+        currentUser: mockUser,
+      });
+      expect(res.name).toBe('Mới');
     });
   });
 });

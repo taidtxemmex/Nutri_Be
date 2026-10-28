@@ -23,9 +23,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
     const traceId =
-      (request.headers['x-trace-id'] as string) ||
-      (request as any).id ||
-      crypto.randomUUID();
+      (request.headers['x-trace-id'] as string) || (request as any).id || crypto.randomUUID();
     response.setHeader('X-Trace-Id', traceId);
     const timestamp = new Date().toISOString();
     const locale = request.locale || 'vi';

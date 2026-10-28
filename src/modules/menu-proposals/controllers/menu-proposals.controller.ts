@@ -18,6 +18,7 @@ import {
   SkipTransform,
 } from '../../../common/decorators';
 import { UserRole } from '../../../config/enums/role.enum';
+import { ParseBigIntPipe } from '../../../common/pipes/parse-bigint.pipe';
 
 @ApiController('MenuProposals', 'menu-proposals')
 export class MenuProposalsController {
@@ -32,10 +33,10 @@ export class MenuProposalsController {
     description: 'Nộp đề xuất thành công',
   })
   async propose(
-    @Param('menuId') menuId: string,
+    @Param('menuId', ParseBigIntPipe) menuId: bigint,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string; proposalId: string }> {
-    return this.service.proposeMenu(menuId, user);
+    return this.service.proposeMenu({ menuIdParam: menuId, currentUser: user });
   }
 
   @Get()
@@ -49,7 +50,7 @@ export class MenuProposalsController {
   async getAll(
     @Query() query: MenuProposalQueryDto,
   ): Promise<{ items: MenuProposalListDto[]; total: number; page: number; limit: number }> {
-    return this.service.getAdminProposals(query);
+    return this.service.getAdminProposals({ query });
   }
 
   @Get('my')
@@ -61,7 +62,7 @@ export class MenuProposalsController {
     description: 'Lấy danh sách đề xuất của tôi thành công',
   })
   async getMy(@CurrentUser() user: any): Promise<MenuProposalListDto[]> {
-    return this.service.getMyProposals(user);
+    return this.service.getMyProposals({ currentUser: user });
   }
 
   @Get('public')
@@ -83,8 +84,11 @@ export class MenuProposalsController {
     type: MenuProposalDetailDto,
     description: 'Lấy chi tiết đề xuất thành công',
   })
-  async getFull(@Param('id') id: string, @CurrentUser() user: any): Promise<MenuProposalDetailDto> {
-    return this.service.getDetail(id, user);
+  async getFull(
+    @Param('id', ParseBigIntPipe) id: bigint,
+    @CurrentUser() user: any,
+  ): Promise<MenuProposalDetailDto> {
+    return this.service.getDetail({ id, currentUser: user });
   }
 
   @Get(':id')
@@ -98,17 +102,17 @@ export class MenuProposalsController {
     description: 'Lấy chi tiết ngày của đề xuất thành công',
   })
   async getProposalDay(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @Query('week') week: number | undefined,
     @Query('day') day: number | undefined,
     @CurrentUser() user: any,
   ): Promise<MenuDetailResponseDto> {
-    return this.service.getProposalDayDetail(
+    return this.service.getProposalDayDetail({
       id,
-      week ? Number(week) : undefined,
-      day ? Number(day) : undefined,
-      user,
-    );
+      weekNo: week ? Number(week) : undefined,
+      dayOfWeek: day ? Number(day) : undefined,
+      currentUser: user,
+    });
   }
 
   @Put(':id/approve')
@@ -116,10 +120,10 @@ export class MenuProposalsController {
   @ApiOperation({ summary: 'Admin phê duyệt đề xuất thực đơn (Chuyển thành mẫu công khai)' })
   @ApiParam({ name: 'id', description: 'ID đề xuất' })
   async approve(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.service.approve(id, user);
+    return this.service.approve({ id, currentUser: user });
   }
 
   @Put(':id/reject')
@@ -127,11 +131,11 @@ export class MenuProposalsController {
   @ApiOperation({ summary: 'Admin từ chối đề xuất thực đơn (kèm lý do)' })
   @ApiParam({ name: 'id', description: 'ID đề xuất' })
   async reject(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @Body() dto: RejectProposalDto,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.service.reject(id, dto, user);
+    return this.service.reject({ id, dto, currentUser: user });
   }
 
   @Post(':id/export')
@@ -140,14 +144,18 @@ export class MenuProposalsController {
   @ApiOperation({ summary: 'Xuất file Excel đề xuất thực đơn từ Snapshot' })
   @ApiParam({ name: 'id', description: 'ID đề xuất' })
   async exportProposal(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @Body() req: ExportMenuDto,
     @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
-    const buffer = await this.service.exportProposalExcel(id, req.columns, user);
+    const buffer = await this.service.exportProposalExcel({
+      id,
+      columns: req.columns,
+      currentUser: user,
+    });
 
-    setExcelResponseHeaders(res, `de_xuat_thuc_don_${id}.xlsx`);
+    setExcelResponseHeaders({ res, filename: `de_xuat_thuc_don_${id}.xlsx` });
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   }
@@ -157,9 +165,9 @@ export class MenuProposalsController {
   @ApiOperation({ summary: 'Xóa đề xuất thực đơn (Xóa mềm soft-delete)' })
   @ApiParam({ name: 'id', description: 'ID đề xuất' })
   async deleteProposal(
-    @Param('id') id: string,
+    @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.service.deleteProposal(id, user);
+    return this.service.deleteProposal({ idParam: id, currentUser: user });
   }
 }

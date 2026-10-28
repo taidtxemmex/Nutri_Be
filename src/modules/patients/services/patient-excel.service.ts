@@ -8,7 +8,7 @@ import { CACHE_TAG_PATIENTS } from '../../../config/constants/cache.constants';
 import { PatientCodeAllocator } from './patient-code-allocator.service';
 import { AnthropometryEngine } from './anthropometry.service';
 import { ExcelStreamReader, ErrorRowItem } from '../../../core/excel-engine';
-import { ExcelSecurityUtil } from '../../../security/excel/excel-security.util';
+import { ImportPatientExcelParamDto } from '../dto';
 
 @Injectable()
 export class PatientExcelService {
@@ -107,10 +107,7 @@ export class PatientExcelService {
   /**
    * 2. Import danh sách bệnh nhân từ file Excel
    */
-  async importExcel(
-    fileBuffer: Buffer,
-    currentUser: { id: string },
-  ): Promise<{
+  async importExcel({ fileBuffer, currentUser }: ImportPatientExcelParamDto): Promise<{
     success: boolean;
     message: string;
     count?: number;
@@ -132,9 +129,7 @@ export class PatientExcelService {
     const existingCodes = existingPatients
       .map((p) => p.ma_benh_nhan_bv)
       .filter(Boolean) as string[];
-    const existingPhones = existingPatients
-      .map((p) => p.so_dien_thoai)
-      .filter(Boolean) as string[];
+    const existingPhones = existingPatients.map((p) => p.so_dien_thoai).filter(Boolean) as string[];
 
     const allocator = new PatientCodeAllocator(existingCodes, existingPhones);
     const codesInFile = new Set<string>();

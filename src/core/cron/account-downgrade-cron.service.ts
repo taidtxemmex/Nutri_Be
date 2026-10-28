@@ -105,9 +105,7 @@ export class AccountDowngradeCronService {
       // Cập nhật bảng dang_ky cho các user trong lô này
       const updateDangKyResult = await this.prisma.dang_ky.updateMany({
         where: {
-          OR: [
-            { nguoi_dung_id: { in: userIds }, trang_thai: { not: 'HET_HAN' } },
-          ],
+          OR: [{ nguoi_dung_id: { in: userIds }, trang_thai: { not: 'HET_HAN' } }],
         },
         data: {
           trang_thai: 'HET_HAN',
@@ -116,10 +114,7 @@ export class AccountDowngradeCronService {
 
       // Invalidate cache cho lô này
       if (this.cacheService) {
-        const tagsToInvalidate = [
-          CACHE_TAG_USERS,
-          ...userIds.map((id) => buildUserCacheTag(id)),
-        ];
+        const tagsToInvalidate = [CACHE_TAG_USERS, ...userIds.map((id) => buildUserCacheTag(id))];
         await this.cacheService.invalidateTags(tagsToInvalidate);
       }
 

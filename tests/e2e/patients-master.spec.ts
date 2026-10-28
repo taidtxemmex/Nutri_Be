@@ -5,17 +5,17 @@ import * as request from 'supertest';
 import * as ExcelJS from 'exceljs';
 import { TestAppHelper } from '../helpers/test-app.helper';
 import { UserRole } from '../../src/config/enums/role.enum';
-import { MenuType, TargetType, IntakeInputType } from '../../src/config/enums/domain.enum';
+import { MenuType, TargetType } from '../../src/config/enums/domain.enum';
 
 describe('Patients Master E2E & IDOR / 3-Layer Persistence Validation', () => {
   const helper = new TestAppHelper();
 
   let adminToken: string;
-  let adminUser: any;
+  let _adminUser: any;
   let doctorAToken: string;
   let doctorAUser: any;
   let doctorBToken: string;
-  let doctorBUser: any;
+  let _doctorBUser: any;
 
   beforeAll(async () => {
     await helper.init();
@@ -47,7 +47,7 @@ describe('Patients Master E2E & IDOR / 3-Layer Persistence Validation', () => {
       fullName: 'Quản Trị Viên Bệnh Viện',
     });
     adminToken = admin.token;
-    adminUser = admin.user;
+    _adminUser = admin.user;
 
     const docA = await helper.createTestUser({
       username: `doc_a_${uniqueSuffix}`,
@@ -65,7 +65,7 @@ describe('Patients Master E2E & IDOR / 3-Layer Persistence Validation', () => {
       fullName: 'Bác Sĩ Trần Thị B',
     });
     doctorBToken = docB.token;
-    doctorBUser = docB.user;
+    _doctorBUser = docB.user;
   });
 
   afterAll(async () => {

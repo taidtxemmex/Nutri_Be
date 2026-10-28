@@ -62,4 +62,3 @@ if (require.main === module) {
   const { runStandaloneSeed } = require('./standalone-runner');
   runStandaloneSeed('raw-sql', (p: PrismaClient, dbUrl: string) => seedRawSqlData(p, dbUrl));
 }
-

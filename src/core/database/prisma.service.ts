@@ -44,10 +44,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             args: any;
             query: (args: any) => Promise<any>;
           }) {
-            if (SOFT_DELETE_MODELS.includes(model) && args?.data) {
-              if (args.data.deleted_at === undefined) {
-                args.data.deleted_at = null;
-              }
+            if (
+              SOFT_DELETE_MODELS.includes(model) &&
+              args?.data &&
+              args.data.deleted_at === undefined
+            ) {
+              args.data.deleted_at = null;
             }
             return query(args);
           },
@@ -78,10 +80,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             args: any;
             query: (args: any) => Promise<any>;
           }) {
-            if (SOFT_DELETE_MODELS.includes(model)) {
-              if (args?.create && args.create.deleted_at === undefined) {
-                args.create.deleted_at = null;
-              }
+            if (
+              SOFT_DELETE_MODELS.includes(model) &&
+              args?.create &&
+              args.create.deleted_at === undefined
+            ) {
+              args.create.deleted_at = null;
             }
             return query(args);
           },

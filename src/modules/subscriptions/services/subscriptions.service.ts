@@ -29,6 +29,16 @@ import {
   SubscriptionRequestDto,
   SubscriptionResponseDto,
   SubscriptionApproveDto,
+  CreatePlanParamDto,
+  FindAllPlansParamDto,
+  FindPlanByIdParamDto,
+  UpdatePlanParamDto,
+  DeletePlanParamDto,
+  RequestSubscriptionParamDto,
+  ApproveSubscriptionParamDto,
+  RejectSubscriptionParamDto,
+  ListUserRequestsParamDto,
+  ListAllRequestsParamDto,
 } from '../dto';
 
 @Injectable()
@@ -67,7 +77,17 @@ export class SubscriptionsService {
   /**
    * Admin tạo mới gói cước
    */
-  async createPlan(dto: CreatePlanDto, adminUser?: any): Promise<PlanResponseDto> {
+  async createPlan(
+    paramOrDto: CreatePlanParamDto | CreatePlanDto,
+    legacyAdminUser?: any,
+  ): Promise<PlanResponseDto> {
+    const dto =
+      paramOrDto instanceof CreatePlanDto ? paramOrDto : (paramOrDto as CreatePlanParamDto).dto;
+    const _adminUser =
+      paramOrDto instanceof CreatePlanDto
+        ? legacyAdminUser
+        : (paramOrDto as CreatePlanParamDto).adminUser;
+
     const code = dto.getPackageCode();
     if (!code) {
       throw new BadRequestException('Mã gói cước không được để trống');
@@ -126,10 +146,11 @@ export class SubscriptionsService {
    * Lấy danh sách gói cước (kèm cache)
    * @param activeOnly Chỉ lấy các gói đang mở bán (dành cho người dùng / public)
    */
-  async findAllPlans(activeOnly = false): Promise<PlanResponseDto[]> {
+  async findAllPlans(param?: FindAllPlansParamDto | boolean): Promise<PlanResponseDto[]> {
+    const activeOnly = typeof param === 'boolean' ? param : (param?.activeOnly ?? false);
     const cacheKey = activeOnly
-      ? this.cacheService.generateKey(CACHE_TAG_PLANS, { active: true })
-      : this.cacheService.generateKey(CACHE_TAG_PLANS, { all: true });
+      ? this.cacheService.generateKey({ prefix: CACHE_TAG_PLANS, params: { active: true } })
+      : this.cacheService.generateKey({ prefix: CACHE_TAG_PLANS, params: { all: true } });
 
     return this.cacheService.getOrSet(
       cacheKey,
@@ -165,8 +186,14 @@ export class SubscriptionsService {
   /**
    * Lấy chi tiết một gói cước theo ID (Lean Detail Envelope)
    */
-  async findPlanById(id: string | number | bigint): Promise<PlanResponseDto> {
-    const numericId = BigInt(id);
+  async findPlanById(
+    paramOrId: FindPlanByIdParamDto | string | number | bigint,
+  ): Promise<PlanResponseDto> {
+    const rawId =
+      typeof paramOrId === 'object' && paramOrId !== null && 'id' in paramOrId
+        ? paramOrId.id
+        : (paramOrId as string | number | bigint);
+    const numericId = BigInt(rawId);
     const plan = await this.prisma.goi.findFirst({
       where: {
         id: numericId,
@@ -186,7 +213,7 @@ export class SubscriptionsService {
     });
 
     if (!plan) {
-      throw new NotFoundException(`Gói cước có ID "${id}" không tồn tại`);
+      throw new NotFoundException(`Gói cước có ID "${rawId}" không tồn tại`);
     }
 
     return PlanResponseDto.fromEntity(plan);
@@ -196,10 +223,24 @@ export class SubscriptionsService {
    * Cập nhật thông tin gói cước
    */
   async updatePlan(
-    id: string | number | bigint,
-    dto: UpdatePlanDto,
-    adminUser?: any,
+    paramOrId: UpdatePlanParamDto | string | number | bigint,
+    legacyDto?: UpdatePlanDto,
+    legacyAdminUser?: any,
   ): Promise<PlanResponseDto> {
+    let id: string | number | bigint;
+    let dto: UpdatePlanDto;
+    let _adminUser: any;
+
+    if (paramOrId && typeof paramOrId === 'object' && 'dto' in paramOrId) {
+      id = paramOrId.id;
+      dto = paramOrId.dto;
+      _adminUser = paramOrId.adminUser;
+    } else {
+      id = paramOrId as string | number | bigint;
+      dto = legacyDto!;
+      _adminUser = legacyAdminUser;
+    }
+
     const numericId = BigInt(id);
 
     const existing = await this.prisma.goi.findFirst({
@@ -254,7 +295,21 @@ export class SubscriptionsService {
   /**
    * Xóa mềm gói cước (soft delete)
    */
-  async deletePlan(id: string | number | bigint, adminUser?: any): Promise<{ message: string; id: string }> {
+  async deletePlan(
+    paramOrId: DeletePlanParamDto | string | number | bigint,
+    legacyAdminUser?: any,
+  ): Promise<{ message: string; id: string }> {
+    let id: string | number | bigint;
+    let _adminUser: any;
+
+    if (paramOrId && typeof paramOrId === 'object' && 'id' in paramOrId) {
+      id = paramOrId.id;
+      _adminUser = paramOrId.adminUser;
+    } else {
+      id = paramOrId as string | number | bigint;
+      _adminUser = legacyAdminUser;
+    }
+
     const numericId = BigInt(id);
 
     const existing = await this.prisma.goi.findFirst({
@@ -299,9 +354,19 @@ export class SubscriptionsService {
    * Người dùng gửi yêu cầu thanh toán / nâng cấp tài khoản
    */
   async requestSubscription(
-    userId: string,
-    dto: SubscriptionRequestDto,
+    paramOrUserId: RequestSubscriptionParamDto | string,
+    legacyDto?: SubscriptionRequestDto,
   ): Promise<SubscriptionResponseDto> {
+    let userId: string;
+    let dto: SubscriptionRequestDto;
+
+    if (paramOrUserId && typeof paramOrUserId === 'object' && 'userId' in paramOrUserId) {
+      userId = paramOrUserId.userId;
+      dto = paramOrUserId.dto;
+    } else {
+      userId = paramOrUserId as string;
+      dto = legacyDto!;
+    }
     const packageCode = dto.getPackageCode();
     if (!packageCode) {
       throw new BadRequestException('Mã gói cước không được để trống');
@@ -377,14 +442,14 @@ export class SubscriptionsService {
         for (const doc of dto.documents) {
           // A3: Validate externalLink scheme (phòng thủ XSS / javascript: schemes)
           if (doc.externalLink && !/^https?:\/\//i.test(doc.externalLink)) {
-            throw new BadRequestException('Đường dẫn minh chứng bên ngoài phải bắt đầu bằng http:// hoặc https://');
+            throw new BadRequestException(
+              'Đường dẫn minh chứng bên ngoài phải bắt đầu bằng http:// hoặc https://',
+            );
           }
 
           // A3: Validate objectKey (chống path traversal và null byte)
-          if (doc.objectKey) {
-            if (doc.objectKey.includes('..') || doc.objectKey.includes('\0')) {
-              throw new BadRequestException('Đường dẫn tệp tin objectKey không hợp lệ');
-            }
+          if (doc.objectKey && (doc.objectKey.includes('..') || doc.objectKey.includes('\0'))) {
+            throw new BadRequestException('Đường dẫn tệp tin objectKey không hợp lệ');
           }
 
           await tx.minh_chung.create({
@@ -415,13 +480,16 @@ export class SubscriptionsService {
     // A4: Enqueue job thông báo tạo yêu cầu thanh toán
     if (this.queueService) {
       try {
-        await this.queueService.enqueue('mail:send', {
-          to: user.ten_dang_nhap || 'user@nutri.vn',
-          subject: 'Xác nhận tạo yêu cầu thanh toán gói cước',
+        await this.queueService.enqueue({
+          queueName: 'mail:send',
           payload: {
-            maGiaoDich: created.ma_giao_dich,
-            tenGoi: packageEntity.ten_goi,
-            soTien: packageEntity.gia_tien,
+            to: user.ten_dang_nhap || 'user@nutri.vn',
+            subject: 'Xác nhận tạo yêu cầu thanh toán gói cước',
+            payload: {
+              maGiaoDich: created.ma_giao_dich,
+              tenGoi: packageEntity.ten_goi,
+              soTien: packageEntity.gia_tien,
+            },
           },
         });
       } catch (err: any) {
@@ -429,9 +497,12 @@ export class SubscriptionsService {
       }
     }
 
-    return SubscriptionResponseDto.fromEntity(created, {
-      username: user.ten_dang_nhap,
-      fullName: user.ho_so_ca_nhan?.ho_ten ?? undefined,
+    return SubscriptionResponseDto.fromEntity({
+      entity: created,
+      userProfile: {
+        username: user.ten_dang_nhap,
+        fullName: user.ho_so_ca_nhan?.ho_ten ?? undefined,
+      },
     });
   }
 
@@ -445,9 +516,20 @@ export class SubscriptionsService {
    * - Invalidate cache 'users', 'user:${userId}'
    */
   async approveSubscription(
-    requestId: string | number | bigint,
-    adminId: string,
+    paramOrId: ApproveSubscriptionParamDto | string | number | bigint,
+    legacyAdminId?: string,
   ): Promise<SubscriptionResponseDto> {
+    let requestId: string | number | bigint;
+    let adminId: string;
+
+    if (paramOrId && typeof paramOrId === 'object' && 'subscriptionId' in paramOrId) {
+      requestId = paramOrId.subscriptionId;
+      adminId = paramOrId.adminId;
+    } else {
+      requestId = paramOrId as string | number | bigint;
+      adminId = legacyAdminId!;
+    }
+
     const numericId = BigInt(requestId);
 
     const updatedRequest = await this.prisma.$transaction(async (tx) => {
@@ -460,7 +542,11 @@ export class SubscriptionsService {
           WHERE id = ${numericId}
           FOR UPDATE
         `;
-        if (lockedRequests && lockedRequests.length > 0 && lockedRequests[0]?.trang_thai !== undefined) {
+        if (
+          lockedRequests &&
+          lockedRequests.length > 0 &&
+          lockedRequests[0]?.trang_thai !== undefined
+        ) {
           request = lockedRequests[0];
         }
       } catch (err: any) {
@@ -543,7 +629,7 @@ export class SubscriptionsService {
       // 4. Cập nhật vai trò cho User (A1: Chỉ nâng lên USERPRO nếu vai trò hiện tại là USER hoặc rỗng)
       // Nếu user đang là ADMIN / SUPERADMIN / BAC_SI thì giữ nguyên đặc quyền quản trị, vẫn cộng dồn pro_expired_at
       const currentRole = (user.vai_tro || '').toUpperCase();
-      const newRole = (currentRole === 'USER' || !currentRole) ? 'USERPRO' : user.vai_tro;
+      const newRole = currentRole === 'USER' || !currentRole ? 'USERPRO' : user.vai_tro;
 
       await tx.nguoi_dung.update({
         where: { id: request.nguoi_dung_id },
@@ -580,7 +666,9 @@ export class SubscriptionsService {
         });
 
         if (updateResult.count === 0) {
-          throw new BadRequestException('Yêu cầu thanh toán đã được phê duyệt bởi quản trị viên khác.');
+          throw new BadRequestException(
+            'Yêu cầu thanh toán đã được phê duyệt bởi quản trị viên khác.',
+          );
         }
       }
 
@@ -617,12 +705,17 @@ export class SubscriptionsService {
     // A4: Enqueue job thông báo kích hoạt gói PRO
     if (this.queueService) {
       try {
-        await this.queueService.enqueue('mail:send', {
-          to: updatedRequest.nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung?.ten_dang_nhap || 'user@nutri.vn',
-          subject: 'Kích hoạt gói dịch vụ PRO thành công',
+        await this.queueService.enqueue({
+          queueName: 'mail:send',
           payload: {
-            maGiaoDich: updatedRequest.ma_giao_dich,
-            tenGoi: updatedRequest.ten_goi,
+            to:
+              updatedRequest.nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung
+                ?.ten_dang_nhap || 'user@nutri.vn',
+            subject: 'Kích hoạt gói dịch vụ PRO thành công',
+            payload: {
+              maGiaoDich: updatedRequest.ma_giao_dich,
+              tenGoi: updatedRequest.ten_goi,
+            },
           },
         });
       } catch (err: any) {
@@ -633,9 +726,12 @@ export class SubscriptionsService {
     const linkedUser =
       (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
 
-    return SubscriptionResponseDto.fromEntity(updatedRequest, {
-      username: linkedUser.ten_dang_nhap,
-      fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+    return SubscriptionResponseDto.fromEntity({
+      entity: updatedRequest,
+      userProfile: {
+        username: linkedUser.ten_dang_nhap,
+        fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+      },
     });
   }
 
@@ -643,10 +739,24 @@ export class SubscriptionsService {
    * Admin từ chối yêu cầu thanh toán
    */
   async rejectSubscription(
-    requestId: string | number | bigint,
-    adminId: string,
-    dto: SubscriptionApproveDto,
+    paramOrId: RejectSubscriptionParamDto | string | number | bigint,
+    legacyAdminId?: string,
+    legacyDto?: SubscriptionApproveDto,
   ): Promise<SubscriptionResponseDto> {
+    let requestId: string | number | bigint;
+    let adminId: string;
+    let dto: SubscriptionApproveDto;
+
+    if (paramOrId && typeof paramOrId === 'object' && 'subscriptionId' in paramOrId) {
+      requestId = paramOrId.subscriptionId;
+      adminId = paramOrId.adminId;
+      dto = paramOrId.dto;
+    } else {
+      requestId = paramOrId as string | number | bigint;
+      adminId = legacyAdminId!;
+      dto = legacyDto!;
+    }
+
     const numericId = BigInt(requestId);
 
     const updatedRequest = await this.prisma.$transaction(async (tx) => {
@@ -711,12 +821,17 @@ export class SubscriptionsService {
     // A4: Enqueue job thông báo từ chối thanh toán
     if (this.queueService) {
       try {
-        await this.queueService.enqueue('mail:send', {
-          to: (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung?.ten_dang_nhap || 'user@nutri.vn',
-          subject: 'Thông báo về yêu cầu thanh toán gói cước',
+        await this.queueService.enqueue({
+          queueName: 'mail:send',
           payload: {
-            maGiaoDich: (updatedRequest as any).ma_giao_dich,
-            lyDoTuChoi: dto.getRejectionReason(),
+            to:
+              (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung
+                ?.ten_dang_nhap || 'user@nutri.vn',
+            subject: 'Thông báo về yêu cầu thanh toán gói cước',
+            payload: {
+              maGiaoDich: (updatedRequest as any).ma_giao_dich,
+              lyDoTuChoi: dto.getRejectionReason(),
+            },
           },
         });
       } catch (err: any) {
@@ -727,16 +842,26 @@ export class SubscriptionsService {
     const linkedUser =
       (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
 
-    return SubscriptionResponseDto.fromEntity(updatedRequest, {
-      username: linkedUser.ten_dang_nhap,
-      fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+    return SubscriptionResponseDto.fromEntity({
+      entity: updatedRequest,
+      userProfile: {
+        username: linkedUser.ten_dang_nhap,
+        fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+      },
     });
   }
 
   /**
    * Lấy danh sách yêu cầu thanh toán của một người dùng
    */
-  async listUserRequests(userId: string): Promise<SubscriptionResponseDto[]> {
+  async listUserRequests(
+    paramOrUserId: ListUserRequestsParamDto | string,
+  ): Promise<SubscriptionResponseDto[]> {
+    const userId =
+      typeof paramOrUserId === 'object' && paramOrUserId !== null && 'userId' in paramOrUserId
+        ? paramOrUserId.userId
+        : (paramOrUserId as string);
+
     const requests = await this.prisma.yeu_cau_thanh_toan.findMany({
       where: { nguoi_dung_id: userId },
       orderBy: { ngay_tao: 'desc' },
@@ -751,7 +876,16 @@ export class SubscriptionsService {
   /**
    * Admin lấy danh sách toàn bộ yêu cầu thanh toán
    */
-  async listAllRequests(statuses?: string | string[]): Promise<SubscriptionResponseDto[]> {
+  async listAllRequests(
+    paramOrStatuses?: ListAllRequestsParamDto | string | string[],
+  ): Promise<SubscriptionResponseDto[]> {
+    let statuses: string | string[] | undefined;
+    if (paramOrStatuses && typeof paramOrStatuses === 'object' && 'statuses' in paramOrStatuses) {
+      statuses = paramOrStatuses.statuses;
+    } else {
+      statuses = paramOrStatuses as string | string[] | undefined;
+    }
+
     let statusFilter: string[] | undefined = undefined;
     if (statuses) {
       const rawList = Array.isArray(statuses) ? statuses : statuses.split(',');
@@ -776,9 +910,12 @@ export class SubscriptionsService {
 
     return requests.map((r) => {
       const linkedUser = (r as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
-      return SubscriptionResponseDto.fromEntity(r, {
-        username: linkedUser.ten_dang_nhap,
-        fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+      return SubscriptionResponseDto.fromEntity({
+        entity: r,
+        userProfile: {
+          username: linkedUser.ten_dang_nhap,
+          fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+        },
       });
     });
   }

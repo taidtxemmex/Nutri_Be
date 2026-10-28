@@ -30,7 +30,10 @@ const DEFAULT_ORDER = ['raw-sql', 'users', 'packages', 'sequences'];
  */
 function resolveSeedFile(input: string): { filePath: string; name: string } | null {
   const clean = input.trim();
-  const baseName = path.basename(clean).replace(/\.(ts|js)$/, '').replace(/\.seed$/, '');
+  const baseName = path
+    .basename(clean)
+    .replace(/\.(ts|js)$/, '')
+    .replace(/\.seed$/, '');
   const targetName = ALIASES[baseName.toLowerCase()] || baseName;
 
   // 1. File trong prisma/seeds/{targetName}.seed.ts
@@ -58,7 +61,9 @@ function resolveSeedFile(input: string): { filePath: string; name: string } | nu
  * Nạp động module seed và gọi hàm thực thi
  */
 async function executeSeedModule(filePath: string, name: string): Promise<void> {
-  console.log(`\n▶️  [Seed] Đang nạp và thực thi module: ${name} (${path.relative(process.cwd(), filePath)})...`);
+  console.log(
+    `\n▶️  [Seed] Đang nạp và thực thi module: ${name} (${path.relative(process.cwd(), filePath)})...`,
+  );
   const mod = await import(filePath);
 
   // Tìm hàm seed phù hợp: default export hoặc hàm có tiền tố seed / run / main
@@ -144,7 +149,12 @@ async function main() {
 
   for (const arg of rawArgs) {
     if (arg.startsWith('--only=')) {
-      targets.push(...arg.replace('--only=', '').split(',').map((s) => s.trim()));
+      targets.push(
+        ...arg
+          .replace('--only=', '')
+          .split(',')
+          .map((s) => s.trim()),
+      );
     } else if (arg.startsWith('--')) {
       const clean = arg.replace(/^--/, '').trim();
       if (clean) targets.push(clean);

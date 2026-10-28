@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { MealsService } from '../../src/modules/meals/services/meals.service';
 import { NutritionCalculatorService } from '../../src/core/nutrition-engine';
 import { UserRole } from '../../src/config/enums/role.enum';
@@ -49,14 +49,14 @@ describe('MealsService', () => {
       mockPrisma.mon_an.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.create(
-          {
+        service.create({
+          dto: {
             mealName: 'Bữa sáng',
             time: '07:00',
             dishes: [{ dishId: 999, coefficient: 1.0 }],
           },
-          { id: 'user-1' },
-        ),
+          currentUser: { id: 'user-1' },
+        }),
       ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'PROP_019' }),
@@ -103,14 +103,14 @@ describe('MealsService', () => {
       mockPrisma.bua_an.create.mockResolvedValue({ id: BigInt(1) });
       mockPrisma.bua_an.findUnique.mockResolvedValue(mockSavedMeal);
 
-      const res = await service.create(
-        {
+      const res = await service.create({
+        dto: {
           mealName: 'Bữa trưa',
           time: '12:00',
           dishes: [{ dishId: 10, coefficient: 1.0 }],
         },
-        { id: 'user-1' },
-      );
+        currentUser: { id: 'user-1' },
+      });
 
       expect(res.id).toBe('1');
       expect(res.totalMealNutrients).toBeDefined();
@@ -155,15 +155,15 @@ describe('MealsService', () => {
       };
       mockPrisma.bua_an.findUnique.mockResolvedValueOnce(updatedMealMock);
 
-      await service.update(
-        1,
-        {
+      await service.update({
+        id: 1,
+        dto: {
           mealName: 'Bữa trưa cập nhật',
           time: '12:30',
           dishes: [{ dishId: 10 }], // Không truyền coefficient
         },
-        { id: 'user-1' },
-      );
+        currentUser: { id: 'user-1' },
+      });
 
       expect(mockPrisma.chi_tiet_bua_an.createMany).toHaveBeenCalledWith({
         data: [
@@ -184,7 +184,9 @@ describe('MealsService', () => {
       });
       mockPrisma.chi_tiet_thuc_don.count.mockResolvedValue(2); // In use in 2 menus!
 
-      await expect(service.delete(1, { id: 'user-1', role: UserRole.USER })).rejects.toThrow(
+      await expect(
+        service.delete({ id: 1, currentUser: { id: 'user-1', role: UserRole.USER } }),
+      ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'MEAL_002' }),
           status: HttpStatus.CONFLICT,
@@ -199,7 +201,10 @@ describe('MealsService', () => {
       });
       mockPrisma.chi_tiet_thuc_don.count.mockResolvedValue(0);
 
-      const res = await service.delete(1, { id: 'user-1', role: UserRole.USER });
+      const res = await service.delete({
+        id: 1,
+        currentUser: { id: 'user-1', role: UserRole.USER },
+      });
       expect(res.message).toBe('Xóa bữa ăn thành công');
       expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(['meals']);
     });

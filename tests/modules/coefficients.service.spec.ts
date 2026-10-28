@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpStatus } from '@nestjs/common';
 import { CoefficientsService } from '../../src/modules/coefficients/services/coefficients.service';
 import { UserRole } from '../../src/config/enums/role.enum';
 
@@ -34,10 +34,10 @@ describe('CoefficientsService', () => {
       mockPrisma.nguyen_lieu.findFirst.mockResolvedValue(null);
 
       await expect(
-        service.create(
-          { ingredientId: 999, processingMethod: 'Luộc', coefficient: 0.8 },
-          { id: 'user-1', role: UserRole.USER },
-        ),
+        service.create({
+          dto: { ingredientId: 999, processingMethod: 'Luộc', coefficient: 0.8 },
+          currentUser: { id: 'user-1', role: UserRole.USER },
+        }),
       ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'PROP_006' }),
@@ -54,10 +54,10 @@ describe('CoefficientsService', () => {
       mockPrisma.he_so_song_chin.findFirst.mockResolvedValue({ id: BigInt(10) });
 
       await expect(
-        service.create(
-          { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.8 },
-          { id: 'user-1', role: UserRole.USER },
-        ),
+        service.create({
+          dto: { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.8 },
+          currentUser: { id: 'user-1', role: UserRole.USER },
+        }),
       ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'COEF_002' }),
@@ -74,10 +74,10 @@ describe('CoefficientsService', () => {
       mockPrisma.he_so_song_chin.findFirst.mockResolvedValue({ id: BigInt(10), is_public: true });
 
       await expect(
-        service.create(
-          { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.8, isPublic: true },
-          { id: 'admin-1', role: UserRole.ADMIN },
-        ),
+        service.create({
+          dto: { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.8, isPublic: true },
+          currentUser: { id: 'admin-1', role: UserRole.ADMIN },
+        }),
       ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'COEF_003' }),
@@ -102,10 +102,10 @@ describe('CoefficientsService', () => {
         nguyen_lieu: { ten_nguyen_lieu: 'Thịt bò' },
       });
 
-      const res = await service.create(
-        { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.85, isPublic: true },
-        { id: 'admin-1', role: UserRole.ADMIN },
-      );
+      const res = await service.create({
+        dto: { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.85, isPublic: true },
+        currentUser: { id: 'admin-1', role: UserRole.ADMIN },
+      });
 
       expect(res.id).toBe('100');
       expect(res.isPublic).toBe(true);
@@ -117,7 +117,13 @@ describe('CoefficientsService', () => {
     it('should throw COEF_001 if coefficient to update is not found', async () => {
       mockPrisma.he_so_song_chin.findUnique.mockResolvedValue(null);
 
-      await expect(service.update(999, { coefficient: 0.9 }, { id: 'user-1' })).rejects.toThrow(
+      await expect(
+        service.update({
+          id: 999,
+          dto: { coefficient: 0.9 },
+          currentUser: { id: 'user-1' },
+        }),
+      ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'COEF_001' }),
         }),
@@ -132,7 +138,11 @@ describe('CoefficientsService', () => {
       });
 
       await expect(
-        service.update(1, { coefficient: 0.9 }, { id: 'user-1', role: UserRole.USER }),
+        service.update({
+          id: 1,
+          dto: { coefficient: 0.9 },
+          currentUser: { id: 'user-1', role: UserRole.USER },
+        }),
       ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'AUTH_002' }),
@@ -149,7 +159,12 @@ describe('CoefficientsService', () => {
       });
       mockPrisma.he_so_song_chin.delete.mockRejectedValue(new Error('Foreign key violation'));
 
-      await expect(service.delete(1, { id: 'user-1', role: UserRole.USER })).rejects.toThrow(
+      await expect(
+        service.delete({
+          id: 1,
+          currentUser: { id: 'user-1', role: UserRole.USER },
+        }),
+      ).rejects.toThrow(
         expect.objectContaining({
           response: expect.objectContaining({ code: 'COEF_004' }),
           status: HttpStatus.CONFLICT,

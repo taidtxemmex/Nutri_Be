@@ -4,3 +4,4 @@ export * from './plan-response.dto';
 export * from './subscription-request.dto';
 export * from './subscription-approve.dto';
 export * from './subscription-response.dto';
+export * from './subscription-params.dto';

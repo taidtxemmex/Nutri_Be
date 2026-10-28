@@ -13,9 +13,10 @@ export class IngredientExportController {
   @HttpCode(HttpStatus.OK)
   @SkipTransform()
   @ApiOperation({
-    summary: 'Xuất danh sách nguyên liệu ra file Excel dạng Stream O(1) RAM (Tương thích đường dẫn NutriFE)',
+    summary:
+      'Xuất danh sách nguyên liệu ra file Excel dạng Stream O(1) RAM (Tương thích đường dẫn NutriFE)',
   })
   async exportIngredients(@Body() dto: ExportIngredientDto, @Res() res: Response): Promise<void> {
-    await this.excelService.streamExportIngredients(dto, res);
+    await this.excelService.streamExportIngredients({ dto, outputStream: res });
   }
 }

@@ -2,7 +2,6 @@ import { ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { EventEmitter } from 'events';
 import {
   ExcelThrottleGuard,
-  ThrottleExcelExport,
   THROTTLE_EXCEL_EXPORT_KEY,
 } from '../../src/security/excel/excel-throttle.guard';
 
@@ -156,4 +155,3 @@ describe('ExcelConcurrencyQueue & Throttler Tests (VPS 1 Core 2GB Protection)', 
     expect(ExcelThrottleGuard.getActiveJobs()).toBe(0);
   });
 });
-

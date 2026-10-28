@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { MenuProposalsService } from '../../src/modules/menu-proposals/services/menu-proposals.service';
 import { MenuType, TargetType } from '../../src/config/enums/domain.enum';
 
@@ -100,7 +100,7 @@ describe('MenuProposalsService', () => {
       mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue(null);
       mockPrisma.de_xuat_thuc_don.create.mockResolvedValue({ id: BigInt(55) });
 
-      const res = await service.proposeMenu('10', mockUser);
+      const res = await service.proposeMenu({ menuIdParam: '10', currentUser: mockUser });
 
       expect(res.success).toBe(true);
       expect(res.proposalId).toBe('55');
@@ -121,15 +121,47 @@ describe('MenuProposalsService', () => {
         nguoi_dung_id: mockUser.id,
       });
 
-      mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({ id: BigInt(1) });
+      mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        trang_thai: 'CHO_DUYET',
+      });
 
-      await expect(service.proposeMenu('10', mockUser)).rejects.toThrow(HttpException);
+      await expect(
+        service.proposeMenu({ menuIdParam: '10', currentUser: mockUser }),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('từ chối nộp đề xuất nếu thực đơn đã có đề xuất được duyệt (DA_DUYET)', async () => {
+      mockPrisma.thuc_don.findFirst.mockResolvedValue({
+        id: BigInt(10),
+        nguoi_dung_id: mockUser.id,
+      });
+
+      mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({
+        id: BigInt(2),
+        trang_thai: 'DA_DUYET',
+      });
+
+      await expect(
+        service.proposeMenu({ menuIdParam: '10', currentUser: mockUser }),
+      ).rejects.toThrow(HttpException);
+    });
+
+    it('từ chối nộp đề xuất nếu người dùng không sở hữu thực đơn và không phải admin', async () => {
+      mockPrisma.thuc_don.findFirst.mockResolvedValue({
+        id: BigInt(10),
+        nguoi_dung_id: 'other-user',
+      });
+
+      await expect(
+        service.proposeMenu({ menuIdParam: '10', currentUser: mockUser }),
+      ).rejects.toThrow(HttpException);
     });
   });
 
   describe('2. approve', () => {
     it('Admin duyệt đề xuất: cập nhật trạng thái DA_DUYET và đổi thực đơn gốc sang CONG_KHAI', async () => {
-      mockPrisma.de_xuat_thuc_don.findUnique.mockResolvedValue({
+      mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({
         id: BigInt(55),
         menu_goc_id: BigInt(10),
         trang_thai: 'CHO_DUYET',
@@ -138,7 +170,7 @@ describe('MenuProposalsService', () => {
       mockPrisma.de_xuat_thuc_don.update.mockResolvedValue({});
       mockPrisma.thuc_don.update.mockResolvedValue({});
 
-      const res = await service.approve('55', mockAdmin);
+      const res = await service.approve({ id: '55', currentUser: mockAdmin });
 
       expect(res.success).toBe(true);
       expect(mockPrisma.de_xuat_thuc_don.update).toHaveBeenCalledWith({
@@ -159,18 +191,18 @@ describe('MenuProposalsService', () => {
 
   describe('3. reject', () => {
     it('Admin từ chối đề xuất kèm lý do', async () => {
-      mockPrisma.de_xuat_thuc_don.findUnique.mockResolvedValue({
+      mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({
         id: BigInt(55),
         trang_thai: 'CHO_DUYET',
       });
 
       mockPrisma.de_xuat_thuc_don.update.mockResolvedValue({});
 
-      const res = await service.reject(
-        '55',
-        { reason: 'Tỷ lệ lipid vượt quá khuyến nghị' },
-        mockAdmin,
-      );
+      const res = await service.reject({
+        id: '55',
+        dto: { reason: 'Tỷ lệ lipid vượt quá khuyến nghị' },
+        currentUser: mockAdmin,
+      });
 
       expect(res.success).toBe(true);
       expect(mockPrisma.de_xuat_thuc_don.update).toHaveBeenCalledWith({

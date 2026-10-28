@@ -43,6 +43,63 @@ export interface SummaryRowOptions {
   height?: number;
 }
 
+export interface SetHeadersOptions {
+  height?: number;
+  bgColor?: string;
+  textColor?: string;
+  font?: Partial<ExcelJS.Font>;
+}
+
+export interface SetHeadersParamDto {
+  headers: Array<ExcelColumnDefinition>;
+  options?: SetHeadersOptions;
+}
+
+export interface AddTitleParamDto {
+  title: string;
+  options?: TitleOptions;
+}
+
+export interface AddSectionHeaderParamDto {
+  sectionTitle: string;
+  options?: SectionHeaderOptions;
+}
+
+export interface AddRowOptions {
+  height?: number;
+  font?: Partial<ExcelJS.Font>;
+  fill?: ExcelJS.Fill;
+  alignment?: Partial<ExcelJS.Alignment>;
+  border?: Partial<ExcelJS.Borders>;
+}
+
+export interface AddRowParamDto {
+  data: any[] | Record<string, any>;
+  options?: AddRowOptions;
+}
+
+export interface AddClinicalAlertRowParamDto {
+  data: any[] | Record<string, any>;
+  indicator?: 'DEFICIENCY' | 'EXCESS' | 'OPTIMAL' | 'WARNING';
+}
+
+export interface AddSummaryRowParamDto {
+  data: any[] | Record<string, any>;
+  options?: SummaryRowOptions;
+}
+
+export interface MergeCellsParamDto {
+  topOrRange: number | string;
+  left?: number;
+  bottom?: number;
+  right?: number;
+}
+
+export interface AddWorksheetParamDto {
+  sheetName: string;
+  options?: ExcelStreamOptions;
+}
+
 /**
  * BaseExcelStreamer<TRecord>
  * Lõi xuất file Excel dạng Stream chuẩn y tế với bộ nhớ O(1) < 35MB RAM
@@ -60,8 +117,7 @@ export abstract class BaseExcelStreamer<TRecord = any> {
     options: ExcelStreamOptions = {},
   ) {
     this.isHttpResponse =
-      Boolean(this.outputStream) &&
-      typeof (this.outputStream as any).setHeader === 'function';
+      Boolean(this.outputStream) && typeof (this.outputStream as any).setHeader === 'function';
 
     // 1. Cấu hình HTTP Response Headers nếu stream là Express Response
     if (this.isHttpResponse) {
@@ -99,12 +155,14 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    */
   protected async handleBackpressure(): Promise<void> {
     const stream = this.outputStream as any;
-    if (stream && typeof stream.once === 'function') {
-      if (stream.writableNeedDrain || stream._writableState?.needDrain) {
-        await new Promise<void>((resolve) => {
-          stream.once('drain', resolve);
-        });
-      }
+    if (
+      stream &&
+      typeof stream.once === 'function' &&
+      (stream.writableNeedDrain || stream._writableState?.needDrain)
+    ) {
+      await new Promise<void>((resolve) => {
+        stream.once('drain', resolve);
+      });
     }
   }
 
@@ -113,14 +171,25 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Màu Navy chuẩn #1F497D, chữ trắng, in đậm, căn giữa
    */
   public setHeaders(
-    headers: Array<ExcelColumnDefinition>,
-    options?: {
-      height?: number;
-      bgColor?: string;
-      textColor?: string;
-      font?: Partial<ExcelJS.Font>;
-    },
+    paramOrHeaders: SetHeadersParamDto | Array<ExcelColumnDefinition>,
+    legacyOptions?: SetHeadersOptions,
   ): void {
+    let headers: Array<ExcelColumnDefinition>;
+    let options: SetHeadersOptions | undefined;
+
+    if (
+      paramOrHeaders &&
+      typeof paramOrHeaders === 'object' &&
+      !Array.isArray(paramOrHeaders) &&
+      'headers' in paramOrHeaders
+    ) {
+      headers = (paramOrHeaders as SetHeadersParamDto).headers;
+      options = (paramOrHeaders as SetHeadersParamDto).options;
+    } else {
+      headers = paramOrHeaders as Array<ExcelColumnDefinition>;
+      options = legacyOptions;
+    }
+
     // Đặt cấu hình columns (key, width, style) mà không gán header trong defn
     // nhằm tránh việc ExcelJS tự động gọi getRow(1) gây lỗi "row has been committed" khi đã có title trước đó
     this.worksheet.columns = headers.map((h) => ({
@@ -151,7 +220,18 @@ export abstract class BaseExcelStreamer<TRecord = any> {
   /**
    * Thêm tiêu đề báo cáo y tế (Medical Report Title)
    */
-  public addTitle(title: string, options: TitleOptions = {}): void {
+  public addTitle(paramOrTitle: AddTitleParamDto | string, legacyOptions: TitleOptions = {}): void {
+    let title: string;
+    let options: TitleOptions;
+
+    if (paramOrTitle && typeof paramOrTitle === 'object' && 'title' in paramOrTitle) {
+      title = (paramOrTitle as AddTitleParamDto).title;
+      options = (paramOrTitle as AddTitleParamDto).options || {};
+    } else {
+      title = paramOrTitle as string;
+      options = legacyOptions;
+    }
+
     const titleRowNumber = this.rowCount + 1;
     const titleRow = this.worksheet.getRow(titleRowNumber);
     titleRow.getCell(1).value = ExcelSecurityUtil.sanitizeCellValue(title);
@@ -192,7 +272,21 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Thêm tiêu đề phân mục y tế (Section Header)
    * Ví dụ: "I. DANH SÁCH BỆNH NHÂN", "II. PHÂN TÍCH NHU CẦU DINH DƯỠNG"
    */
-  public addSectionHeader(sectionTitle: string, options: SectionHeaderOptions = {}): void {
+  public addSectionHeader(
+    paramOrTitle: AddSectionHeaderParamDto | string,
+    legacyOptions: SectionHeaderOptions = {},
+  ): void {
+    let sectionTitle: string;
+    let options: SectionHeaderOptions;
+
+    if (paramOrTitle && typeof paramOrTitle === 'object' && 'sectionTitle' in paramOrTitle) {
+      sectionTitle = (paramOrTitle as AddSectionHeaderParamDto).sectionTitle;
+      options = (paramOrTitle as AddSectionHeaderParamDto).options || {};
+    } else {
+      sectionTitle = paramOrTitle as string;
+      options = legacyOptions;
+    }
+
     const rowNumber = this.rowCount + 1;
     const row = this.worksheet.getRow(rowNumber);
     row.getCell(1).value = ExcelSecurityUtil.sanitizeCellValue(sectionTitle);
@@ -222,15 +316,25 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Thêm 1 dòng dữ liệu kèm khử độc Formula Injection và commit cuốn chiếu
    */
   public async addRow(
-    data: any[] | Record<string, any>,
-    options?: {
-      height?: number;
-      font?: Partial<ExcelJS.Font>;
-      fill?: ExcelJS.Fill;
-      alignment?: Partial<ExcelJS.Alignment>;
-      border?: Partial<ExcelJS.Borders>;
-    },
+    paramOrData: AddRowParamDto | any[] | Record<string, any>,
+    legacyOptions?: AddRowOptions,
   ): Promise<void> {
+    let data: any[] | Record<string, any>;
+    let options: AddRowOptions | undefined;
+
+    if (
+      paramOrData &&
+      typeof paramOrData === 'object' &&
+      !Array.isArray(paramOrData) &&
+      'data' in paramOrData
+    ) {
+      data = (paramOrData as AddRowParamDto).data;
+      options = (paramOrData as AddRowParamDto).options;
+    } else {
+      data = paramOrData as any[] | Record<string, any>;
+      options = legacyOptions;
+    }
+
     const sanitizedData = Array.isArray(data)
       ? ExcelSecurityUtil.sanitizeRow(data)
       : ExcelSecurityUtil.sanitizeRecord(data);
@@ -269,9 +373,25 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Tô màu cảnh báo vi chất thiếu hụt (DEFICIENCY), dư thừa (EXCESS) hoặc đạt chuẩn (OPTIMAL)
    */
   public async addClinicalAlertRow(
-    data: any[] | Record<string, any>,
-    indicator: 'DEFICIENCY' | 'EXCESS' | 'OPTIMAL' | 'WARNING' = 'OPTIMAL',
+    paramOrData: AddClinicalAlertRowParamDto | any[] | Record<string, any>,
+    legacyIndicator: 'DEFICIENCY' | 'EXCESS' | 'OPTIMAL' | 'WARNING' = 'OPTIMAL',
   ): Promise<void> {
+    let data: any[] | Record<string, any>;
+    let indicator: 'DEFICIENCY' | 'EXCESS' | 'OPTIMAL' | 'WARNING';
+
+    if (
+      paramOrData &&
+      typeof paramOrData === 'object' &&
+      !Array.isArray(paramOrData) &&
+      'data' in paramOrData
+    ) {
+      data = (paramOrData as AddClinicalAlertRowParamDto).data;
+      indicator = (paramOrData as AddClinicalAlertRowParamDto).indicator || 'OPTIMAL';
+    } else {
+      data = paramOrData as any[] | Record<string, any>;
+      indicator = legacyIndicator;
+    }
+
     let fillArgb: string = EXCEL_STYLES.COLORS.OPTIMAL_GREEN_FILL;
     let fontColorArgb: string = EXCEL_STYLES.COLORS.OPTIMAL_GREEN_TEXT;
 
@@ -310,9 +430,25 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Nền xanh nhạt, chữ đậm, viền trên mảnh viền dưới đôi chuẩn kế toán y tế
    */
   public async addSummaryRow(
-    data: any[] | Record<string, any>,
-    options?: SummaryRowOptions,
+    paramOrData: AddSummaryRowParamDto | any[] | Record<string, any>,
+    legacyOptions?: SummaryRowOptions,
   ): Promise<void> {
+    let data: any[] | Record<string, any>;
+    let options: SummaryRowOptions | undefined;
+
+    if (
+      paramOrData &&
+      typeof paramOrData === 'object' &&
+      !Array.isArray(paramOrData) &&
+      'data' in paramOrData
+    ) {
+      data = (paramOrData as AddSummaryRowParamDto).data;
+      options = (paramOrData as AddSummaryRowParamDto).options;
+    } else {
+      data = paramOrData as any[] | Record<string, any>;
+      options = legacyOptions;
+    }
+
     await this.addRow(data, {
       height: options?.height || 24,
       font: options?.font || EXCEL_STYLES.FONTS.TOTAL,
@@ -342,11 +478,27 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Lưu ý: Trong streaming mode, việc gộp ô phải thực hiện trước khi các dòng tương ứng bị commit
    */
   public mergeCells(
-    topOrRange: number | string,
+    paramOrRange: MergeCellsParamDto | number | string,
     left?: number,
     bottom?: number,
     right?: number,
   ): void {
+    if (paramOrRange && typeof paramOrRange === 'object' && 'topOrRange' in paramOrRange) {
+      const dto = paramOrRange as MergeCellsParamDto;
+      if (typeof dto.topOrRange === 'string') {
+        this.worksheet.mergeCells(dto.topOrRange);
+      } else if (
+        typeof dto.topOrRange === 'number' &&
+        typeof dto.left === 'number' &&
+        typeof dto.bottom === 'number' &&
+        typeof dto.right === 'number'
+      ) {
+        this.worksheet.mergeCells(dto.topOrRange, dto.left, dto.bottom, dto.right);
+      }
+      return;
+    }
+
+    const topOrRange = paramOrRange;
     if (typeof topOrRange === 'string') {
       this.worksheet.mergeCells(topOrRange);
     } else if (
@@ -375,9 +527,20 @@ export abstract class BaseExcelStreamer<TRecord = any> {
    * Tự động commit trang tính hiện tại trước khi tạo mới để giải phóng RAM
    */
   public async addWorksheet(
-    sheetName: string,
-    options: ExcelStreamOptions = {},
+    paramOrName: AddWorksheetParamDto | string,
+    legacyOptions: ExcelStreamOptions = {},
   ): Promise<ExcelJS.Worksheet> {
+    let sheetName: string;
+    let options: ExcelStreamOptions;
+
+    if (paramOrName && typeof paramOrName === 'object' && 'sheetName' in paramOrName) {
+      sheetName = (paramOrName as AddWorksheetParamDto).sheetName;
+      options = (paramOrName as AddWorksheetParamDto).options || {};
+    } else {
+      sheetName = paramOrName as string;
+      options = legacyOptions;
+    }
+
     if (this.worksheet) {
       await this.worksheet.commit();
     }

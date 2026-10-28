@@ -7,7 +7,7 @@ describe('Profiles E2E & Soft Delete Verification (e2e)', () => {
   let userToken: string;
   let adminToken: string;
   let regularUserId: string;
-  let adminUserId: string;
+  let _adminUserId: string;
 
   beforeAll(async () => {
     await helper.init();
@@ -32,7 +32,7 @@ describe('Profiles E2E & Soft Delete Verification (e2e)', () => {
       password: 'P@ssw0rd123!',
     });
     adminToken = admin.token;
-    adminUserId = admin.user.id;
+    _adminUserId = admin.user.id;
   });
 
   afterAll(async () => {

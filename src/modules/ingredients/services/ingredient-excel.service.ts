@@ -2,10 +2,14 @@ import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs
 import * as ExcelJS from 'exceljs';
 import { Response } from 'express';
 import { Writable, PassThrough } from 'stream';
-import * as path from 'path';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { IngredientsService, normalizeVietnameseNFC } from './ingredients.service';
-import { ExportIngredientDto } from '../dto/export-ingredient.dto';
+import {
+  GenerateIngredientTemplateParamsDto,
+  StreamExportIngredientsParamsDto,
+  ExportIngredientsParamsDto,
+  ImportIngredientExcelParamsDto,
+} from '../dto';
 import {
   ExcelStreamReader,
   ErrorRowItem,
@@ -133,7 +137,7 @@ export class IngredientExcelService {
    * Tạo file mẫu Excel 86 cột chuẩn hóa, có header tiếng Việt và cấu hình dropdown
    * Tích hợp bộ đệm CacheService 30 phút (0ms)
    */
-  async generateTemplate(columns?: string[]): Promise<Buffer> {
+  async generateTemplate({ columns }: GenerateIngredientTemplateParamsDto = {}): Promise<Buffer> {
     const colKey = columns && columns.length > 0 ? columns.slice().sort().join(',') : 'all';
     const cacheKey = `ingredient:template:${colKey}`;
 
@@ -261,7 +265,9 @@ export class IngredientExcelService {
 
     if (this.cacheService && buffer.length <= 5 * 1024 * 1024) {
       await this.cacheService.set(cacheKey, buffer.toString('base64'), 1800, 'ingredients');
-      this.logger.debug('💾 Đã lưu template nguyên liệu vào CacheService (TTL 30m, tag=ingredients)');
+      this.logger.debug(
+        '💾 Đã lưu template nguyên liệu vào CacheService (TTL 30m, tag=ingredients)',
+      );
     }
 
     return buffer;
@@ -272,31 +278,36 @@ export class IngredientExcelService {
    * Áp dụng BaseExcelStreamer, Prisma Cursor Batching 200 items (Rule 19)
    * và Lean Query Projection (Rule 11)
    */
-  async streamExportIngredients(
-    dto: ExportIngredientDto,
-    outputStream: Response | Writable,
-  ): Promise<void> {
+  async streamExportIngredients({
+    dto,
+    outputStream,
+  }: StreamExportIngredientsParamsDto): Promise<void> {
     if (outputStream && typeof (outputStream as any).setHeader === 'function') {
       const res = outputStream as Response;
       res.status(200);
-      setExcelResponseHeaders(res, 'danh_sach_nguyen_lieu.xlsx');
+      setExcelResponseHeaders({ res, filename: 'danh_sach_nguyen_lieu.xlsx' });
       res.setHeader('Transfer-Encoding', 'chunked');
       res.setHeader('X-Accel-Buffering', 'no');
     }
 
     const cacheKey = this.cacheService
-      ? this.cacheService.generateKey('export:ingredients', {
-          keyword: dto.keyword,
-          categoryId: dto.categoryId,
-          loaiProtein: dto.loaiProtein,
-          columns: dto.columns,
+      ? this.cacheService.generateKey({
+          prefix: 'export:ingredients',
+          params: {
+            keyword: dto.keyword,
+            categoryId: dto.categoryId,
+            loaiProtein: dto.loaiProtein,
+            columns: dto.columns,
+          },
         })
       : null;
 
     if (cacheKey && this.cacheService) {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
-        this.logger.debug('🚀 [Cache Hit] Trả về dữ liệu xuất nguyên liệu tức thì từ CacheService (0ms)');
+        this.logger.debug(
+          '🚀 [Cache Hit] Trả về dữ liệu xuất nguyên liệu tức thì từ CacheService (0ms)',
+        );
         const buf = Buffer.from(cached, 'base64');
         if (outputStream && typeof (outputStream as any).end === 'function') {
           (outputStream as any).end(buf);
@@ -407,7 +418,11 @@ export class IngredientExcelService {
             stt++,
             item.ten_nguyen_lieu,
             item.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc || '',
-            item.loai_protein === 'DONG_VAT' ? 'Động vật' : item.loai_protein === 'THUC_VAT' ? 'Thực vật' : (item.loai_protein || ''),
+            item.loai_protein === 'DONG_VAT'
+              ? 'Động vật'
+              : item.loai_protein === 'THUC_VAT'
+                ? 'Thực vật'
+                : item.loai_protein || '',
             item.edible ?? 100,
             ...nutrientColumns.map((col) => {
               const val = item[col.key];
@@ -433,7 +448,7 @@ export class IngredientExcelService {
   /**
    * Xuất danh sách nguyên liệu ra file Excel theo bộ lọc (Backward compatibility trả Buffer)
    */
-  async exportIngredients(dto: ExportIngredientDto): Promise<Buffer> {
+  async exportIngredients({ dto }: ExportIngredientsParamsDto): Promise<Buffer> {
     const passThrough = new PassThrough();
     const chunks: Buffer[] = [];
     passThrough.on('data', (c) => chunks.push(c));
@@ -441,7 +456,7 @@ export class IngredientExcelService {
       passThrough.on('end', () => resolve(Buffer.concat(chunks)));
       passThrough.on('error', reject);
     });
-    await this.streamExportIngredients(dto, passThrough);
+    await this.streamExportIngredients({ dto, outputStream: passThrough });
     return streamPromise;
   }
 
@@ -450,7 +465,7 @@ export class IngredientExcelService {
    * Sử dụng ExcelJS WorkbookReader streaming O(1) RAM, Smart Sheet Signature Detection
    * và Pre-fetch In-Memory Lookup Maps triệt tiêu 100% N+1 queries.
    */
-  async importExcel(fileBuffer: Buffer, userId?: string): Promise<ImportResult> {
+  async importExcel({ fileBuffer, userId }: ImportIngredientExcelParamsDto): Promise<ImportResult> {
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new HttpException(
         {
@@ -534,7 +549,11 @@ export class IngredientExcelService {
             const cellCount = Array.isArray(row.values) ? row.values.length : 100;
             for (let c = 1; c < cellCount; c++) {
               const cell = row.getCell(c);
-              const headerText = cell?.text ? cell.text.trim() : (cell?.value ? String(cell.value).trim() : '');
+              const headerText = cell?.text
+                ? cell.text.trim()
+                : cell?.value
+                  ? String(cell.value).trim()
+                  : '';
               if (headerText) {
                 currentHeaderMap.set(headerText, c);
                 currentHeaders.push(headerText);
@@ -547,13 +566,22 @@ export class IngredientExcelService {
               'Material',
               'Name',
             ]);
-            const cat = this.findHeaderColumn(currentHeaderMap, ['Nhóm', 'Danh mục', 'Category', 'Group']);
+            const cat = this.findHeaderColumn(currentHeaderMap, [
+              'Nhóm',
+              'Danh mục',
+              'Category',
+              'Group',
+            ]);
             const p = this.findHeaderColumn(currentHeaderMap, [
               'Loại protein',
               'Protein type',
               'ProteinType',
             ]);
-            const ed = this.findHeaderColumn(currentHeaderMap, ['Edible (%)', 'Ăn được (%)', 'Edible']);
+            const ed = this.findHeaderColumn(currentHeaderMap, [
+              'Edible (%)',
+              'Ăn được (%)',
+              'Edible',
+            ]);
 
             // Nếu sheet này chứa đủ 4 cột bắt buộc -> chọn làm targetWorksheet
             if (m && cat && p && ed) {
@@ -600,7 +628,10 @@ export class IngredientExcelService {
           const errors: string[] = [];
 
           // A. Validate Tên nguyên liệu
-          const rawMaterial = ExcelStreamReader.readCellString(row.getCell(colMaterial!), true);
+          const rawMaterial = ExcelStreamReader.readCellString({
+            cell: row.getCell(colMaterial!),
+            sanitize: true,
+          });
           if (!rawMaterial) {
             errors.push('Tên nguyên liệu không được để trống');
           } else {
@@ -621,7 +652,10 @@ export class IngredientExcelService {
           }
 
           // B. Validate Danh mục
-          const rawCategory = ExcelStreamReader.readCellString(row.getCell(colCategory!), false);
+          const rawCategory = ExcelStreamReader.readCellString({
+            cell: row.getCell(colCategory!),
+            sanitize: false,
+          });
           let categoryId: number | null = null;
           if (!rawCategory) {
             errors.push('Nhóm nguyên liệu không được để trống');
@@ -635,7 +669,10 @@ export class IngredientExcelService {
           }
 
           // C. Validate Loại protein
-          const rawProtein = ExcelStreamReader.readCellString(row.getCell(colProtein!), false);
+          const rawProtein = ExcelStreamReader.readCellString({
+            cell: row.getCell(colProtein!),
+            sanitize: false,
+          });
           let loaiProtein: string | null = null;
           if (!rawProtein) {
             errors.push('Loại protein không được để trống');
@@ -772,7 +809,6 @@ export class IngredientExcelService {
       message: `Đã nhập thành công ${validRows.length} nguyên liệu vào hệ thống`,
     };
   }
-
 
   private findHeaderColumn(
     headerMap: Map<string, number>,

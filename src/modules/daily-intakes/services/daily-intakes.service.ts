@@ -4,28 +4,34 @@ import { CacheService } from '../../../core/cache/cache.service';
 import { NutritionCalculatorService } from '../../../core/nutrition-engine';
 import { NutritionEngine } from '../../../core/nutrition-engine/nutrition.engine';
 import {
-  CreateDailyIntakeDto,
-  UpdateDailyIntakeDto,
-  DailyIntakeQueryDto,
   DailyIntakeResponseDto,
   DailyIntakeListDto,
   DailyIntakeMealResponseDto,
   DailyIntakeIngredientResponseDto,
+  CreateDailyIntakeParamDto,
+  GetAllDailyIntakesParamDto,
+  GetDailyIntakeByIdParamDto,
+  UpdateDailyIntakeParamDto,
+  DeleteDailyIntakeParamDto,
+  GetDailyIntakesByPatientParamDto,
+  GetRdaReportParamDto,
 } from '../dto';
 import { RdaComparisonEngine, RdaComparisonResult } from '../engines/rda-comparison.engine';
 import { DemographicProfile } from '../engines/rda-reference-data';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
-import { Gender, IntakeInputType } from '../../../config/enums/domain.enum';
+import { isAdminRole } from '../../../config/enums/role.enum';
 import {
-  CACHE_TAG_DAILY_INTAKES,
   CACHE_TAG_PATIENTS,
   CACHE_TTL_PERPETUAL,
-  buildDailyIntakeCacheTag,
   buildPatientCacheTag,
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import { PatientsService } from '../../patients/services/patients.service';
 import { Optional } from '@nestjs/common';
+
+export interface CalculateAgeParamDto {
+  dateOfBirth?: Date | null;
+  onlyBirthYear?: boolean;
+}
 
 @Injectable()
 export class DailyIntakesService {
@@ -46,7 +52,25 @@ export class DailyIntakesService {
   /**
    * Helper tính tuổi từ ngày sinh
    */
-  private calculateAge(dateOfBirth?: Date | null, onlyBirthYear?: boolean): number {
+  private calculateAge(
+    paramOrDob?: CalculateAgeParamDto | Date | null,
+    legacyOnlyBirthYear?: boolean,
+  ): number {
+    let dateOfBirth: Date | null | undefined;
+    let onlyBirthYear: boolean | undefined;
+
+    if (
+      paramOrDob &&
+      typeof paramOrDob === 'object' &&
+      !(paramOrDob instanceof Date) &&
+      ('dateOfBirth' in paramOrDob || 'onlyBirthYear' in paramOrDob)
+    ) {
+      dateOfBirth = paramOrDob.dateOfBirth;
+      onlyBirthYear = paramOrDob.onlyBirthYear;
+    } else {
+      dateOfBirth = paramOrDob as Date | null | undefined;
+      onlyBirthYear = legacyOnlyBirthYear;
+    }
     if (!dateOfBirth) return 30; // Mặc định người trưởng thành 30 tuổi
     const now = new Date();
     const birth = new Date(dateOfBirth);
@@ -80,13 +104,23 @@ export class DailyIntakesService {
 
         let itemNutrients: Record<string, number> = {};
         if (rawIngredient) {
-          const ingCalc = NutritionEngine.calculateIngredientNutrients(rawIngredient, weightVal, {
-            isNetWeight: false, // Áp dụng tỷ lệ ăn được (edible) chính xác cho cân thô
-            preserveDecimals: true,
+          const ingCalc = NutritionEngine.calculateIngredientNutrients({
+            ingredient: rawIngredient,
+            weightGrams: weightVal,
+            options: {
+              isNetWeight: false, // Áp dụng tỷ lệ ăn được (edible) chính xác cho cân thô
+              preserveDecimals: true,
+            },
           });
 
-          NutritionEngine.accumulateNutrients(mealAccumulated, ingCalc.nutrients);
-          itemNutrients = NutritionEngine.roundDecimalMap(ingCalc.nutrients, 2);
+          NutritionEngine.accumulateNutrients({
+            target: mealAccumulated,
+            source: ingCalc.nutrients,
+          });
+          itemNutrients = NutritionEngine.roundDecimalMap({
+            map: ingCalc.nutrients,
+            decimalPlaces: 2,
+          });
         }
 
         ingredientResponses.push({
@@ -99,7 +133,10 @@ export class DailyIntakesService {
         });
       }
 
-      NutritionEngine.accumulateNutrients(totalDayAccumulated, mealAccumulated);
+      NutritionEngine.accumulateNutrients({
+        target: totalDayAccumulated,
+        source: mealAccumulated,
+      });
 
       mealResponses.push({
         id: meal.id.toString(),
@@ -107,7 +144,10 @@ export class DailyIntakesService {
         mealName: meal.ten_bua || null,
         mealTime: meal.gio_an || null,
         ingredients: ingredientResponses,
-        totalMealNutrients: NutritionEngine.roundDecimalMap(mealAccumulated, 2),
+        totalMealNutrients: NutritionEngine.roundDecimalMap({
+          map: mealAccumulated,
+          decimalPlaces: 2,
+        }),
       });
     }
 
@@ -122,23 +162,23 @@ export class DailyIntakesService {
       inputType: intake.kieu_nhap,
       note: intake.ghi_chu || null,
       meals: mealResponses,
-      totalDayNutrients: NutritionEngine.roundDecimalMap(totalDayAccumulated, 2),
+      totalDayNutrients: NutritionEngine.roundDecimalMap({
+        map: totalDayAccumulated,
+        decimalPlaces: 2,
+      }),
     };
   }
 
   /**
    * 1. POST /api/daily-intakes: Tạo mới ghi nhận khẩu phần 24h
    */
-  async create(
-    dto: CreateDailyIntakeDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<DailyIntakeResponseDto> {
+  async create({ dto, currentUser }: CreateDailyIntakeParamDto): Promise<DailyIntakeResponseDto> {
     const patientId = BigInt(dto.patientId);
 
     // 1. Kiểm tra bệnh nhân thuộc user (Tái sử dụng Cache thực thể Bệnh nhân 0ms)
     let patient: any;
     if (this.patientsService) {
-      patient = await this.patientsService.getPatientEntity(patientId);
+      patient = await this.patientsService.getPatientEntity({ id: patientId });
     } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
       patient = await this.cacheService.getOrSet(
         buildPatientDetailCacheKey(patientId),
@@ -231,16 +271,18 @@ export class DailyIntakesService {
     );
 
     await this.cacheService.invalidateTag(this.CACHE_TAG);
-    return this.getById(created.id, currentUser);
+    return this.getById({ id: created.id, currentUser });
   }
 
   /**
    * 2. GET /api/daily-intakes: Danh sách khẩu phần theo bệnh nhân/ngày, phân trang
    */
-  async getAll(
-    query: DailyIntakeQueryDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ items: DailyIntakeListDto[]; total: number; page: number; limit: number }> {
+  async getAll({ query, currentUser }: GetAllDailyIntakesParamDto): Promise<{
+    items: DailyIntakeListDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
     const skip = (page - 1) * limit;
@@ -344,10 +386,7 @@ export class DailyIntakesService {
   /**
    * 3. GET /api/daily-intakes/:id: Chi tiết khẩu phần kèm dinh dưỡng tính toán theo chuẩn Bộ Y Tế
    */
-  async getById(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<DailyIntakeResponseDto> {
+  async getById({ id, currentUser }: GetDailyIntakeByIdParamDto): Promise<DailyIntakeResponseDto> {
     const intakeId = BigInt(id);
     const intake = await this.prisma.khau_phan_24h.findUnique({
       where: { id: intakeId },
@@ -386,11 +425,11 @@ export class DailyIntakesService {
   /**
    * 4. PUT /api/daily-intakes/:id: Cập nhật khẩu phần
    */
-  async update(
-    id: string | number | bigint,
-    dto: UpdateDailyIntakeDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<DailyIntakeResponseDto> {
+  async update({
+    id,
+    dto,
+    currentUser,
+  }: UpdateDailyIntakeParamDto): Promise<DailyIntakeResponseDto> {
     const intakeId = BigInt(id);
     const intake = await this.prisma.khau_phan_24h.findUnique({
       where: { id: intakeId },
@@ -465,16 +504,16 @@ export class DailyIntakesService {
     );
 
     await this.cacheService.invalidateTag(this.CACHE_TAG);
-    return this.getById(intakeId, currentUser);
+    return this.getById({ id: intakeId, currentUser });
   }
 
   /**
    * 5. DELETE /api/daily-intakes/:id: Xóa khẩu phần
    */
-  async delete(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ success: boolean; message: string }> {
+  async delete({
+    id,
+    currentUser,
+  }: DeleteDailyIntakeParamDto): Promise<{ success: boolean; message: string }> {
     const intakeId = BigInt(id);
     const intake = await this.prisma.khau_phan_24h.findUnique({
       where: { id: intakeId },
@@ -523,15 +562,15 @@ export class DailyIntakesService {
   /**
    * 6. GET /api/daily-intakes/patient/:patientId: Lịch sử khẩu phần của bệnh nhân
    */
-  async getByPatient(
-    patientIdParam: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<DailyIntakeListDto[]> {
+  async getByPatient({
+    patientId: patientIdParam,
+    currentUser,
+  }: GetDailyIntakesByPatientParamDto): Promise<DailyIntakeListDto[]> {
     const patientId = BigInt(patientIdParam);
 
     let patient: any;
     if (this.patientsService) {
-      patient = await this.patientsService.getPatientEntity(patientId);
+      patient = await this.patientsService.getPatientEntity({ id: patientId });
     } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
       patient = await this.cacheService.getOrSet(
         buildPatientDetailCacheKey(patientId),
@@ -592,16 +631,16 @@ export class DailyIntakesService {
   /**
    * 7. GET /api/daily-intakes/:id/rda-report: Báo cáo đánh giá RDA/DRI lâm sàng
    */
-  async getRdaReport(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-    options?: { limitSetId?: string | number | bigint; physiologicalStatus?: string },
-  ): Promise<RdaComparisonResult> {
-    const intakeDetail = await this.getById(id, currentUser);
+  async getRdaReport({
+    id,
+    currentUser,
+    options,
+  }: GetRdaReportParamDto): Promise<RdaComparisonResult> {
+    const intakeDetail = await this.getById({ id, currentUser });
 
     let patient: any;
     if (this.patientsService) {
-      patient = await this.patientsService.getPatientEntity(intakeDetail.patientId);
+      patient = await this.patientsService.getPatientEntity({ id: intakeDetail.patientId });
     } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
       patient = await this.cacheService.getOrSet(
         buildPatientDetailCacheKey(intakeDetail.patientId),
@@ -625,7 +664,10 @@ export class DailyIntakesService {
       );
     }
 
-    const age = this.calculateAge(patient.ngay_sinh, Boolean(patient.chi_nam_sinh));
+    const age = this.calculateAge({
+      dateOfBirth: patient.ngay_sinh,
+      onlyBirthYear: Boolean(patient.chi_nam_sinh),
+    });
     const isMale = patient.gioi_tinh?.toUpperCase() === 'NAM';
 
     const demographic: DemographicProfile = {
@@ -659,6 +701,10 @@ export class DailyIntakesService {
       }
     }
 
-    return RdaComparisonEngine.compare(intakeDetail.totalDayNutrients, demographic, customTargets);
+    return RdaComparisonEngine.compare({
+      actualIntake: intakeDetail.totalDayNutrients,
+      demographic,
+      customTargets,
+    });
   }
 }

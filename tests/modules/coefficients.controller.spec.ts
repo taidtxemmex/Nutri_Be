@@ -37,6 +37,6 @@ describe('CoefficientsController', () => {
   it('should call getMy and return user coefficients', async () => {
     const res = await controller.getMy({ id: 'u1' });
     expect(res).toEqual([{ id: '2', isPublic: false }]);
-    expect(service.findMy).toHaveBeenCalledWith({ id: 'u1' });
+    expect(service.findMy).toHaveBeenCalledWith({ currentUser: { id: 'u1' } });
   });
 });

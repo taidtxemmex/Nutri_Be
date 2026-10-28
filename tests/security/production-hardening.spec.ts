@@ -3,7 +3,7 @@ import { getHelmetOptions } from '../../src/security/headers/helmet.config';
 import { createSwaggerAuthMiddleware } from '../../src/security/swagger/swagger-auth.middleware';
 import { validateProductionSecrets } from '../../src/security/validation/security-secrets.validator';
 import { ThrottlerBehindProxyGuard } from '../../src/security/rate-limit/throttler-behind-proxy.guard';
-import { ExecutionContext, ForbiddenException, HttpException, HttpStatus } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, HttpException } from '@nestjs/common';
 import { Request, Response } from 'express';
 
 describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
@@ -25,7 +25,7 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
     it('should permit requests from whitelisted production domain: https://nutri.vn', (done) => {
       process.env.NODE_ENV = 'production';
       const corsOptions = createCorsOptions();
-      const originFn = corsOptions.origin as Function;
+      const originFn = corsOptions.origin as any;
 
       originFn('https://nutri.vn', (err: Error | null, allow?: boolean) => {
         expect(err).toBeNull();
@@ -37,7 +37,7 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
     it('should permit requests from whitelisted production domain: https://ilove.truenutri.vn', (done) => {
       process.env.NODE_ENV = 'production';
       const corsOptions = createCorsOptions();
-      const originFn = corsOptions.origin as Function;
+      const originFn = corsOptions.origin as any;
 
       originFn('https://ilove.truenutri.vn', (err: Error | null, allow?: boolean) => {
         expect(err).toBeNull();
@@ -49,7 +49,7 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
     it('should permit requests from whitelisted VPS IP: http://165.245.185.11', (done) => {
       process.env.NODE_ENV = 'production';
       const corsOptions = createCorsOptions();
-      const originFn = corsOptions.origin as Function;
+      const originFn = corsOptions.origin as any;
 
       originFn('http://165.245.185.11', (err: Error | null, allow?: boolean) => {
         expect(err).toBeNull();
@@ -61,7 +61,7 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
     it('should block unauthorized attacker origins with ForbiddenException', (done) => {
       process.env.NODE_ENV = 'production';
       const corsOptions = createCorsOptions();
-      const originFn = corsOptions.origin as Function;
+      const originFn = corsOptions.origin as any;
 
       originFn('https://malicious-hacker-site.com', (err: Error | null, allow?: boolean) => {
         expect(err).toBeInstanceOf(ForbiddenException);
@@ -72,7 +72,7 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
 
     it('should allow server-to-server or mobile requests without Origin header', (done) => {
       const corsOptions = createCorsOptions();
-      const originFn = corsOptions.origin as Function;
+      const originFn = corsOptions.origin as any;
 
       originFn(undefined, (err: Error | null, allow?: boolean) => {
         expect(err).toBeNull();
@@ -144,7 +144,10 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
 
       middleware(req, res, next);
 
-      expect(res.setHeader).toHaveBeenCalledWith('WWW-Authenticate', expect.stringContaining('Basic'));
+      expect(res.setHeader).toHaveBeenCalledWith(
+        'WWW-Authenticate',
+        expect.stringContaining('Basic'),
+      );
       expect(res.status).toHaveBeenCalledWith(401);
       expect(next).not.toHaveBeenCalled();
     });
@@ -208,7 +211,9 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
       delete process.env.JWT_SECRET;
       process.env.DATABASE_URL = 'mysql://user:pass@localhost:3306/db';
 
-      expect(() => validateProductionSecrets()).toThrow('Fatal Security Exception: JWT_SECRET must be explicitly configured in production.');
+      expect(() => validateProductionSecrets()).toThrow(
+        'Fatal Security Exception: JWT_SECRET must be explicitly configured in production.',
+      );
     });
 
     it('should throw fatal error in production if JWT_SECRET is shorter than 32 characters', () => {
@@ -216,22 +221,28 @@ describe('PRODUCTION HARDENING & GO-LIVE SECURITY SUITE', () => {
       process.env.JWT_SECRET = 'short_secret_123';
       process.env.DATABASE_URL = 'mysql://user:pass@localhost:3306/db';
 
-      expect(() => validateProductionSecrets()).toThrow('Fatal Security Exception: JWT_SECRET must be at least 32 characters for adequate entropy.');
+      expect(() => validateProductionSecrets()).toThrow(
+        'Fatal Security Exception: JWT_SECRET must be at least 32 characters for adequate entropy.',
+      );
     });
 
     it('should throw fatal error in production if JWT_SECRET is a known weak default', () => {
       process.env.NODE_ENV = 'production';
-      process.env.JWT_SECRET = 'truenutri_super_secret_jwt_key_2026_clinical_nutrition_protect_token';
+      process.env.JWT_SECRET =
+        'truenutri_super_secret_jwt_key_2026_clinical_nutrition_protect_token';
       process.env.DATABASE_URL = 'mysql://user:pass@localhost:3306/db';
 
-      expect(() => validateProductionSecrets()).toThrow('Fatal Security Exception: Do not use default or placeholder JWT secrets in production.');
+      expect(() => validateProductionSecrets()).toThrow(
+        'Fatal Security Exception: Do not use default or placeholder JWT secrets in production.',
+      );
     });
 
     it('should pass cleanly when strong production secrets are present', () => {
       process.env.NODE_ENV = 'production';
       process.env.JWT_SECRET = 'c8b3a199857d45e0bb1b4d08b3e8e2c34d88e6a4b1234567890abcdef1234567';
       process.env.DATABASE_URL = 'mysql://user:pass@localhost:3306/db';
-      process.env.STORAGE_HMAC_SECRET = 'storage_hmac_secret_super_strong_for_production_testing_2026';
+      process.env.STORAGE_HMAC_SECRET =
+        'storage_hmac_secret_super_strong_for_production_testing_2026';
 
       expect(() => validateProductionSecrets()).not.toThrow();
     });

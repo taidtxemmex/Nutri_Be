@@ -1,5 +1,5 @@
-import { IsNotEmpty, IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNumber, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 
 export class CreatePlanDto {
@@ -35,7 +35,10 @@ export class CreatePlanDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   name?: string;
 
-  @ApiPropertyOptional({ example: 'Gói Pro 1 Tháng', description: 'Tên gói cước (alias packageName)' })
+  @ApiPropertyOptional({
+    example: 'Gói Pro 1 Tháng',
+    description: 'Tên gói cước (alias packageName)',
+  })
   @IsOptional()
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
@@ -69,13 +72,19 @@ export class CreatePlanDto {
   @Min(0, { message: 'Giá tiền không được âm' })
   price?: number;
 
-  @ApiPropertyOptional({ example: 'Toàn quyền sử dụng các tính năng nâng cao', description: 'Mô tả gói' })
+  @ApiPropertyOptional({
+    example: 'Toàn quyền sử dụng các tính năng nâng cao',
+    description: 'Mô tả gói',
+  })
   @IsOptional()
   @IsString({ message: 'Mô tả phải là chuỗi ký tự' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   mo_ta?: string;
 
-  @ApiPropertyOptional({ example: 'Toàn quyền sử dụng các tính năng nâng cao', description: 'Mô tả (alias description)' })
+  @ApiPropertyOptional({
+    example: 'Toàn quyền sử dụng các tính năng nâng cao',
+    description: 'Mô tả (alias description)',
+  })
   @IsOptional()
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

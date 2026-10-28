@@ -1,4 +1,4 @@
-import { Get, Post, Put, Delete, Body, Param, HttpStatus, HttpCode } from '@nestjs/common';
+import { Get, Post, Put, Delete, Body, Param, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { NutritionLimitSetsService } from '../services/nutrition-limit-sets.service';
 import {
@@ -21,7 +21,7 @@ export class NutritionLimitSetsController {
     description: 'Lấy danh sách thành công',
   })
   async getAll(@CurrentUser() user: any): Promise<NutritionLimitSetResponseDto[]> {
-    return this.service.getAll(user);
+    return this.service.getAll({ currentUser: user });
   }
 
   @Get(':id')
@@ -36,7 +36,7 @@ export class NutritionLimitSetsController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<NutritionLimitSetResponseDto> {
-    return this.service.getById(id, user);
+    return this.service.getById({ id, currentUser: user });
   }
 
   @Post()
@@ -51,7 +51,7 @@ export class NutritionLimitSetsController {
     @Body() dto: CreateNutritionLimitSetDto,
     @CurrentUser() user: any,
   ): Promise<NutritionLimitSetResponseDto> {
-    return this.service.create(dto, user);
+    return this.service.create({ dto, currentUser: user });
   }
 
   @Put(':id')
@@ -67,7 +67,7 @@ export class NutritionLimitSetsController {
     @Body() dto: UpdateNutritionLimitSetDto,
     @CurrentUser() user: any,
   ): Promise<NutritionLimitSetResponseDto> {
-    return this.service.update(id, dto, user);
+    return this.service.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -78,6 +78,6 @@ export class NutritionLimitSetsController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.service.delete(id, user);
+    return this.service.delete({ id, currentUser: user });
   }
 }

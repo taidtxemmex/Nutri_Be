@@ -52,17 +52,16 @@ describe('IngredientsController', () => {
     mockExcelService = {
       generateTemplate: jest.fn().mockResolvedValue(Buffer.from('fake-template')),
       exportIngredients: jest.fn().mockResolvedValue(Buffer.from('fake-export')),
-      streamExportIngredients: jest.fn().mockImplementation(async (dto, res) => {
-        res.setHeader(
-          'Content-Type',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        );
-        res.setHeader(
-          'Content-Disposition',
-          'attachment; filename="danh_sach_nguyen_lieu.xlsx"',
-        );
-        res.end(Buffer.from('fake-export'));
-      }),
+      streamExportIngredients: jest
+        .fn()
+        .mockImplementation(async ({ dto: _dto, outputStream: res }) => {
+          res.setHeader(
+            'Content-Type',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          );
+          res.setHeader('Content-Disposition', 'attachment; filename="danh_sach_nguyen_lieu.xlsx"');
+          res.end(Buffer.from('fake-export'));
+        }),
       importExcel: jest.fn().mockResolvedValue({
         success: true,
         totalImported: 5,
@@ -86,7 +85,7 @@ describe('IngredientsController', () => {
       const query = { page: 1, limit: 10, keyword: 'gạo' };
       const result = await controller.findAll(query);
       expect(result.items).toHaveLength(1);
-      expect(mockIngredientsService.findAll).toHaveBeenCalledWith(query);
+      expect(mockIngredientsService.findAll).toHaveBeenCalledWith({ query });
     });
   });
 
@@ -102,7 +101,7 @@ describe('IngredientsController', () => {
     it('should return ingredient detail by id', async () => {
       const result = await controller.findById('1');
       expect(result.id).toBe('1');
-      expect(mockIngredientsService.findById).toHaveBeenCalledWith('1');
+      expect(mockIngredientsService.findById).toHaveBeenCalledWith({ id: '1' });
     });
   });
 
@@ -112,7 +111,7 @@ describe('IngredientsController', () => {
       const user = { id: 'u1', role: UserRole.USER };
       const result = await controller.create(dto, user);
       expect(result.trang_thai).toBe('CHO_DUYET');
-      expect(mockIngredientsService.create).toHaveBeenCalledWith(dto, user);
+      expect(mockIngredientsService.create).toHaveBeenCalledWith({ dto, currentUser: user });
     });
   });
 
@@ -122,7 +121,11 @@ describe('IngredientsController', () => {
       const user = { id: 'u1', role: UserRole.ADMIN };
       const result = await controller.update('1', dto, user);
       expect(result.trang_thai).toBe('DA_DUYET');
-      expect(mockIngredientsService.update).toHaveBeenCalledWith('1', dto, user);
+      expect(mockIngredientsService.update).toHaveBeenCalledWith({
+        id: '1',
+        dto,
+        currentUser: user,
+      });
     });
   });
 
@@ -130,7 +133,7 @@ describe('IngredientsController', () => {
     it('should call delete on service', async () => {
       const result = await controller.delete('1');
       expect(result.message).toContain('Đã xóa nguyên liệu thành công');
-      expect(mockIngredientsService.delete).toHaveBeenCalledWith('1');
+      expect(mockIngredientsService.delete).toHaveBeenCalledWith({ id: '1' });
     });
   });
 
@@ -138,7 +141,7 @@ describe('IngredientsController', () => {
     it('should call approve on service', async () => {
       const result = await controller.approvePending('1');
       expect(result.trang_thai).toBe('DA_DUYET');
-      expect(mockIngredientsService.approve).toHaveBeenCalledWith('1');
+      expect(mockIngredientsService.approve).toHaveBeenCalledWith({ pendingId: '1' });
     });
   });
 
@@ -146,7 +149,7 @@ describe('IngredientsController', () => {
     it('should call rejectPending on service', async () => {
       const result = await controller.rejectPending('1');
       expect(result.trang_thai).toBe('TU_CHOI');
-      expect(mockIngredientsService.rejectPending).toHaveBeenCalledWith('1');
+      expect(mockIngredientsService.rejectPending).toHaveBeenCalledWith({ pendingId: '1' });
     });
   });
 
@@ -163,7 +166,7 @@ describe('IngredientsController', () => {
       );
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
-        'attachment; filename="Template_import_nguyen_lieu.xlsx"',
+        expect.stringContaining('attachment; filename="Template_import_nguyen_lieu.xlsx"'),
       );
       expect(res.end).toHaveBeenCalledWith(Buffer.from('fake-template'));
     });
@@ -218,7 +221,7 @@ describe('IngredientsController', () => {
 
       expect(res.setHeader).toHaveBeenCalledWith(
         'Content-Disposition',
-        'attachment; filename="errors.xlsx"',
+        expect.stringContaining('attachment; filename="errors.xlsx"'),
       );
       expect(res.end).toHaveBeenCalledWith(Buffer.from('fake-error-file'));
     });
@@ -276,7 +279,7 @@ describe('IngredientsController', () => {
 
       const result = await controller.calculateSummary(dto as any);
 
-      expect(mockIngredientsService.calculateSummary).toHaveBeenCalledWith(dto);
+      expect(mockIngredientsService.calculateSummary).toHaveBeenCalledWith({ dto });
       expect(result).toEqual(mockSummary);
     });
   });

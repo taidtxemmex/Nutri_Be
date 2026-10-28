@@ -97,13 +97,9 @@ export class RolesGuard implements CanActivate {
     const requiresPatient = normalizedRequired.some(
       (r) => patientAliases.includes(r as UserRole) || r === 'BENH_NHAN' || r === 'USER',
     );
-    if (
+    return Boolean(
       requiresPatient &&
-      (patientAliases.includes(userRole as UserRole) || userRole === UserRole.ADMIN)
-    ) {
-      return true;
-    }
-
-    return false;
+      (patientAliases.includes(userRole as UserRole) || userRole === UserRole.ADMIN),
+    );
   }
 }

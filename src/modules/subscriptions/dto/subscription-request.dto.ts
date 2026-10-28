@@ -1,9 +1,12 @@
-import { IsArray, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsArray, IsOptional, IsString, MaxLength, ValidateNested } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 
 export class PaymentDocRequestDto {
-  @ApiPropertyOptional({ example: 'payment/receipt_123.jpg', description: 'Object key từ file upload' })
+  @ApiPropertyOptional({
+    example: 'payment/receipt_123.jpg',
+    description: 'Object key từ file upload',
+  })
   @IsOptional()
   @IsString()
   objectKey?: string;
@@ -18,7 +21,10 @@ export class PaymentDocRequestDto {
   @IsString()
   mimeType?: string;
 
-  @ApiPropertyOptional({ example: 'https://example.com/receipt.jpg', description: 'Link ngoài nếu có' })
+  @ApiPropertyOptional({
+    example: 'https://example.com/receipt.jpg',
+    description: 'Link ngoài nếu có',
+  })
   @IsOptional()
   @IsString()
   externalLink?: string;
@@ -46,7 +52,10 @@ export class SubscriptionRequestDto {
   @MaxLength(50)
   packageCode?: string;
 
-  @ApiPropertyOptional({ type: [PaymentDocRequestDto], description: 'Danh sách chứng từ / hóa đơn thanh toán đính kèm' })
+  @ApiPropertyOptional({
+    type: [PaymentDocRequestDto],
+    description: 'Danh sách chứng từ / hóa đơn thanh toán đính kèm',
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })

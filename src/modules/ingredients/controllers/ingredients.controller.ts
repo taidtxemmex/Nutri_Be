@@ -80,7 +80,7 @@ export class IngredientsController {
     description: 'Tính toán tổng hợp dinh dưỡng thành công',
   })
   async calculateSummary(@Body() dto: CalculateSummaryDto): Promise<CalculateSummaryResponseDto> {
-    return this.ingredientsService.calculateSummary(dto);
+    return this.ingredientsService.calculateSummary({ dto });
   }
 
   @Get('template')
@@ -96,13 +96,13 @@ export class IngredientsController {
     const safeFileName = path.basename('Template_import_nguyen_lieu.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    setExcelResponseHeaders(res, safeFileName);
+    setExcelResponseHeaders({ res, filename: safeFileName });
 
     if (isDefault && fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
     }
 
-    const buffer = await this.excelService.generateTemplate(colArray);
+    const buffer = await this.excelService.generateTemplate({ columns: colArray });
     if (isDefault) {
       fs.promises.writeFile(filePath, buffer).catch(() => {});
     }
@@ -127,14 +127,17 @@ export class IngredientsController {
       );
     }
 
-    const result = await this.excelService.importExcel(file.buffer, user?.id);
+    const result = await this.excelService.importExcel({
+      fileBuffer: file.buffer,
+      userId: user?.id,
+    });
 
     // Nếu import phát hiện lỗi ở các dòng -> Trả file Excel chứa cột chú thích lỗi cho Client
     if (!result.success && result.errorFileBuffer) {
-      setExcelResponseHeaders(
+      setExcelResponseHeaders({
         res,
-        result.errorFileName || 'ingredient_import_errors.xlsx',
-      );
+        filename: result.errorFileName || 'ingredient_import_errors.xlsx',
+      });
       return res.end(result.errorFileBuffer);
     }
 
@@ -156,7 +159,7 @@ export class IngredientsController {
   @SkipTransform()
   @ApiOperation({ summary: 'Xuất danh sách nguyên liệu ra file Excel dạng Stream O(1) RAM' })
   async exportIngredients(@Body() dto: ExportIngredientDto, @Res() res: Response): Promise<void> {
-    await this.excelService.streamExportIngredients(dto, res);
+    await this.excelService.streamExportIngredients({ dto, outputStream: res });
   }
 
   @Post('approve/:pendingId')
@@ -168,7 +171,7 @@ export class IngredientsController {
     description: 'Phê duyệt nguyên liệu thành công',
   })
   async approvePending(@Param('pendingId') pendingId: string): Promise<IngredientDetailDto> {
-    return this.ingredientsService.approve(pendingId);
+    return this.ingredientsService.approve({ pendingId });
   }
 
   @Post('reject/:pendingId')
@@ -180,7 +183,7 @@ export class IngredientsController {
     description: 'Từ chối nguyên liệu thành công',
   })
   async rejectPending(@Param('pendingId') pendingId: string): Promise<IngredientDetailDto> {
-    return this.ingredientsService.rejectPending(pendingId);
+    return this.ingredientsService.rejectPending({ pendingId });
   }
 
   @Get()
@@ -192,7 +195,7 @@ export class IngredientsController {
     description: 'Lấy danh sách nguyên liệu phân trang thành công',
   })
   async findAll(@Query() query: IngredientQueryDto) {
-    return this.ingredientsService.findAll(query);
+    return this.ingredientsService.findAll({ query });
   }
 
   @Get(':id')
@@ -203,7 +206,7 @@ export class IngredientsController {
     description: 'Lấy chi tiết nguyên liệu thành công',
   })
   async findById(@Param('id') id: string): Promise<IngredientDetailDto> {
-    return this.ingredientsService.findById(id);
+    return this.ingredientsService.findById({ id });
   }
 
   @Post()
@@ -218,7 +221,7 @@ export class IngredientsController {
     @Body() dto: CreateIngredientDto,
     @CurrentUser() user: any,
   ): Promise<IngredientDetailDto> {
-    return this.ingredientsService.create(dto, user);
+    return this.ingredientsService.create({ dto, currentUser: user });
   }
 
   @Put(':id')
@@ -234,7 +237,7 @@ export class IngredientsController {
     @Body() dto: UpdateIngredientDto,
     @CurrentUser() user: any,
   ): Promise<IngredientDetailDto> {
-    return this.ingredientsService.update(id, dto, user);
+    return this.ingredientsService.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -243,6 +246,6 @@ export class IngredientsController {
   @ApiParam({ name: 'id', description: 'ID nguyên liệu' })
   @ApiStandardResponse({ description: 'Xóa nguyên liệu thành công' })
   async delete(@Param('id') id: string): Promise<{ message: string }> {
-    return this.ingredientsService.delete(id);
+    return this.ingredientsService.delete({ id });
   }
 }

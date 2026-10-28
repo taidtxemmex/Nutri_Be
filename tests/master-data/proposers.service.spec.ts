@@ -33,7 +33,7 @@ describe('ProposersService', () => {
     it('should throw PROPOSER_001 if profile does not exist', async () => {
       mockPrisma.nguoi_de_xuat.findUnique.mockResolvedValue(null);
 
-      await expect(service.getMe('user-123')).rejects.toThrow(NotFoundException);
+      await expect(service.getMe({ userId: 'user-123' })).rejects.toThrow(NotFoundException);
     });
 
     it('should return proposer profile of current user', async () => {
@@ -47,7 +47,7 @@ describe('ProposersService', () => {
         linh_vuc_cong_tac: 'Lâm sàng',
       });
 
-      const result = await service.getMe('user-123');
+      const result = await service.getMe({ userId: 'user-123' });
 
       expect(result.id).toBe(1);
       expect(result.userId).toBe('user-123');
@@ -63,7 +63,12 @@ describe('ProposersService', () => {
       });
 
       await expect(
-        service.update(1, 'attacker-user', false, { education: 'Hacker' }),
+        service.update({
+          id: 1,
+          userId: 'attacker-user',
+          isAdmin: false,
+          dto: { education: 'Hacker' },
+        }),
       ).rejects.toThrow(ForbiddenException);
     });
 
@@ -82,7 +87,12 @@ describe('ProposersService', () => {
         linh_vuc_cong_tac: 'Dinh dưỡng',
       });
 
-      const result = await service.update(1, 'owner-user', false, { education: 'Tiến sĩ' });
+      const result = await service.update({
+        id: 1,
+        userId: 'owner-user',
+        isAdmin: false,
+        dto: { education: 'Tiến sĩ' },
+      });
 
       expect(result.education).toBe('Tiến sĩ');
     });
@@ -102,7 +112,12 @@ describe('ProposersService', () => {
         linh_vuc_cong_tac: 'Dinh dưỡng',
       });
 
-      const result = await service.update(1, 'admin-user', true, { education: 'Admin Update' });
+      const result = await service.update({
+        id: 1,
+        userId: 'admin-user',
+        isAdmin: true,
+        dto: { education: 'Admin Update' },
+      });
 
       expect(result.education).toBe('Admin Update');
     });

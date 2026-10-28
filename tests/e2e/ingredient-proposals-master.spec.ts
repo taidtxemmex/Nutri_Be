@@ -13,7 +13,7 @@ describe('Ingredient Proposals Master E2E & IDOR / 3-Layer Persistence Validatio
   let userAToken: string;
   let userAUser: any;
   let userBToken: string;
-  let userBUser: any;
+  let _userBUser: any;
   let categoryId: number;
 
   beforeAll(async () => {
@@ -64,7 +64,7 @@ describe('Ingredient Proposals Master E2E & IDOR / 3-Layer Persistence Validatio
       fullName: 'Người Dùng B',
     });
     userBToken = userB.token;
-    userBUser = userB.user;
+    _userBUser = userB.user;
   });
 
   afterAll(async () => {

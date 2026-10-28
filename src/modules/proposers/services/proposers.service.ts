@@ -13,17 +13,14 @@ import {
   CACHE_TTL_DETAIL_SECONDS,
   buildProposerCacheTag,
 } from '../../../config/constants/cache.constants';
-import {
-  DEFAULT_PAGE,
-  DEFAULT_LIMIT,
-  MAX_LIMIT,
-} from '../../../config/constants/pagination.constants';
 import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
-  CreateProposerDto,
-  UpdateProposerDto,
-  ProposerQueryDto,
   ProposerResponseDto,
+  FindProposersParamsDto,
+  GetMeProposerParamsDto,
+  FindProposerByIdParamsDto,
+  InsertProposerParamsDto,
+  UpdateProposerParamsDto,
 } from '../dto';
 
 export interface PaginatedProposersResult {
@@ -45,15 +42,18 @@ export class ProposersService {
   /**
    * Danh sách hồ sơ người đề xuất có phân trang (Anti-OOM, Lean Projections)
    */
-  async findAll(query?: ProposerQueryDto): Promise<PaginatedProposersResult> {
+  async findAll({ query }: FindProposersParamsDto = {}): Promise<PaginatedProposersResult> {
     const { page, limit, skip } = normalizePagination(query);
 
-    const cacheKey = this.cacheService?.generateKey('proposers:list', {
-      page,
-      limit,
-      search: query?.search,
-      sortBy: query?.sortBy,
-      sortOrder: query?.sortOrder,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'proposers:list',
+      params: {
+        page,
+        limit,
+        search: query?.search,
+        sortBy: query?.sortBy,
+        sortOrder: query?.sortOrder,
+      },
     });
 
     if (this.cacheService && cacheKey) {
@@ -125,7 +125,7 @@ export class ProposersService {
   /**
    * Lấy hồ sơ người đề xuất của user hiện tại (IDOR Safe: GET /me)
    */
-  async getMe(userId: string): Promise<ProposerResponseDto> {
+  async getMe({ userId }: GetMeProposerParamsDto): Promise<ProposerResponseDto> {
     const cacheKey = buildProposerCacheTag(userId);
 
     if (this.cacheService) {
@@ -175,7 +175,7 @@ export class ProposersService {
   /**
    * Lấy chi tiết hồ sơ người đề xuất theo ID
    */
-  async findById(id: number): Promise<ProposerResponseDto> {
+  async findById({ id }: FindProposerByIdParamsDto): Promise<ProposerResponseDto> {
     const record = await this.prisma.nguoi_de_xuat.findUnique({
       where: { id: BigInt(id) },
       select: {
@@ -210,7 +210,7 @@ export class ProposersService {
   /**
    * Thêm mới hoặc cập nhật hồ sơ người đề xuất cho user hiện tại (Upsert)
    */
-  async insert(userId: string, dto: CreateProposerDto): Promise<ProposerResponseDto> {
+  async insert({ userId, dto }: InsertProposerParamsDto): Promise<ProposerResponseDto> {
     const created = await this.prisma.nguoi_de_xuat.upsert({
       where: { nguoi_dung_id: userId },
       create: {
@@ -239,7 +239,7 @@ export class ProposersService {
       },
     });
 
-    await this.invalidateCache(userId);
+    await this.invalidateCache({ userId });
 
     return {
       id: Number(created.id),
@@ -255,12 +255,12 @@ export class ProposersService {
   /**
    * Cập nhật hồ sơ người đề xuất (Vá lỗi IDOR của Java: kiểm tra quyền sở hữu)
    */
-  async update(
-    id: number,
-    userId: string,
-    isAdmin: boolean,
-    dto: UpdateProposerDto,
-  ): Promise<ProposerResponseDto> {
+  async update({
+    id,
+    userId,
+    isAdmin,
+    dto,
+  }: UpdateProposerParamsDto): Promise<ProposerResponseDto> {
     const existing = await this.prisma.nguoi_de_xuat.findUnique({
       where: { id: BigInt(id) },
       select: { id: true, nguoi_dung_id: true },
@@ -301,7 +301,7 @@ export class ProposersService {
       },
     });
 
-    await this.invalidateCache(existing.nguoi_dung_id);
+    await this.invalidateCache({ userId: existing.nguoi_dung_id });
 
     return {
       id: Number(updated.id),
@@ -314,7 +314,7 @@ export class ProposersService {
     };
   }
 
-  private async invalidateCache(userId?: string): Promise<void> {
+  private async invalidateCache({ userId }: { userId?: string } = {}): Promise<void> {
     if (this.cacheService) {
       const tags = [CACHE_TAG_PROPOSERS];
       if (userId) {

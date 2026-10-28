@@ -30,9 +30,7 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
     const request = context.switchToHttp().getRequest();
     const httpResponse = context.switchToHttp().getResponse();
     const traceId =
-      (request.headers['x-trace-id'] as string) ||
-      (request as any).id ||
-      crypto.randomUUID();
+      (request.headers['x-trace-id'] as string) || (request as any).id || crypto.randomUUID();
     if (httpResponse && typeof httpResponse.setHeader === 'function') {
       httpResponse.setHeader('X-Trace-Id', traceId);
     }

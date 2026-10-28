@@ -6,6 +6,16 @@ export interface ApiFileOptions {
   description?: string;
 }
 
+export interface ApiFileParamDto {
+  fieldName?: string;
+  options?: ApiFileOptions;
+}
+
+export interface ApiMultiFilesParamDto {
+  fieldName?: string;
+  options?: ApiFileOptions;
+}
+
 /**
  * Decorator Swagger cho endpoint tải lên 1 tập tin (Upload Single File)
  *
@@ -14,7 +24,21 @@ export interface ApiFileOptions {
  * @ApiFile('file', { description: 'Hình ảnh đại diện (PNG, JPG)' })
  * async uploadAvatar(@UploadedFile() file: Express.Multer.File) { ... }
  */
-export function ApiFile(fieldName = 'file', options: ApiFileOptions = {}) {
+export function ApiFile(
+  paramOrFieldName: ApiFileParamDto | string = 'file',
+  legacyOptions: ApiFileOptions = {},
+) {
+  let fieldName = 'file';
+  let options: ApiFileOptions = {};
+
+  if (typeof paramOrFieldName === 'object') {
+    fieldName = paramOrFieldName.fieldName || 'file';
+    options = paramOrFieldName.options || {};
+  } else {
+    fieldName = paramOrFieldName;
+    options = legacyOptions;
+  }
+
   return applyDecorators(
     ApiConsumes('multipart/form-data'),
     ApiBody({
@@ -36,7 +60,21 @@ export function ApiFile(fieldName = 'file', options: ApiFileOptions = {}) {
 /**
  * Decorator Swagger cho endpoint tải lên nhiều tập tin (Upload Multiple Files)
  */
-export function ApiMultiFiles(fieldName = 'files', options: ApiFileOptions = {}) {
+export function ApiMultiFiles(
+  paramOrFieldName: ApiMultiFilesParamDto | string = 'files',
+  legacyOptions: ApiFileOptions = {},
+) {
+  let fieldName = 'files';
+  let options: ApiFileOptions = {};
+
+  if (typeof paramOrFieldName === 'object') {
+    fieldName = paramOrFieldName.fieldName || 'files';
+    options = paramOrFieldName.options || {};
+  } else {
+    fieldName = paramOrFieldName;
+    options = legacyOptions;
+  }
+
   return applyDecorators(
     ApiConsumes('multipart/form-data'),
     ApiBody({

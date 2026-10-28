@@ -14,10 +14,31 @@ export interface CursorStreamOptions<T> {
   onBatch: (items: T[]) => Promise<void>;
 }
 
+export interface StreamPrismaInBatchesDto<T> {
+  prisma: any;
+  options: CursorStreamOptions<T>;
+}
+
 export async function streamPrismaInBatches<T extends { id: any }>(
-  prisma: any,
-  options: CursorStreamOptions<T>,
+  paramOrPrisma: StreamPrismaInBatchesDto<T> | any,
+  legacyOptions?: CursorStreamOptions<T>,
 ): Promise<number> {
+  let prisma: any;
+  let options: CursorStreamOptions<T>;
+
+  if (
+    paramOrPrisma &&
+    typeof paramOrPrisma === 'object' &&
+    'prisma' in paramOrPrisma &&
+    'options' in paramOrPrisma
+  ) {
+    prisma = (paramOrPrisma as StreamPrismaInBatchesDto<T>).prisma;
+    options = (paramOrPrisma as StreamPrismaInBatchesDto<T>).options;
+  } else {
+    prisma = paramOrPrisma;
+    options = legacyOptions!;
+  }
+
   const batchSize = options.batchSize || 200;
   let lastId: any = undefined;
   let totalProcessed = 0;

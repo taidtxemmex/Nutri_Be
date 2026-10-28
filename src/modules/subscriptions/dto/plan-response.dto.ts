@@ -31,7 +31,10 @@ export class PlanResponseDto {
   @ApiPropertyOptional({ example: 'Toàn quyền sử dụng tính năng', description: 'Mô tả gói' })
   mo_ta?: string | null;
 
-  @ApiPropertyOptional({ example: 'Toàn quyền sử dụng tính năng', description: 'Mô tả gói (alias description)' })
+  @ApiPropertyOptional({
+    example: 'Toàn quyền sử dụng tính năng',
+    description: 'Mô tả gói (alias description)',
+  })
   description?: string | null;
 
   @ApiProperty({ example: 'ACTIVE', description: 'Trạng thái gói: ACTIVE | INACTIVE' })

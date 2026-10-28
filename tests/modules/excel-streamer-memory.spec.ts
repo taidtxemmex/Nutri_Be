@@ -26,11 +26,7 @@ class DevNullStream extends Writable {
     this.startTime = time;
   }
 
-  _write(
-    chunk: any,
-    _encoding: BufferEncoding,
-    callback: (error?: Error | null) => void,
-  ): void {
+  _write(chunk: any, _encoding: BufferEncoding, callback: (error?: Error | null) => void): void {
     if (this.firstByteReceivedAt === null) {
       this.firstByteReceivedAt = Date.now();
     }

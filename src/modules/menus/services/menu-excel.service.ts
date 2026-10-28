@@ -9,7 +9,6 @@ import {
 import { CacheService } from '../../../core/cache/cache.service';
 import { MenuExportType, MenuType } from '../../../config/enums/domain.enum';
 import { EXCEL_FONT_FAMILY, EXCEL_STYLES } from '../../../config/constants/excel.constants';
-import { Writable } from 'stream';
 import { Response } from 'express';
 import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import {
@@ -18,6 +17,11 @@ import {
   MarketPlanMenuContext,
   MOH_14_FOOD_GROUPS,
 } from './menu-market-plan.streamer';
+import {
+  ExportMenuExcelParamsDto,
+  StreamMenuExcelParamsDto,
+  StreamMarketPlanExcelParamsDto,
+} from '../dto/menu-params.dto';
 
 export interface MenuExportOptions {
   exportType?: MenuExportType;
@@ -50,10 +54,7 @@ export class MenuExcelService {
    * Xuất Excel thực đơn đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED)
    * Tích hợp bộ đệm CacheService phản hồi tức thì 0ms cho các yêu cầu cùng tham số
    */
-  async exportMenuExcel(
-    menuIdOrData: bigint | number | string | any,
-    options: MenuExportOptions = {},
-  ): Promise<Buffer> {
+  async exportMenuExcel({ menuIdOrData, options = {} }: ExportMenuExcelParamsDto): Promise<Buffer> {
     const exportType = options.exportType || MenuExportType.FULL;
     const servings = options.servings && options.servings > 0 ? options.servings : 1;
 
@@ -65,12 +66,15 @@ export class MenuExcelService {
     // 1. Kiểm tra CacheService có gắn userId (cô lập tuyệt đối giữa các tài khoản - 0ms cache hit)
     let cacheKey = '';
     if (isIdQuery && this.cacheService) {
-      cacheKey = this.cacheService.generateKey('menu:export', {
-        menuId: String(menuIdOrData),
-        exportType,
-        servings,
-        cols: options.columns ? options.columns.sort().join(',') : 'all',
-        userId: options.userId || 'anonymous',
+      cacheKey = this.cacheService.generateKey({
+        prefix: 'menu:export',
+        params: {
+          menuId: String(menuIdOrData),
+          exportType,
+          servings,
+          cols: options.columns ? options.columns.sort().join(',') : 'all',
+          userId: options.userId || 'anonymous',
+        },
       });
 
       const cached = await this.cacheService.get<string>(cacheKey);
@@ -138,11 +142,11 @@ export class MenuExcelService {
    * Sử dụng exceljs.stream.xlsx.WorkbookWriter với useSharedStrings: false
    * Tuân thủ Task 6.3 [T9.3] & Pillar III Memory Protection
    */
-  async streamMenuExcel(
-    menuIdOrData: bigint | number | string | any,
-    outputStream: Response | Writable,
-    options: MenuExportOptions = {},
-  ): Promise<void> {
+  async streamMenuExcel({
+    menuIdOrData,
+    outputStream,
+    options = {},
+  }: StreamMenuExcelParamsDto): Promise<void> {
     const exportType = options.exportType || MenuExportType.FULL;
     const servings = options.servings && options.servings > 0 ? options.servings : 1;
 
@@ -169,10 +173,10 @@ export class MenuExcelService {
     // 2. Thiết lập HTTP Response Headers nếu outputStream là Express Response
     if (outputStream && typeof (outputStream as any).setHeader === 'function') {
       const res = outputStream as Response;
-      setExcelResponseHeaders(
+      setExcelResponseHeaders({
         res,
-        `thuc_don_${String(menu.id || menuIdOrData)}_${exportType.toLowerCase()}.xlsx`,
-      );
+        filename: `thuc_don_${String(menu.id || menuIdOrData)}_${exportType.toLowerCase()}.xlsx`,
+      });
       res.setHeader('Transfer-Encoding', 'chunked');
       res.setHeader('X-Accel-Buffering', 'no');
     }
@@ -208,17 +212,11 @@ export class MenuExcelService {
    * Quy đổi ngược khối lượng sạch sang sống thô: W_thô = W_sạch / (edible / 100) * servings
    * Tính toán hao hụt sơ chế và nhiệt chế biến (Task 6.3 [T9.3])
    */
-  async streamMarketPlanExcel(
-    menuIdOrData: bigint | number | string | any,
-    outputStream: Response | Writable,
-    options: {
-      servings?: number;
-      cycle?: string;
-      week?: number;
-      day?: number;
-      userId?: string;
-    } = {},
-  ): Promise<void> {
+  async streamMarketPlanExcel({
+    menuIdOrData,
+    outputStream,
+    options = {},
+  }: StreamMarketPlanExcelParamsDto): Promise<void> {
     const isIdQuery =
       typeof menuIdOrData === 'string' ||
       typeof menuIdOrData === 'number' ||
@@ -264,7 +262,8 @@ export class MenuExcelService {
           if (!ing) continue;
           const net = Number(dd.khoi_luong_song_sach ?? dd.netWeight ?? 0);
           const edible = Number(ing.ty_le_an_duoc ?? ing.edible ?? 100);
-          const name = ing.ten_nguyen_lieu || ing.material || `NL #${dd.nguyen_lieu_id || dd.ingredientId}`;
+          const name =
+            ing.ten_nguyen_lieu || ing.material || `NL #${dd.nguyen_lieu_id || dd.ingredientId}`;
           const catId = Number(ing.danh_muc || 15);
           const catName = MOH_14_FOOD_GROUPS[catId] || 'Nhóm khác';
           const coef = Number(mItem.he_so_song_chin ?? dish.he_so_song_chin ?? 1.0);
@@ -307,7 +306,7 @@ export class MenuExcelService {
       const p = dTotals['protein'] || 0;
       const f = dTotals['fat'] || 0;
       const c = dTotals['carbohydrate'] || 0;
-      totalE += dTotals['energy'] || (p * 4 + f * 9 + c * 4);
+      totalE += dTotals['energy'] || p * 4 + f * 9 + c * 4;
       totalP += p;
       totalF += f;
       totalC += c;
@@ -316,7 +315,7 @@ export class MenuExcelService {
     const eP = Math.round((totalP / dayCount) * 4);
     const eF = Math.round((totalF / dayCount) * 9);
     const eC = Math.round((totalC / dayCount) * 4);
-    const eSum = eP + eF + eC > 0 ? eP + eF + eC : (avgE > 0 ? avgE : 1);
+    const eSum = eP + eF + eC > 0 ? eP + eF + eC : avgE > 0 ? avgE : 1;
 
     const patient = menu.benh_nhan || menu.patient;
     const diseaseGroup = menu.nhom_benh_mo_rong || menu.diseaseGroup;
@@ -337,12 +336,14 @@ export class MenuExcelService {
       servings,
       cycleText,
       createdDate: menu.ngay_tao ? new Date(menu.ngay_tao).toLocaleDateString('vi-VN') : undefined,
-      diseaseGroupName: diseaseGroup?.ten_hien_thi || diseaseGroup?.displayName || diseaseGroup?.ten_nhom,
+      diseaseGroupName:
+        diseaseGroup?.ten_hien_thi || diseaseGroup?.displayName || diseaseGroup?.ten_nhom,
       patient: patient
         ? {
             fullName: patient.ho_ten || patient.fullName,
             patientCode: patient.ma_benh_nhan_bv || patient.patientCode,
-            gender: String(patient.gioi_tinh ?? patient.gender).toUpperCase() === 'NAM' ? 'Nam' : 'Nữ',
+            gender:
+              String(patient.gioi_tinh ?? patient.gender).toUpperCase() === 'NAM' ? 'Nam' : 'Nữ',
             weight: Number(patient.can_nang ?? patient.weight ?? 0),
             height: Number(patient.chieu_cao ?? patient.height ?? 0),
           }
@@ -357,14 +358,14 @@ export class MenuExcelService {
     };
 
     const streamer = new MenuMarketPlanStreamer(outputStream);
-    await streamer.streamMarketPlan(context, Array.from(ingMap.values()));
+    await streamer.streamMarketPlan({ context, ingredients: Array.from(ingMap.values()) });
   }
 
   /**
    * Nạp đầy đủ cây thực đơn 5 cấp từ CSDL:
    * Menu -> Ngày (so_tuan, thu_trong_tuan) -> Bữa ăn -> Món ăn -> Nguyên liệu + Dinh dưỡng
    */
-  public async fetchMenuWithFullRelations(
+  private async fetchMenuWithFullRelations(
     menuId: bigint | number | string,
     userId?: string,
   ): Promise<any> {
@@ -603,7 +604,7 @@ export class MenuExcelService {
       const p = dayTotals['protein'] || 0;
       const f = dayTotals['fat'] || 0;
       const c = dayTotals['carbohydrate'] || 0;
-      const e = dayTotals['energy'] || (p * 4 + f * 9 + c * 4);
+      const e = dayTotals['energy'] || p * 4 + f * 9 + c * 4;
       sumE += e;
       sumP += p;
       sumF += f;
@@ -618,7 +619,7 @@ export class MenuExcelService {
     const eP = Math.round(avgP * 4);
     const eF = Math.round(avgF * 9);
     const eC = Math.round(avgC * 4);
-    const eSum = eP + eF + eC > 0 ? eP + eF + eC : (avgE > 0 ? avgE : 1);
+    const eSum = eP + eF + eC > 0 ? eP + eF + eC : avgE > 0 ? avgE : 1;
 
     const ratioP = Math.round((eP / eSum) * 1000) / 10;
     const ratioL = Math.round((eF / eSum) * 1000) / 10;

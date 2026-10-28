@@ -43,7 +43,7 @@ export class MenusController {
     @Query() query: MenuQueryDto,
     @CurrentUser() user: any,
   ): Promise<{ items: MenuListDto[]; total: number; page: number; limit: number }> {
-    return this.menusService.getAll(query, user);
+    return this.menusService.getAll({ query, currentUser: user });
   }
 
   @Get(':id')
@@ -62,12 +62,12 @@ export class MenusController {
     @Query('day') day: number | undefined,
     @CurrentUser() user: any,
   ): Promise<MenuDetailResponseDto> {
-    return this.menusService.getById(
+    return this.menusService.getById({
       id,
-      week ? Number(week) : undefined,
-      day ? Number(day) : undefined,
-      user,
-    );
+      weekNo: week ? Number(week) : undefined,
+      dayOfWeek: day ? Number(day) : undefined,
+      currentUser: user,
+    });
   }
 
   @Get(':id/full')
@@ -84,7 +84,7 @@ export class MenusController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<MenuFullResponseDto> {
-    return this.menusService.getFullMenu(id, user);
+    return this.menusService.getFullMenu({ id, currentUser: user });
   }
 
   @Post()
@@ -99,7 +99,7 @@ export class MenusController {
     @Body() dto: CreateMenuDto,
     @CurrentUser() user: any,
   ): Promise<MenuMutationResponseDto> {
-    return this.menusService.create(dto, user);
+    return this.menusService.create({ dto, currentUser: user });
   }
 
   @Put(':id')
@@ -115,7 +115,7 @@ export class MenusController {
     @Body() dto: UpdateMenuDto,
     @CurrentUser() user: any,
   ): Promise<MenuMutationResponseDto> {
-    return this.menusService.update(id, dto, user);
+    return this.menusService.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -126,7 +126,7 @@ export class MenusController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.menusService.delete(id, user);
+    return this.menusService.delete({ id, currentUser: user });
   }
 
   @Post(':id/clone')
@@ -139,7 +139,7 @@ export class MenusController {
     description: 'Nhân bản thực đơn thành công',
   })
   async clone(@Param('id') id: string, @CurrentUser() user: any): Promise<MenuMutationResponseDto> {
-    return this.menusService.clone(id, user);
+    return this.menusService.clone({ id, currentUser: user });
   }
 
   @Post(':id/resolve-dish')
@@ -153,7 +153,7 @@ export class MenusController {
     @Body() dto: ResolveDishDto,
     @CurrentUser() user: any,
   ): Promise<{ dishId: string; name: string; recipeHash?: string | null }> {
-    return this.menusService.resolveDishForMenu(dto, user);
+    return this.menusService.resolveDishForMenu({ dto, currentUser: user });
   }
 
   @Post(':id/export/market-plan')
@@ -177,12 +177,16 @@ export class MenusController {
     const week = bodyDto?.week || queryDto?.week;
     const day = bodyDto?.day || queryDto?.day;
 
-    await this.menuExcelService.streamMarketPlanExcel(BigInt(id), res, {
-      servings: Number(servings),
-      cycle,
-      week: week ? Number(week) : undefined,
-      day: day ? Number(day) : undefined,
-      userId: user?.id,
+    await this.menuExcelService.streamMarketPlanExcel({
+      menuIdOrData: BigInt(id),
+      outputStream: res,
+      options: {
+        servings: Number(servings),
+        cycle,
+        week: week ? Number(week) : undefined,
+        day: day ? Number(day) : undefined,
+        userId: user?.id,
+      },
     });
   }
 
@@ -203,16 +207,7 @@ export class MenusController {
     @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
-    const exportType = bodyDto?.exportType || qExportType || MenuExportType.FULL;
-    const servings = bodyDto?.servings || (qServings ? Number(qServings) : 1);
-    const columns = bodyDto?.columns;
-
-    await this.menuExcelService.streamMenuExcel(BigInt(id), res, {
-      exportType,
-      servings,
-      columns,
-      userId: user?.id,
-    });
+    return this.executeExportMenu({ id, bodyDto, qExportType, qServings, user, res });
   }
 
   @Post(':id/export')
@@ -220,7 +215,8 @@ export class MenusController {
   @Auth()
   @SkipTransform()
   @ApiOperation({
-    summary: 'Xuất file Excel thực đơn lâm sàng đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED) dạng Stream O(1) RAM',
+    summary:
+      'Xuất file Excel thực đơn lâm sàng đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED) dạng Stream O(1) RAM',
   })
   @ApiParam({ name: 'id', description: 'ID thực đơn' })
   @ApiBody({ type: ExportMenuDto, required: false })
@@ -232,15 +228,37 @@ export class MenusController {
     @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
+    return this.executeExportMenu({ id, bodyDto, qExportType, qServings, user, res });
+  }
+
+  private async executeExportMenu({
+    id,
+    bodyDto,
+    qExportType,
+    qServings,
+    user,
+    res,
+  }: {
+    id: string;
+    bodyDto?: ExportMenuDto;
+    qExportType?: MenuExportType;
+    qServings?: number;
+    user?: any;
+    res: Response;
+  }): Promise<void> {
     const exportType = bodyDto?.exportType || qExportType || MenuExportType.FULL;
     const servings = bodyDto?.servings || (qServings ? Number(qServings) : 1);
     const columns = bodyDto?.columns;
 
-    await this.menuExcelService.streamMenuExcel(BigInt(id), res, {
-      exportType,
-      servings,
-      columns,
-      userId: user?.id,
+    await this.menuExcelService.streamMenuExcel({
+      menuIdOrData: BigInt(id),
+      outputStream: res,
+      options: {
+        exportType,
+        servings,
+        columns,
+        userId: user?.id,
+      },
     });
   }
 }

@@ -3,12 +3,15 @@ import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { CACHE_TTL_PERPETUAL } from '../../../config/constants/cache.constants';
 import {
-  CreateNutritionLimitSetDto,
-  UpdateNutritionLimitSetDto,
   NutritionLimitSetResponseDto,
+  CreateNutritionLimitSetParamsDto,
+  UpdateNutritionLimitSetParamsDto,
+  GetNutritionLimitSetByIdParamsDto,
+  GetAllNutritionLimitSetsParamsDto,
+  DeleteNutritionLimitSetParamsDto,
 } from '../dto';
 import { NutritionLimitWarning } from '../../../config/enums/domain.enum';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import { isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class NutritionLimitSetsService {
@@ -39,10 +42,10 @@ export class NutritionLimitSetsService {
     };
   }
 
-  async create(
-    dto: CreateNutritionLimitSetDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<NutritionLimitSetResponseDto> {
+  async create({
+    dto,
+    currentUser,
+  }: CreateNutritionLimitSetParamsDto): Promise<NutritionLimitSetResponseDto> {
     const isReusable = Boolean(dto.reusable);
     const name = dto.name?.trim() || 'Giới hạn dinh dưỡng';
 
@@ -81,11 +84,11 @@ export class NutritionLimitSetsService {
     return this.mapToDto(created);
   }
 
-  async update(
-    id: string | number | bigint,
-    dto: UpdateNutritionLimitSetDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<NutritionLimitSetResponseDto> {
+  async update({
+    id,
+    dto,
+    currentUser,
+  }: UpdateNutritionLimitSetParamsDto): Promise<NutritionLimitSetResponseDto> {
     const limitId = BigInt(id);
     const existing = await this.prisma.gioi_han_dinh_duong.findUnique({
       where: { id: limitId },
@@ -123,10 +126,10 @@ export class NutritionLimitSetsService {
     return this.mapToDto(updated);
   }
 
-  async getById(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<NutritionLimitSetResponseDto> {
+  async getById({
+    id,
+    currentUser,
+  }: GetNutritionLimitSetByIdParamsDto): Promise<NutritionLimitSetResponseDto> {
     const limitId = BigInt(id);
     const cacheKey = `nutrition_limit:detail:${limitId.toString()}`;
     const existing = await this.cacheService.getOrSet(
@@ -160,11 +163,12 @@ export class NutritionLimitSetsService {
     return this.mapToDto(existing);
   }
 
-  async getAll(currentUser: {
-    id: string;
-    role?: string;
-  }): Promise<NutritionLimitSetResponseDto[]> {
-    const cacheKey = this.cacheService.generateKey(`${this.CACHE_TAG}:${currentUser.id}`);
+  async getAll({
+    currentUser,
+  }: GetAllNutritionLimitSetsParamsDto): Promise<NutritionLimitSetResponseDto[]> {
+    const cacheKey = this.cacheService.generateKey({
+      prefix: `${this.CACHE_TAG}:${currentUser.id}`,
+    });
     return this.cacheService.getOrSet(
       cacheKey,
       CACHE_TTL_PERPETUAL,
@@ -194,10 +198,10 @@ export class NutritionLimitSetsService {
     );
   }
 
-  async delete(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ success: boolean; message: string }> {
+  async delete({
+    id,
+    currentUser,
+  }: DeleteNutritionLimitSetParamsDto): Promise<{ success: boolean; message: string }> {
     const limitId = BigInt(id);
     const existing = await this.prisma.gioi_han_dinh_duong.findUnique({
       where: { id: limitId },

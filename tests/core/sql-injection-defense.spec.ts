@@ -28,7 +28,7 @@ describe('SQL Injection Defense in Search & Queries', () => {
   it.each(injectionPayloads)(
     'should safely parameterize and escape SQL injection payload: %s',
     async (payload) => {
-      const result = await usersService.findAll({ search: payload, page: 1, limit: 10 });
+      const result = await usersService.findAll({ query: { search: payload, page: 1, limit: 10 } });
 
       expect(mockPrisma.nguoi_dung.findMany).toHaveBeenCalledTimes(1);
       const callArg = mockPrisma.nguoi_dung.findMany.mock.calls[0][0];

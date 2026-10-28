@@ -12,12 +12,18 @@ export class CreateNutritionGuideDto {
   @IsNotEmpty()
   code: string;
 
-  @ApiPropertyOptional({ description: 'Nguyên tắc dinh dưỡng bệnh lý', example: 'Hạn chế đường đơn, kiểm soát carbohydrate' })
+  @ApiPropertyOptional({
+    description: 'Nguyên tắc dinh dưỡng bệnh lý',
+    example: 'Hạn chế đường đơn, kiểm soát carbohydrate',
+  })
   @IsString()
   @IsOptional()
   nutritionPrinciple?: string;
 
-  @ApiPropertyOptional({ description: 'Cơ cấu khẩu phần / yêu cầu ăn kiêng', example: { glucid: '50-60%', protein: '15-20%' } })
+  @ApiPropertyOptional({
+    description: 'Cơ cấu khẩu phần / yêu cầu ăn kiêng',
+    example: { glucid: '50-60%', protein: '15-20%' },
+  })
   @IsOptional()
   dietaryRequirements?: Record<string, any>;
 

@@ -9,7 +9,7 @@ import {
   HttpStatus,
   HttpCode,
 } from '@nestjs/common';
-import { ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { NutritionGuidesService } from '../services/nutrition-guides.service';
 import {
   CreateNutritionGuideDto,
@@ -50,7 +50,7 @@ export class NutritionGuidesController {
     description: 'Lấy chi tiết hướng dẫn dinh dưỡng thành công',
   })
   async getById(@Param('id', ParseIntPipe) id: number): Promise<NutritionGuideResponseDto> {
-    return this.service.getById(id);
+    return this.service.getById({ id });
   }
 
   @Post()
@@ -65,7 +65,7 @@ export class NutritionGuidesController {
     @Body() dto: CreateNutritionGuideDto,
     @CurrentUser() user: any,
   ): Promise<NutritionGuideResponseDto> {
-    return this.service.create(dto, user?.id || user?.userId);
+    return this.service.create({ dto, userId: user?.id || user?.userId });
   }
 
   @Put(':id')
@@ -80,7 +80,7 @@ export class NutritionGuidesController {
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateNutritionGuideDto,
   ): Promise<NutritionGuideResponseDto> {
-    return this.service.update(id, dto);
+    return this.service.update({ id, dto });
   }
 
   @Delete(':id')
@@ -91,8 +91,10 @@ export class NutritionGuidesController {
   @ApiStandardResponse({
     description: 'Xóa hướng dẫn dinh dưỡng thành công',
   })
-  async delete(@Param('id', ParseIntPipe) id: number): Promise<{ success: boolean; message: string }> {
-    await this.service.delete(id);
+  async delete(
+    @Param('id', ParseIntPipe) id: number,
+  ): Promise<{ success: boolean; message: string }> {
+    await this.service.delete({ id });
     return { success: true, message: 'Xóa hướng dẫn dinh dưỡng thành công' };
   }
 }

@@ -34,7 +34,7 @@ describe('CategoriesService', () => {
       mockPrisma.danh_muc.count.mockResolvedValue(1);
       mockPrisma.danh_muc.findMany.mockResolvedValue([{ id: 1, ten_danh_muc: 'Thịt' }]);
 
-      const result = await service.findAll({ page: 1, limit: 20 });
+      const result = await service.findAll({ query: { page: 1, limit: 20 } });
 
       expect(result.items).toHaveLength(1);
       expect(result.items[0]).toEqual({
@@ -65,7 +65,7 @@ describe('CategoriesService', () => {
     it('should throw CAT_001 if categoryName is duplicate', async () => {
       mockPrisma.danh_muc.findFirst.mockResolvedValue({ id: 1 });
 
-      await expect(service.create({ categoryName: 'Thịt' } as any)).rejects.toThrow(
+      await expect(service.create({ dto: { categoryName: 'Thịt' } as any })).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -74,7 +74,7 @@ describe('CategoriesService', () => {
       mockPrisma.danh_muc.findFirst.mockResolvedValue(null);
       mockPrisma.danh_muc.create.mockResolvedValue({ id: 3, ten_danh_muc: 'Rau củ' });
 
-      const result = await service.create({ categoryName: 'Rau củ' } as any);
+      const result = await service.create({ dto: { categoryName: 'Rau củ' } as any });
 
       expect(result.id).toBe(3);
       expect(result.categoryName).toBe('Rau củ');
@@ -86,16 +86,16 @@ describe('CategoriesService', () => {
     it('should throw PROP_007 if category not found', async () => {
       mockPrisma.danh_muc.findUnique.mockResolvedValue(null);
 
-      await expect(service.update(999, { categoryName: 'Mới' } as any)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.update({ id: 999, dto: { categoryName: 'Mới' } as any }),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should throw CAT_001 if name is duplicated on other category', async () => {
       mockPrisma.danh_muc.findUnique.mockResolvedValue({ id: 1, ten_danh_muc: 'Thịt' });
       mockPrisma.danh_muc.findFirst.mockResolvedValue({ id: 2, ten_danh_muc: 'Cá' });
 
-      await expect(service.update(1, { categoryName: 'Cá' } as any)).rejects.toThrow(
+      await expect(service.update({ id: 1, dto: { categoryName: 'Cá' } as any })).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -105,7 +105,7 @@ describe('CategoriesService', () => {
     it('should throw PROP_007 if category not found', async () => {
       mockPrisma.danh_muc.findUnique.mockResolvedValue(null);
 
-      await expect(service.delete(999)).rejects.toThrow(NotFoundException);
+      await expect(service.delete({ id: 999 })).rejects.toThrow(NotFoundException);
     });
 
     it('should throw CAT_002 if category is in use by ingredients or proposals', async () => {
@@ -117,7 +117,7 @@ describe('CategoriesService', () => {
         },
       });
 
-      await expect(service.delete(1)).rejects.toThrow(ConflictException);
+      await expect(service.delete({ id: 1 })).rejects.toThrow(ConflictException);
     });
 
     it('should successfully delete category if count is 0', async () => {
@@ -130,7 +130,7 @@ describe('CategoriesService', () => {
       });
       mockPrisma.danh_muc.delete.mockResolvedValue({ id: 1 });
 
-      const result = await service.delete(1);
+      const result = await service.delete({ id: 1 });
 
       expect(result.success).toBe(true);
       expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['categories', 'category:1']);

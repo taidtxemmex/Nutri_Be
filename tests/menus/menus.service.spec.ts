@@ -1,6 +1,6 @@
-import { HttpException, HttpStatus } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { MenusService } from '../../src/modules/menus/services/menus.service';
-import { MenuType, TargetType, DishStatus } from '../../src/config/enums/domain.enum';
+import { MenuType, TargetType } from '../../src/config/enums/domain.enum';
 
 describe('MenusService', () => {
   let service: MenusService;
@@ -9,7 +9,7 @@ describe('MenusService', () => {
   let mockNutritionCalculator: any;
 
   const mockUser = { id: 'user-uuid-1', role: 'USER' };
-  const mockAdmin = { id: 'admin-uuid-1', role: 'ADMIN' };
+  const _mockAdmin = { id: 'admin-uuid-1', role: 'ADMIN' };
 
   beforeEach(() => {
     mockPrisma = {
@@ -97,8 +97,8 @@ describe('MenusService', () => {
         chi_tiet_thuc_don: [],
       });
 
-      const res = await service.create(
-        {
+      const res = await service.create({
+        dto: {
           menuName: 'Thực đơn ngày 1',
           menuType: MenuType.NGAY,
           targetType: TargetType.BENH_NHAN,
@@ -110,8 +110,8 @@ describe('MenusService', () => {
             },
           ],
         },
-        mockUser,
-      );
+        currentUser: mockUser,
+      });
 
       expect(res.id).toBe('10');
       expect(res.menuName).toBe('Thực đơn ngày 1');
@@ -145,7 +145,7 @@ describe('MenusService', () => {
         },
       ]);
 
-      const result = await service.getAll({ page: 1, limit: 10 }, mockUser);
+      const result = await service.getAll({ query: { page: 1, limit: 10 }, currentUser: mockUser });
 
       expect(result.total).toBe(1);
       expect(result.items.length).toBe(1);
@@ -193,9 +193,9 @@ describe('MenusService', () => {
         chi_tiet_thuc_don: [],
       });
 
-      const res = await service.update(
-        '10',
-        {
+      const res = await service.update({
+        id: '10',
+        dto: {
           menuName: 'Thực đơn mới',
           meals: [
             {
@@ -206,8 +206,8 @@ describe('MenusService', () => {
             },
           ],
         },
-        mockUser,
-      );
+        currentUser: mockUser,
+      });
 
       expect(res.id).toBe('10');
       expect(mockPrisma.bua_an.create).toHaveBeenCalled(); // Xác nhận CoW tạo bữa ăn mới
@@ -222,9 +222,9 @@ describe('MenusService', () => {
 
       mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({ id: BigInt(1) });
 
-      await expect(service.update('10', { menuName: 'Thực đơn sửa' }, mockUser)).rejects.toThrow(
-        HttpException,
-      );
+      await expect(
+        service.update({ id: '10', dto: { menuName: 'Thực đơn sửa' }, currentUser: mockUser }),
+      ).rejects.toThrow(HttpException);
     });
   });
 
@@ -269,7 +269,7 @@ describe('MenusService', () => {
         chi_tiet_thuc_don: [],
       });
 
-      const res = await service.clone('10', mockUser);
+      const res = await service.clone({ id: '10', currentUser: mockUser });
 
       expect(res.id).toBe('20');
       expect(res.menuName).toBe('[Bản sao] Thực đơn chuẩn');

@@ -31,8 +31,7 @@ describe('Chatbot Deprecation E2E (Task 7.5: HTTP 410 Gone)', () => {
     });
 
     it('GET /api/v1/chatbot/message should return 410 Gone', async () => {
-      const res = await request(helper.getHttpServer())
-        .get('/api/v1/chatbot/message');
+      const res = await request(helper.getHttpServer()).get('/api/v1/chatbot/message');
 
       expect(res.status).toBe(HttpStatus.GONE);
       expect(res.body.error.code).toBe('CHATBOT_DEPRECATED');
@@ -48,8 +47,7 @@ describe('Chatbot Deprecation E2E (Task 7.5: HTTP 410 Gone)', () => {
     });
 
     it('GET /api/chatbot/message should return 410 Gone', async () => {
-      const res = await request(helper.getHttpServer())
-        .get('/api/chatbot/message');
+      const res = await request(helper.getHttpServer()).get('/api/chatbot/message');
 
       expect(res.status).toBe(HttpStatus.GONE);
       expect(res.body.error.code).toBe('CHATBOT_DEPRECATED');
@@ -74,8 +72,7 @@ describe('Chatbot Deprecation E2E (Task 7.5: HTTP 410 Gone)', () => {
     });
 
     it('GET /api/chatbot should return 410 Gone', async () => {
-      const res = await request(helper.getHttpServer())
-        .get('/api/chatbot');
+      const res = await request(helper.getHttpServer()).get('/api/chatbot');
 
       expect(res.status).toBe(HttpStatus.GONE);
       expect(res.body.error.code).toBe('CHATBOT_DEPRECATED');

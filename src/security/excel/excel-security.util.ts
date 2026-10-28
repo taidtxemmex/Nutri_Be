@@ -8,8 +8,7 @@ import { EXCEL_UPLOAD_CONFIG } from '../../config/constants/excel.constants';
 export class ExcelSecurityUtil {
   public static readonly DANGEROUS_PREFIXES: readonly string[] =
     EXCEL_UPLOAD_CONFIG?.DANGEROUS_PREFIXES || ['=', '+', '-', '@', '\t', '\r', '%', '|'];
-  public static readonly MAX_CELL_LENGTH: number =
-    EXCEL_UPLOAD_CONFIG?.MAX_CELL_LENGTH || 1000;
+  public static readonly MAX_CELL_LENGTH: number = EXCEL_UPLOAD_CONFIG?.MAX_CELL_LENGTH || 1000;
 
   /**
    * Kiểm tra xem giá trị chuỗi có nguy cơ là payload Formula Injection hay không

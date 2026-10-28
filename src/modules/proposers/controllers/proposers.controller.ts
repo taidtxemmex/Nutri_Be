@@ -38,7 +38,7 @@ export class ProposersController {
     description: 'Hồ sơ người đề xuất cá nhân',
   })
   async getMe(@CurrentUserId() userId: string) {
-    return this.proposersService.getMe(userId);
+    return this.proposersService.getMe({ userId });
   }
 
   @Put('me')
@@ -48,7 +48,7 @@ export class ProposersController {
     description: 'Cập nhật hồ sơ thành công',
   })
   async updateMe(@CurrentUserId() userId: string, @Body() dto: UpdateProposerDto) {
-    return this.proposersService.insert(userId, dto);
+    return this.proposersService.insert({ userId, dto });
   }
 
   @Get('')
@@ -58,7 +58,7 @@ export class ProposersController {
     description: 'Danh sách hồ sơ người đề xuất',
   })
   async findAll(@Query() query: ProposerQueryDto) {
-    return this.proposersService.findAll(query);
+    return this.proposersService.findAll({ query });
   }
 
   @Get(':id')
@@ -69,7 +69,7 @@ export class ProposersController {
     description: 'Chi tiết hồ sơ người đề xuất',
   })
   async findById(@Param('id', ParseIntPipe) id: number) {
-    return this.proposersService.findById(id);
+    return this.proposersService.findById({ id });
   }
 
   @Post('')
@@ -80,7 +80,7 @@ export class ProposersController {
     description: 'Lưu hồ sơ người đề xuất thành công',
   })
   async insert(@CurrentUserId() userId: string, @Body() dto: CreateProposerDto) {
-    return this.proposersService.insert(userId, dto);
+    return this.proposersService.insert({ userId, dto });
   }
 
   @Put(':id')
@@ -96,6 +96,6 @@ export class ProposersController {
     @Body() dto: UpdateProposerDto,
   ) {
     const isAdmin = user.role === UserRole.ADMIN || user.role === UserRole.SUPERADMIN;
-    return this.proposersService.update(id, user.id, isAdmin, dto);
+    return this.proposersService.update({ id, userId: user.id, isAdmin, dto });
   }
 }

@@ -12,7 +12,8 @@ import {
   DailyIntakeExportRequestDto,
   DailyIntakeExportTemplateType,
 } from '../dto/daily-intake-export-request.dto';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import { ExportReportStreamParamDto } from '../dto';
+import { isAdminRole } from '../../../config/enums/role.enum';
 import * as ExcelJS from 'exceljs';
 
 /**
@@ -32,12 +33,43 @@ class DailyIntakeExcelStreamer extends BaseExcelStreamer {
    * Xuất khối thông tin bệnh nhân ở đầu báo cáo Mẫu 3
    */
   public async writePatientHeaderBlock(
-    patient: { ho_ten: string; ma_benh_nhan_bv?: string | null; id: bigint; gioi_tinh: string; age?: number },
-    fromDate: string,
-    toDate: string,
+    paramOrPatient:
+      | {
+          patient?: {
+            ho_ten: string;
+            ma_benh_nhan_bv?: string | null;
+            id: bigint;
+            gioi_tinh: string;
+            age?: number;
+          };
+          fromDate?: string;
+          toDate?: string;
+          ho_ten?: string;
+          ma_benh_nhan_bv?: string | null;
+          id?: bigint;
+          gioi_tinh?: string;
+          age?: number;
+        }
+      | any,
+    legacyFromDate?: string,
+    legacyToDate?: string,
   ): Promise<void> {
+    let patient: any;
+    let fromDate: string;
+    let toDate: string;
+
+    if (paramOrPatient && typeof paramOrPatient === 'object' && 'patient' in paramOrPatient) {
+      patient = paramOrPatient.patient;
+      fromDate = paramOrPatient.fromDate || '';
+      toDate = paramOrPatient.toDate || '';
+    } else {
+      patient = paramOrPatient;
+      fromDate = legacyFromDate || '';
+      toDate = legacyToDate || '';
+    }
+
     const boldFont = { name: EXCEL_FONT_FAMILY, size: 10, bold: true, color: { argb: 'FF1F497D' } };
-    const labelStyle = { vertical: 'middle' as const, horizontal: 'left' as const };
+    const _labelStyle = { vertical: 'middle' as const, horizontal: 'left' as const };
 
     const r1 = this.worksheet.addRow([
       'Họ tên bệnh nhân:',
@@ -79,7 +111,25 @@ class DailyIntakeExcelStreamer extends BaseExcelStreamer {
   /**
    * Xuất dòng tiêu đề ngày ăn (Day Title) gom ô ngang
    */
-  public async writeDayTitleRow(dateStr: string, totalCols: number, labelPrefix = 'NGÀY: '): Promise<void> {
+  public async writeDayTitleRow(
+    paramOrDateStr: { dateStr: string; totalCols: number; labelPrefix?: string } | string,
+    legacyTotalCols?: number,
+    legacyLabelPrefix = 'NGÀY: ',
+  ): Promise<void> {
+    let dateStr: string;
+    let totalCols: number;
+    let labelPrefix: string;
+
+    if (paramOrDateStr && typeof paramOrDateStr === 'object' && 'dateStr' in paramOrDateStr) {
+      dateStr = paramOrDateStr.dateStr;
+      totalCols = paramOrDateStr.totalCols;
+      labelPrefix = paramOrDateStr.labelPrefix || 'NGÀY: ';
+    } else {
+      dateStr = paramOrDateStr as string;
+      totalCols = legacyTotalCols!;
+      labelPrefix = legacyLabelPrefix;
+    }
+
     const rowNum = this.rowCount + 1;
     const row = this.worksheet.getRow(rowNum);
     const cell = row.getCell(1);
@@ -147,7 +197,21 @@ class DailyIntakeExcelStreamer extends BaseExcelStreamer {
   /**
    * Xuất dòng tổng kết bữa ăn (Meal Total Row)
    */
-  public async writeMealTotalRow(mealName: string, totals: any[]): Promise<void> {
+  public async writeMealTotalRow(
+    paramOrMealName: { mealName: string; totals: any[] } | string,
+    legacyTotals?: any[],
+  ): Promise<void> {
+    let mealName: string;
+    let totals: any[];
+
+    if (paramOrMealName && typeof paramOrMealName === 'object' && 'mealName' in paramOrMealName) {
+      mealName = paramOrMealName.mealName;
+      totals = paramOrMealName.totals;
+    } else {
+      mealName = paramOrMealName as string;
+      totals = legacyTotals!;
+    }
+
     const rowData = [`Tổng bữa: ${mealName}`, '', '', ...totals];
     const sanitized = ExcelSecurityUtil.sanitizeRow(rowData);
     const row = this.worksheet.addRow(sanitized);
@@ -198,6 +262,12 @@ class DailyIntakeExcelStreamer extends BaseExcelStreamer {
   }
 }
 
+export interface StreamMultiPatientReportParamDto {
+  dto: DailyIntakeExportRequestDto;
+  res: Response;
+  user: any;
+}
+
 @Injectable()
 export class DailyIntakeReportStreamService {
   private readonly logger = new Logger(DailyIntakeReportStreamService.name);
@@ -227,10 +297,29 @@ export class DailyIntakeReportStreamService {
    * Router trung tâm điều hướng xuất báo cáo theo templateType (1..4)
    */
   async export(
-    dto: DailyIntakeExportRequestDto,
-    res: Response,
-    user: any,
+    paramOrDto: ExportReportStreamParamDto | DailyIntakeExportRequestDto,
+    legacyRes?: Response,
+    legacyUser?: any,
   ): Promise<void> {
+    let dto: DailyIntakeExportRequestDto;
+    let res: Response;
+    let user: any;
+
+    if (
+      paramOrDto &&
+      typeof paramOrDto === 'object' &&
+      'dto' in paramOrDto &&
+      'res' in paramOrDto
+    ) {
+      dto = paramOrDto.dto;
+      res = paramOrDto.res;
+      user = paramOrDto.user;
+    } else {
+      dto = paramOrDto as DailyIntakeExportRequestDto;
+      res = legacyRes!;
+      user = legacyUser;
+    }
+
     if (dto.templateType == null) {
       throw new HttpException(
         { code: 'EXPORT_TEMPLATE_REQUIRED', message: 'Vui lòng chọn mẫu xuất báo cáo (1..4)' },
@@ -242,10 +331,7 @@ export class DailyIntakeReportStreamService {
 
     switch (dto.templateType) {
       case DailyIntakeExportTemplateType.TOTAL_FOOD_GROUP_MULTI_PATIENTS:
-        res.setHeader(
-          'Content-Disposition',
-          'attachment; filename="tong_hop_nhom_thuc_pham.xlsx"',
-        );
+        res.setHeader('Content-Disposition', 'attachment; filename="tong_hop_nhom_thuc_pham.xlsx"');
         return this.streamTotalFoodGroupMultiPatients(dto, res, user);
 
       case DailyIntakeExportTemplateType.AVG_GROUP_WEIGHT_PER_PATIENT:
@@ -291,7 +377,10 @@ export class DailyIntakeReportStreamService {
     const fiber = (ing.fiber ?? 0) * ratio;
 
     // Carb tính theo chênh lệch (by difference) chuẩn FAO
-    const carbPer100 = Math.max(0, 100 - (ing.water ?? 0) - (ing.protein ?? 0) - (ing.fat ?? 0) - (ing.ash ?? 0));
+    const carbPer100 = Math.max(
+      0,
+      100 - (ing.water ?? 0) - (ing.protein ?? 0) - (ing.fat ?? 0) - (ing.ash ?? 0),
+    );
     const carbohydrate = carbPer100 * ratio;
 
     // Năng lượng Atwater (4-9-4)
@@ -330,11 +419,30 @@ export class DailyIntakeReportStreamService {
   // Tổng hợp nhóm thực phẩm nhiều bệnh nhân theo ngày ăn, số nhóm TP tiêu thụ,
   // tổng vi chất, tách Protein ĐV/TV và Lipid ĐV/TV.
   // =========================================================================
-  async streamTotalFoodGroupMultiPatients(
-    dto: DailyIntakeExportRequestDto,
-    res: Response,
-    user: any,
+  public async streamTotalFoodGroupMultiPatients(
+    paramOrDto: StreamMultiPatientReportParamDto | DailyIntakeExportRequestDto,
+    legacyRes?: Response,
+    legacyUser?: any,
   ): Promise<void> {
+    let dto: DailyIntakeExportRequestDto;
+    let res: Response;
+    let user: any;
+
+    if (
+      paramOrDto &&
+      typeof paramOrDto === 'object' &&
+      'dto' in paramOrDto &&
+      'res' in paramOrDto
+    ) {
+      dto = paramOrDto.dto;
+      res = paramOrDto.res;
+      user = paramOrDto.user;
+    } else {
+      dto = paramOrDto as DailyIntakeExportRequestDto;
+      res = legacyRes!;
+      user = legacyUser;
+    }
+
     const where: any = {
       ngay_an: {
         gte: new Date(`${dto.fromDate}T00:00:00.000Z`),
@@ -464,7 +572,10 @@ export class DailyIntakeReportStreamService {
 
     if (!intakes || intakes.length === 0) {
       throw new HttpException(
-        { code: 'EXPORT_NO_DATA', message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn' },
+        {
+          code: 'EXPORT_NO_DATA',
+          message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn',
+        },
         HttpStatus.NOT_FOUND,
       );
     }
@@ -562,8 +673,7 @@ export class DailyIntakeReportStreamService {
 
         const proteinAnimalRatio =
           totalProtein === 0 ? 0 : Number((proteinAnimal / totalProtein).toFixed(4));
-        const lipidPlantRatio =
-          totalFat === 0 ? 0 : Number((fatPlant / totalFat).toFixed(4));
+        const lipidPlantRatio = totalFat === 0 ? 0 : Number((fatPlant / totalFat).toFixed(4));
 
         const rowValues: any[] = [
           patientCode,
@@ -599,11 +709,30 @@ export class DailyIntakeReportStreamService {
   // MẪU 2: AVG_GROUP_WEIGHT_PER_PATIENT
   // Thống kê khối lượng trung bình từng nhóm thực phẩm / đầu người
   // =========================================================================
-  async streamAvgGroupWeightPerPatient(
-    dto: DailyIntakeExportRequestDto,
-    res: Response,
-    user: any,
+  public async streamAvgGroupWeightPerPatient(
+    paramOrDto: StreamMultiPatientReportParamDto | DailyIntakeExportRequestDto,
+    legacyRes?: Response,
+    legacyUser?: any,
   ): Promise<void> {
+    let dto: DailyIntakeExportRequestDto;
+    let res: Response;
+    let user: any;
+
+    if (
+      paramOrDto &&
+      typeof paramOrDto === 'object' &&
+      'dto' in paramOrDto &&
+      'res' in paramOrDto
+    ) {
+      dto = paramOrDto.dto;
+      res = paramOrDto.res;
+      user = paramOrDto.user;
+    } else {
+      dto = paramOrDto as DailyIntakeExportRequestDto;
+      res = legacyRes!;
+      user = legacyUser;
+    }
+
     const categories = await this.prisma.danh_muc.findMany({
       select: { id: true, ten_danh_muc: true },
       orderBy: { id: 'asc' },
@@ -649,7 +778,10 @@ export class DailyIntakeReportStreamService {
 
     if (!intakes || intakes.length === 0) {
       throw new HttpException(
-        { code: 'EXPORT_NO_DATA', message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn' },
+        {
+          code: 'EXPORT_NO_DATA',
+          message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn',
+        },
         HttpStatus.NOT_FOUND,
       );
     }
@@ -708,12 +840,7 @@ export class DailyIntakeReportStreamService {
         const totalWeight = totalWeightByCategory.get(catName) || 0;
         const avgWeight = patientCount === 0 ? 0 : Number((totalWeight / patientCount).toFixed(2));
 
-        await streamer.writeDataRow([
-          order++,
-          catName,
-          Number(totalWeight.toFixed(2)),
-          avgWeight,
-        ]);
+        await streamer.writeDataRow([order++, catName, Number(totalWeight.toFixed(2)), avgWeight]);
       }
 
       await streamer.writeEmptyRow();
@@ -726,11 +853,30 @@ export class DailyIntakeReportStreamService {
   // MẪU 3: DAILY_NUTRIENT_INTAKE_PATIENT
   // Báo cáo khẩu phần chi tiết cá nhân theo dải ngày (phân rã từng bữa & dòng TỔNG NGÀY)
   // =========================================================================
-  async streamPatientDailyNutrition(
-    dto: DailyIntakeExportRequestDto,
-    res: Response,
-    user: any,
+  public async streamPatientDailyNutrition(
+    paramOrDto: StreamMultiPatientReportParamDto | DailyIntakeExportRequestDto,
+    legacyRes?: Response,
+    legacyUser?: any,
   ): Promise<void> {
+    let dto: DailyIntakeExportRequestDto;
+    let res: Response;
+    let user: any;
+
+    if (
+      paramOrDto &&
+      typeof paramOrDto === 'object' &&
+      'dto' in paramOrDto &&
+      'res' in paramOrDto
+    ) {
+      dto = paramOrDto.dto;
+      res = paramOrDto.res;
+      user = paramOrDto.user;
+    } else {
+      dto = paramOrDto as DailyIntakeExportRequestDto;
+      res = legacyRes!;
+      user = legacyUser;
+    }
+
     const patientWhere: any = {
       id: BigInt(dto.patientId!),
       deleted_at: null,
@@ -880,7 +1026,10 @@ export class DailyIntakeReportStreamService {
 
     if (!intakes || intakes.length === 0) {
       throw new HttpException(
-        { code: 'EXPORT_NO_DATA', message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn' },
+        {
+          code: 'EXPORT_NO_DATA',
+          message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn',
+        },
         HttpStatus.NOT_FOUND,
       );
     }
@@ -891,11 +1040,7 @@ export class DailyIntakeReportStreamService {
     });
 
     const age = this.calculateAge(patient.ngay_sinh);
-    await streamer.writePatientHeaderBlock(
-      { ...patient, age },
-      dto.fromDate,
-      dto.toDate,
-    );
+    await streamer.writePatientHeaderBlock({ ...patient, age }, dto.fromDate, dto.toDate);
 
     const tableHeaders: string[] = [
       'Nguyên liệu',
@@ -1024,7 +1169,10 @@ export class DailyIntakeReportStreamService {
             mealTotalValues.push(Number((mealNutrients[col.field] || 0).toFixed(2)));
           }
 
-          await streamer.writeMealTotalRow(meal.ten_bua || `Bữa ${meal.thu_tu_bua}`, mealTotalValues);
+          await streamer.writeMealTotalRow(
+            meal.ten_bua || `Bữa ${meal.thu_tu_bua}`,
+            mealTotalValues,
+          );
         }
       } else {
         // Xuất không chia bữa (INGREDIENT_ONLY)
@@ -1121,11 +1269,30 @@ export class DailyIntakeReportStreamService {
   // MẪU 4: TOTAL_WEIGHT_FOOD_GROUP_MULTI_PATIENTS
   // Xuất 2 Sheets: TONG_KL_NHOM_THUC_PHAM (ma trận BN x nhóm TP) và TRUNG_BINH (TB/ngày)
   // =========================================================================
-  async streamTotalWeightFoodGroupMultiPatients(
-    dto: DailyIntakeExportRequestDto,
-    res: Response,
-    user: any,
+  public async streamTotalWeightFoodGroupMultiPatients(
+    paramOrDto: StreamMultiPatientReportParamDto | DailyIntakeExportRequestDto,
+    legacyRes?: Response,
+    legacyUser?: any,
   ): Promise<void> {
+    let dto: DailyIntakeExportRequestDto;
+    let res: Response;
+    let user: any;
+
+    if (
+      paramOrDto &&
+      typeof paramOrDto === 'object' &&
+      'dto' in paramOrDto &&
+      'res' in paramOrDto
+    ) {
+      dto = paramOrDto.dto;
+      res = paramOrDto.res;
+      user = paramOrDto.user;
+    } else {
+      dto = paramOrDto as DailyIntakeExportRequestDto;
+      res = legacyRes!;
+      user = legacyUser;
+    }
+
     const categories = await this.prisma.danh_muc.findMany({
       select: { id: true, ten_danh_muc: true },
       orderBy: { id: 'asc' },
@@ -1181,7 +1348,10 @@ export class DailyIntakeReportStreamService {
 
     if (!intakes || intakes.length === 0) {
       throw new HttpException(
-        { code: 'EXPORT_NO_DATA', message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn' },
+        {
+          code: 'EXPORT_NO_DATA',
+          message: 'Không có dữ liệu khẩu phần trong khoảng thời gian đã chọn',
+        },
         HttpStatus.NOT_FOUND,
       );
     }

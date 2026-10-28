@@ -17,12 +17,15 @@ describe('EvidencesController', () => {
   it('preview should return preview url', async () => {
     const res = await controller.preview('1', { id: 'u1' });
     expect(res).toBe('http://preview.url');
-    expect(service.generatePreviewUrl).toHaveBeenCalledWith('1', { id: 'u1' });
+    expect(service.generatePreviewUrl).toHaveBeenCalledWith({ id: '1', currentUser: { id: 'u1' } });
   });
 
   it('download should return download url', async () => {
     const res = await controller.download('1', { id: 'u1' });
     expect(res).toBe('http://download.url');
-    expect(service.generateDownloadUrl).toHaveBeenCalledWith('1', { id: 'u1' });
+    expect(service.generateDownloadUrl).toHaveBeenCalledWith({
+      id: '1',
+      currentUser: { id: 'u1' },
+    });
   });
 });

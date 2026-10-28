@@ -184,10 +184,13 @@ describe('DailyIntakeExcelService', () => {
 
       const fileBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
-      const result = await service.importDailyIntakeExcel(fileBuffer, {
-        patientId: 10,
-        userId: 'doctor-001',
-        date: '2026-10-26',
+      const result = await service.importDailyIntakeExcel({
+        fileBuffer,
+        options: {
+          patientId: 10,
+          userId: 'doctor-001',
+          date: '2026-10-26',
+        },
       });
 
       expect(result.success).toBe(true);
@@ -207,9 +210,12 @@ describe('DailyIntakeExcelService', () => {
 
       const fileBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
-      const result = await service.importDailyIntakeExcel(fileBuffer, {
-        patientId: 10,
-        userId: 'doctor-001',
+      const result = await service.importDailyIntakeExcel({
+        fileBuffer,
+        options: {
+          patientId: 10,
+          userId: 'doctor-001',
+        },
       });
 
       expect(result.success).toBe(false);
@@ -235,11 +241,14 @@ describe('DailyIntakeExcelService', () => {
       const fileBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
       await expect(
-        service.importDailyIntakeExcel(fileBuffer, {
-          patientId: 10,
-          userId: 'doctor-001',
-          date: '2026-10-26',
-          overwrite: false,
+        service.importDailyIntakeExcel({
+          fileBuffer,
+          options: {
+            patientId: 10,
+            userId: 'doctor-001',
+            date: '2026-10-26',
+            overwrite: false,
+          },
         }),
       ).rejects.toThrow();
     });

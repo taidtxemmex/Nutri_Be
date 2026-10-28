@@ -93,10 +93,29 @@ export function ApiPaginatedResponse<T extends Type<any>>(options: PaginatedResp
   );
 }
 
+export interface ApiErrorResponseParamDto {
+  status?: number;
+  description?: string;
+}
+
 /**
  * Decorator Swagger chuẩn hóa cho Error Envelope (Rule 10)
  */
-export function ApiErrorResponse(status = 400, description = 'Lỗi yêu cầu') {
+export function ApiErrorResponse(
+  paramOrStatus: ApiErrorResponseParamDto | number = 400,
+  legacyDescription = 'Lỗi yêu cầu',
+) {
+  let status = 400;
+  let description = 'Lỗi yêu cầu';
+
+  if (typeof paramOrStatus === 'object') {
+    status = paramOrStatus.status ?? 400;
+    description = paramOrStatus.description || 'Lỗi yêu cầu';
+  } else {
+    status = paramOrStatus;
+    description = legacyDescription;
+  }
+
   return applyDecorators(
     ApiExtraModels(ErrorEnvelopeDto),
     ApiResponse({

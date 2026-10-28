@@ -23,25 +23,39 @@ export function validateProductionSecrets(): void {
   // 1. Kiểm tra JWT_SECRET
   if (!jwtSecret) {
     if (isProduction) {
-      logger.error('CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is missing in PRODUCTION!');
-      throw new Error('Fatal Security Exception: JWT_SECRET must be explicitly configured in production.');
+      logger.error(
+        'CRITICAL SECURITY VIOLATION: JWT_SECRET environment variable is missing in PRODUCTION!',
+      );
+      throw new Error(
+        'Fatal Security Exception: JWT_SECRET must be explicitly configured in production.',
+      );
     } else {
       logger.warn('WARNING: JWT_SECRET is not configured. Development fallback will be used.');
     }
   } else {
     if (jwtSecret.length < 32) {
       if (isProduction) {
-        logger.error('CRITICAL SECURITY VIOLATION: JWT_SECRET entropy is too low (< 32 characters)!');
-        throw new Error('Fatal Security Exception: JWT_SECRET must be at least 32 characters for adequate entropy.');
+        logger.error(
+          'CRITICAL SECURITY VIOLATION: JWT_SECRET entropy is too low (< 32 characters)!',
+        );
+        throw new Error(
+          'Fatal Security Exception: JWT_SECRET must be at least 32 characters for adequate entropy.',
+        );
       } else {
-        logger.warn('WARNING: JWT_SECRET should be at least 32 characters long for cryptographic safety.');
+        logger.warn(
+          'WARNING: JWT_SECRET should be at least 32 characters long for cryptographic safety.',
+        );
       }
     }
 
     if (INSECURE_JWT_FALLBACKS.includes(jwtSecret)) {
       if (isProduction) {
-        logger.error('CRITICAL SECURITY VIOLATION: Insecure default or known JWT_SECRET detected in PRODUCTION!');
-        throw new Error('Fatal Security Exception: Do not use default or placeholder JWT secrets in production.');
+        logger.error(
+          'CRITICAL SECURITY VIOLATION: Insecure default or known JWT_SECRET detected in PRODUCTION!',
+        );
+        throw new Error(
+          'Fatal Security Exception: Do not use default or placeholder JWT secrets in production.',
+        );
       } else {
         logger.warn('WARNING: Known development default JWT_SECRET is currently active.');
       }
@@ -58,20 +72,32 @@ export function validateProductionSecrets(): void {
   const hmacSecret = process.env.STORAGE_HMAC_SECRET;
   if (!hmacSecret) {
     if (isProduction) {
-      logger.error('CRITICAL SECURITY VIOLATION: STORAGE_HMAC_SECRET environment variable is missing in PRODUCTION!');
-      throw new Error('Fatal Security Exception: STORAGE_HMAC_SECRET must be explicitly configured in production.');
+      logger.error(
+        'CRITICAL SECURITY VIOLATION: STORAGE_HMAC_SECRET environment variable is missing in PRODUCTION!',
+      );
+      throw new Error(
+        'Fatal Security Exception: STORAGE_HMAC_SECRET must be explicitly configured in production.',
+      );
     } else {
       logger.warn('WARNING: STORAGE_HMAC_SECRET is not configured. Falling back to JWT_SECRET.');
     }
   } else if (hmacSecret.length < 32) {
     if (isProduction) {
-      logger.error('CRITICAL SECURITY VIOLATION: STORAGE_HMAC_SECRET entropy is too low (< 32 characters)!');
-      throw new Error('Fatal Security Exception: STORAGE_HMAC_SECRET must be at least 32 characters for adequate entropy.');
+      logger.error(
+        'CRITICAL SECURITY VIOLATION: STORAGE_HMAC_SECRET entropy is too low (< 32 characters)!',
+      );
+      throw new Error(
+        'Fatal Security Exception: STORAGE_HMAC_SECRET must be at least 32 characters for adequate entropy.',
+      );
     } else {
-      logger.warn('WARNING: STORAGE_HMAC_SECRET should be at least 32 characters long for cryptographic safety.');
+      logger.warn(
+        'WARNING: STORAGE_HMAC_SECRET should be at least 32 characters long for cryptographic safety.',
+      );
     }
   }
 
   // 4. Thông báo hoàn tất kiểm tra an ninh khởi động
-  logger.log(`[Security Audit] Secrets validation completed successfully. Mode: ${isProduction ? 'PRODUCTION (STRICT)' : 'NON-PRODUCTION'}`);
+  logger.log(
+    `[Security Audit] Secrets validation completed successfully. Mode: ${isProduction ? 'PRODUCTION (STRICT)' : 'NON-PRODUCTION'}`,
+  );
 }

@@ -166,9 +166,12 @@ describe('MenuExcelService', () => {
 
   describe('Mode 1: FULL Export', () => {
     it('xuất đầy đủ cây thực đơn 5 cấp kèm chỉ tiêu vi chất và merge cells chính xác', async () => {
-      const buffer = await service.exportMenuExcel(mockMenuData, {
-        exportType: MenuExportType.FULL,
-        servings: 1,
+      const buffer = await service.exportMenuExcel({
+        menuIdOrData: mockMenuData,
+        options: {
+          exportType: MenuExportType.FULL,
+          servings: 1,
+        },
       });
 
       expect(buffer).toBeDefined();
@@ -201,8 +204,11 @@ describe('MenuExcelService', () => {
 
   describe('Mode 2: NET Export', () => {
     it('chỉ xuất khối lượng sống sạch (Net weight) và không có 86 cột vi chất', async () => {
-      const buffer = await service.exportMenuExcel(mockMenuData, {
-        exportType: MenuExportType.NET,
+      const buffer = await service.exportMenuExcel({
+        menuIdOrData: mockMenuData,
+        options: {
+          exportType: MenuExportType.NET,
+        },
       });
 
       expect(buffer).toBeDefined();
@@ -225,9 +231,12 @@ describe('MenuExcelService', () => {
 
   describe('Mode 3: NET_NUTRITION Export', () => {
     it('xuất khối lượng thực tế kèm vi chất tổng hợp theo từng bữa và cả ngày', async () => {
-      const buffer = await service.exportMenuExcel(mockMenuData, {
-        exportType: MenuExportType.NET_NUTRITION,
-        columns: ['energy', 'protein', 'fat', 'carbohydrate'],
+      const buffer = await service.exportMenuExcel({
+        menuIdOrData: mockMenuData,
+        options: {
+          exportType: MenuExportType.NET_NUTRITION,
+          columns: ['energy', 'protein', 'fat', 'carbohydrate'],
+        },
       });
 
       expect(buffer).toBeDefined();
@@ -249,9 +258,12 @@ describe('MenuExcelService', () => {
 
   describe('Mode 4: RAW Export', () => {
     it('xuất bảng tổng hợp đi chợ nguyên liệu thô theo ngày và cả chu kỳ cho N suất', async () => {
-      const buffer = await service.exportMenuExcel(mockMenuData, {
-        exportType: MenuExportType.RAW,
-        servings: 50,
+      const buffer = await service.exportMenuExcel({
+        menuIdOrData: mockMenuData,
+        options: {
+          exportType: MenuExportType.RAW,
+          servings: 50,
+        },
       });
 
       expect(buffer).toBeDefined();
@@ -272,9 +284,12 @@ describe('MenuExcelService', () => {
 
   describe('Mode 5: COOKED Export', () => {
     it('xuất bảng chế biến nhà bếp với khối lượng chín và hướng dẫn chia suất', async () => {
-      const buffer = await service.exportMenuExcel(mockMenuData, {
-        exportType: MenuExportType.COOKED,
-        servings: 100,
+      const buffer = await service.exportMenuExcel({
+        menuIdOrData: mockMenuData,
+        options: {
+          exportType: MenuExportType.COOKED,
+          servings: 100,
+        },
       });
 
       expect(buffer).toBeDefined();
@@ -296,8 +311,11 @@ describe('MenuExcelService', () => {
       const fakeBase64 = Buffer.from('FAKE_EXCEL_BUFFER').toString('base64');
       mockCacheService.get.mockResolvedValueOnce(fakeBase64);
 
-      const buffer = await service.exportMenuExcel(BigInt(1), {
-        exportType: MenuExportType.FULL,
+      const buffer = await service.exportMenuExcel({
+        menuIdOrData: BigInt(1),
+        options: {
+          exportType: MenuExportType.FULL,
+        },
       });
 
       expect(buffer.toString()).toBe('FAKE_EXCEL_BUFFER');
@@ -310,8 +328,12 @@ describe('MenuExcelService', () => {
       const chunks: Buffer[] = [];
       passThrough.on('data', (c) => chunks.push(c));
 
-      await service.streamMenuExcel(mockMenuData, passThrough, {
-        exportType: MenuExportType.NET,
+      await service.streamMenuExcel({
+        menuIdOrData: mockMenuData,
+        outputStream: passThrough,
+        options: {
+          exportType: MenuExportType.NET,
+        },
       });
 
       const fullStreamBuffer = Buffer.concat(chunks);

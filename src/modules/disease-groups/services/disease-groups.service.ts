@@ -14,17 +14,14 @@ import {
   buildDiseaseGroupCacheTag,
   buildDiseaseGroupDetailCacheKey,
 } from '../../../config/constants/cache.constants';
-import {
-  DEFAULT_PAGE,
-  DEFAULT_LIMIT,
-  MAX_LIMIT,
-} from '../../../config/constants/pagination.constants';
 import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
-  CreateDiseaseGroupDto,
-  UpdateDiseaseGroupDto,
-  DiseaseGroupQueryDto,
   DiseaseGroupResponseDto,
+  FindDiseaseGroupsParamsDto,
+  FindDiseaseGroupByIdParamsDto,
+  CreateDiseaseGroupParamsDto,
+  UpdateDiseaseGroupParamsDto,
+  DeleteDiseaseGroupParamsDto,
 } from '../dto';
 
 export interface PaginatedDiseaseGroupsResult {
@@ -47,15 +44,18 @@ export class DiseaseGroupsService {
    * Danh sách nhóm bệnh có phân trang (Anti-OOM, Lean Projection)
    * Tích hợp Perpetual Cache (Rule 23)
    */
-  async findAll(query?: DiseaseGroupQueryDto): Promise<PaginatedDiseaseGroupsResult> {
+  async findAll({ query }: FindDiseaseGroupsParamsDto = {}): Promise<PaginatedDiseaseGroupsResult> {
     const { page, limit, skip } = normalizePagination(query);
 
-    const cacheKey = this.cacheService?.generateKey('disease-groups:list', {
-      page,
-      limit,
-      search: query?.search,
-      sortBy: query?.sortBy,
-      sortOrder: query?.sortOrder,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'disease-groups:list',
+      params: {
+        page,
+        limit,
+        search: query?.search,
+        sortBy: query?.sortBy,
+        sortOrder: query?.sortOrder,
+      },
     });
 
     const fetchDiseaseGroups = async (): Promise<PaginatedDiseaseGroupsResult> => {
@@ -123,7 +123,7 @@ export class DiseaseGroupsService {
   /**
    * Lấy chi tiết nhóm bệnh theo ID (Shared Entity Cache / Identity Map)
    */
-  async findById(id: number): Promise<DiseaseGroupResponseDto> {
+  async findById({ id }: FindDiseaseGroupByIdParamsDto): Promise<DiseaseGroupResponseDto> {
     const fetchDiseaseGroup = async () => {
       const record = await this.prisma.nhom_benh.findUnique({
         where: { id },
@@ -179,7 +179,7 @@ export class DiseaseGroupsService {
   /**
    * Tạo mới nhóm bệnh
    */
-  async create(dto: CreateDiseaseGroupDto): Promise<DiseaseGroupResponseDto> {
+  async create({ dto }: CreateDiseaseGroupParamsDto): Promise<DiseaseGroupResponseDto> {
     const code = (
       typeof dto.getCode === 'function' ? dto.getCode() : dto.code || dto.maNhom || ''
     ).trim();
@@ -218,7 +218,7 @@ export class DiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache(created.id);
+    await this.invalidateCache({ id: created.id });
 
     return {
       id: created.id,
@@ -232,7 +232,7 @@ export class DiseaseGroupsService {
   /**
    * Cập nhật nhóm bệnh
    */
-  async update(id: number, dto: UpdateDiseaseGroupDto): Promise<DiseaseGroupResponseDto> {
+  async update({ id, dto }: UpdateDiseaseGroupParamsDto): Promise<DiseaseGroupResponseDto> {
     const existing = await this.prisma.nhom_benh.findUnique({
       where: { id },
       select: { id: true },
@@ -281,7 +281,7 @@ export class DiseaseGroupsService {
       },
     });
 
-    await this.invalidateCache(id);
+    await this.invalidateCache({ id });
 
     return {
       id: updated.id,
@@ -296,7 +296,9 @@ export class DiseaseGroupsService {
    * Xóa nhóm bệnh
    * - Proactive check _count trên nhom_benh_mo_rong (DG_002, 409)
    */
-  async delete(id: number): Promise<{ success: boolean; message: string }> {
+  async delete({
+    id,
+  }: DeleteDiseaseGroupParamsDto): Promise<{ success: boolean; message: string }> {
     const existing = await this.prisma.nhom_benh.findUnique({
       where: { id },
       select: {
@@ -326,7 +328,7 @@ export class DiseaseGroupsService {
       where: { id },
     });
 
-    await this.invalidateCache(id);
+    await this.invalidateCache({ id });
 
     return {
       success: true,
@@ -334,7 +336,7 @@ export class DiseaseGroupsService {
     };
   }
 
-  private async invalidateCache(id?: number): Promise<void> {
+  private async invalidateCache({ id }: { id?: number } = {}): Promise<void> {
     if (this.cacheService) {
       const tags = [CACHE_TAG_DISEASE_GROUPS];
       if (id !== undefined) {

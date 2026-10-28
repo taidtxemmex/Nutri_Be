@@ -8,7 +8,8 @@ export async function runStandaloneSeed(
   name: string,
   fn: (prisma: PrismaClient, databaseUrl: string) => Promise<void>,
 ): Promise<void> {
-  const databaseUrl = process.env.DATABASE_URL || 'mysql://dangtai:12345678@127.0.0.1:3306/dinhduong';
+  const databaseUrl =
+    process.env.DATABASE_URL || 'mysql://dangtai:12345678@127.0.0.1:3306/dinhduong';
   const adapter = new PrismaMariaDb(databaseUrl);
   const prisma = new PrismaClient({ adapter });
 

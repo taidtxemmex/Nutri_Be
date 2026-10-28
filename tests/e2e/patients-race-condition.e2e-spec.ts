@@ -108,7 +108,7 @@ describe('Sprint 5 Suite 2: Patients Race Condition & Code Allocator (Task 5.2)'
 
       // Layer 2: API Contract Envelope & Unique Code Assertions
       const allocatedCodes = responses.map((res) => res.body.data.patientCode);
-      const allocatedIds = responses.map((res) => res.body.data.id);
+      const _allocatedIds = responses.map((res) => res.body.data.id);
 
       // KHẲNG ĐỊNH: Không có bất kỳ 2 mã bệnh nhân nào bị trùng lặp!
       const uniqueCodesSet = new Set(allocatedCodes);

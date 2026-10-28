@@ -4,3 +4,4 @@ export * from './dish-response.dto';
 export * from './clone-dish.dto';
 export * from './reject-dish.dto';
 export * from './export-dish.dto';
+export * from './dish-params.dto';

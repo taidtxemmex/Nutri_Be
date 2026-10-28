@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  ExecutionContext,
-  HttpException,
-  HttpStatus,
-} from '@nestjs/common';
+import { Injectable, ExecutionContext, HttpException, HttpStatus } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ThrottlerLimitDetail } from '@nestjs/throttler/dist/throttler.guard.interface';
 
@@ -22,17 +17,21 @@ export class ThrottlerBehindProxyGuard extends ThrottlerGuard {
     const url = req?.originalUrl || req?.url || '';
 
     // Chỉ áp dụng throttler 'auth' cho các endpoint đăng nhập / đăng ký
-    if (throttler?.name === 'auth') {
-      if (!url.includes('/auth/login') && !url.includes('/auth/register')) {
-        return true;
-      }
+    if (
+      throttler?.name === 'auth' &&
+      !url.includes('/auth/login') &&
+      !url.includes('/auth/register')
+    ) {
+      return true;
     }
 
     // Chỉ áp dụng throttler 'sensitive' cho các endpoint quên / đặt lại mật khẩu
-    if (throttler?.name === 'sensitive') {
-      if (!url.includes('/auth/forgot-password') && !url.includes('/auth/reset-password')) {
-        return true;
-      }
+    if (
+      throttler?.name === 'sensitive' &&
+      !url.includes('/auth/forgot-password') &&
+      !url.includes('/auth/reset-password')
+    ) {
+      return true;
     }
 
     return super.handleRequest(requestProps);
@@ -42,10 +41,7 @@ export class ThrottlerBehindProxyGuard extends ThrottlerGuard {
     const xForwardedFor = req.headers['x-forwarded-for'];
     if (xForwardedFor) {
       // Lấy địa chỉ IP đầu tiên trong chuỗi proxy (Client IP thực tế)
-      const ip = Array.isArray(xForwardedFor)
-        ? xForwardedFor[0]
-        : xForwardedFor.split(',')[0].trim();
-      return ip;
+      return Array.isArray(xForwardedFor) ? xForwardedFor[0] : xForwardedFor.split(',')[0].trim();
     }
     return req.ips?.length ? req.ips[0] : req.ip || 'unknown-client';
   }

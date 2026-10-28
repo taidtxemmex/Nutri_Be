@@ -14,17 +14,14 @@ import {
   buildCategoryCacheTag,
   buildCategoryDetailCacheKey,
 } from '../../../config/constants/cache.constants';
-import {
-  DEFAULT_PAGE,
-  DEFAULT_LIMIT,
-  MAX_LIMIT,
-} from '../../../config/constants/pagination.constants';
 import { normalizePagination } from '../../../common/dto/base-pagination-query.dto';
 import {
-  CreateCategoryDto,
-  UpdateCategoryDto,
-  CategoryQueryDto,
   CategoryResponseDto,
+  FindCategoriesParamsDto,
+  FindCategoryByIdParamsDto,
+  CreateCategoryParamsDto,
+  UpdateCategoryParamsDto,
+  DeleteCategoryParamsDto,
 } from '../dto';
 
 export interface PaginatedCategoriesResult {
@@ -46,15 +43,18 @@ export class CategoriesService {
   /**
    * Danh sách danh mục phân trang kèm tìm kiếm (Anti-OOM: max 100 items, Lean Projection)
    */
-  async findAll(query?: CategoryQueryDto): Promise<PaginatedCategoriesResult> {
+  async findAll({ query }: FindCategoriesParamsDto = {}): Promise<PaginatedCategoriesResult> {
     const { page, limit, skip } = normalizePagination(query);
 
-    const cacheKey = this.cacheService?.generateKey('categories:list', {
-      page,
-      limit,
-      search: query?.search,
-      sortBy: query?.sortBy,
-      sortOrder: query?.sortOrder,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'categories:list',
+      params: {
+        page,
+        limit,
+        search: query?.search,
+        sortBy: query?.sortBy,
+        sortOrder: query?.sortOrder,
+      },
     });
 
     if (this.cacheService && cacheKey) {
@@ -153,7 +153,7 @@ export class CategoriesService {
   /**
    * Lấy chi tiết danh mục theo ID (Shared Entity Cache / Identity Map)
    */
-  async findById(id: number): Promise<CategoryResponseDto> {
+  async findById({ id }: FindCategoryByIdParamsDto): Promise<CategoryResponseDto> {
     const fetchCategory = async () => {
       const record = await this.prisma.danh_muc.findUnique({
         where: { id },
@@ -186,7 +186,9 @@ export class CategoriesService {
           [CACHE_TAG_CATEGORIES, buildCategoryCacheTag(id)],
         );
       }
-      const cached = await this.cacheService.get<CategoryResponseDto>(buildCategoryDetailCacheKey(id));
+      const cached = await this.cacheService.get<CategoryResponseDto>(
+        buildCategoryDetailCacheKey(id),
+      );
       if (cached) return cached;
       const result = await fetchCategory();
       await this.cacheService.set(buildCategoryDetailCacheKey(id), result, CACHE_TTL_PERPETUAL, [
@@ -205,7 +207,7 @@ export class CategoriesService {
    * - Check trùng tên (CAT_001, 400)
    * - Invalidate Cache tag: categories
    */
-  async create(dto: CreateCategoryDto): Promise<CategoryResponseDto> {
+  async create({ dto }: CreateCategoryParamsDto): Promise<CategoryResponseDto> {
     const name = (
       typeof dto.getName === 'function' ? dto.getName() : dto.categoryName || dto.tenDanhMuc || ''
     ).trim();
@@ -240,7 +242,7 @@ export class CategoriesService {
       },
     });
 
-    await this.invalidateCategoryCache(created.id);
+    await this.invalidateCategoryCache({ id: created.id });
 
     return {
       id: created.id,
@@ -255,7 +257,7 @@ export class CategoriesService {
    * - Check trùng tên khác ID (CAT_001, 400)
    * - Invalidate Cache tag: categories & category:id
    */
-  async update(id: number, dto: UpdateCategoryDto): Promise<CategoryResponseDto> {
+  async update({ id, dto }: UpdateCategoryParamsDto): Promise<CategoryResponseDto> {
     const existing = await this.prisma.danh_muc.findUnique({
       where: { id },
       select: { id: true, ten_danh_muc: true },
@@ -304,7 +306,7 @@ export class CategoriesService {
       },
     });
 
-    await this.invalidateCategoryCache(id);
+    await this.invalidateCategoryCache({ id });
 
     return {
       id: updated.id,
@@ -319,7 +321,7 @@ export class CategoriesService {
    * - Proactive check _count trên nguyen_lieu & de_xuat_nguyen_lieu (CAT_002, 409)
    * - Invalidate Cache tag: categories & category:id
    */
-  async delete(id: number): Promise<{ success: boolean; message: string }> {
+  async delete({ id }: DeleteCategoryParamsDto): Promise<{ success: boolean; message: string }> {
     const existing = await this.prisma.danh_muc.findUnique({
       where: { id },
       select: {
@@ -355,7 +357,7 @@ export class CategoriesService {
       where: { id },
     });
 
-    await this.invalidateCategoryCache(id);
+    await this.invalidateCategoryCache({ id });
 
     return {
       success: true,
@@ -363,7 +365,7 @@ export class CategoriesService {
     };
   }
 
-  private async invalidateCategoryCache(id?: number): Promise<void> {
+  private async invalidateCategoryCache({ id }: { id?: number } = {}): Promise<void> {
     if (this.cacheService) {
       const tags = [CACHE_TAG_CATEGORIES];
       if (id !== undefined) {

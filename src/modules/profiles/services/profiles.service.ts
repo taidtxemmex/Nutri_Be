@@ -4,13 +4,11 @@ import { CacheService } from '../../../core/cache/cache.service';
 import {
   CACHE_TAG_PROFILES,
   CACHE_TAG_USERS,
-  CACHE_TTL_DETAIL_SECONDS,
-  CACHE_TTL_LIST_SECONDS,
   CACHE_TTL_PERPETUAL,
   buildUserCacheTag,
 } from '../../../config/constants/cache.constants';
 import { DEFAULT_LIMIT, MAX_LIMIT } from '../../../config/constants/pagination.constants';
-import { ProfileFilterDto, UpdateProfileDto } from '../dto';
+import { GetMyProfileParamsDto, UpdateMyProfileParamsDto, GetAllProfilesParamsDto } from '../dto';
 
 export interface MyProfileResult {
   id: string;
@@ -53,8 +51,11 @@ export class ProfilesService {
   /**
    * Lấy thông tin hồ sơ của người dùng hiện tại (có Cache 60s per detail)
    */
-  async getMyProfile(userId: string): Promise<MyProfileResult> {
-    const cacheKey = this.cacheService?.generateKey('profiles:my', { userId });
+  async getMyProfile({ userId }: GetMyProfileParamsDto): Promise<MyProfileResult> {
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'profiles:my',
+      params: { userId },
+    });
     if (this.cacheService && cacheKey) {
       const cached = await this.cacheService.get<MyProfileResult>(cacheKey);
       if (cached) {
@@ -112,12 +113,10 @@ export class ProfilesService {
     };
 
     if (this.cacheService && cacheKey) {
-      await this.cacheService.set(
-        cacheKey,
-        result,
-        CACHE_TTL_PERPETUAL,
-        [CACHE_TAG_PROFILES, buildUserCacheTag(userId)],
-      );
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, [
+        CACHE_TAG_PROFILES,
+        buildUserCacheTag(userId),
+      ]);
     }
 
     return result;
@@ -126,7 +125,7 @@ export class ProfilesService {
   /**
    * Cập nhật hồ sơ người dùng hiện tại (với Debounced Invalidation 500ms)
    */
-  async updateMyProfile(userId: string, dto: UpdateProfileDto) {
+  async updateMyProfile({ userId, dto }: UpdateMyProfileParamsDto) {
     const existingUser = await this.prisma.nguoi_dung.findUnique({
       where: { id: userId },
       select: { id: true, deleted_at: true },
@@ -179,15 +178,18 @@ export class ProfilesService {
    * Anti-OOM: Bounded take <= MAX_LIMIT (100)
    * Cache 15s có chuẩn hóa query params (Rule 23 & Rule 25)
    */
-  async getAllProfiles(filter: ProfileFilterDto): Promise<PaginatedProfilesResult> {
+  async getAllProfiles({ filter }: GetAllProfilesParamsDto): Promise<PaginatedProfilesResult> {
     const page = Math.max(0, Number(filter.page) || 0);
     const size = Math.min(MAX_LIMIT, Math.max(1, Number(filter.size) || DEFAULT_LIMIT));
     const skip = page * size;
 
-    const cacheKey = this.cacheService?.generateKey('profiles:list', {
-      page,
-      size,
-      keyword: filter.keyword,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'profiles:list',
+      params: {
+        page,
+        size,
+        keyword: filter.keyword,
+      },
     });
 
     if (this.cacheService && cacheKey) {

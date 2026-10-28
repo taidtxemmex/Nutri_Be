@@ -205,7 +205,7 @@ describe('Sprint 5 Suite 3: Patients Excel Import & Formula Injection (Task 5.4)
       expect(dbRows[0].ho_ten).toBe("'=1+1");
       expect(dbRows[0].ghi_chu).toBe("'@SUM(A1:A10)");
       expect(dbRows[1].ho_ten).toBe("'+Dương Văn Tính");
-      expect(dbRows[1].ghi_chu).toBe("'-2+5+cmd|\"/C calc\"!A0");
+      expect(dbRows[1].ghi_chu).toBe('\'-2+5+cmd|"/C calc"!A0');
       expect(dbRows[1].ma_benh_nhan_bv).toBe("'-CMD_CODE");
     });
   });

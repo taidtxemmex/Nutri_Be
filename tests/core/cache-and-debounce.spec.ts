@@ -130,12 +130,12 @@ describe('Intelligent Cache, Query Normalization & Debounced Mutation Invalidati
   describe('List Caching & Cache Hit on Consecutive Calls', () => {
     it('should call DB on first GET list, and return cached result on second call (Cache Hit)', async () => {
       // First call -> Cache Miss -> Queries DB
-      const result1 = await usersService.findAll({ page: 1, limit: 10, search: 'minh' });
+      const result1 = await usersService.findAll({ query: { page: 1, limit: 10, search: 'minh' } });
       expect(result1.items).toHaveLength(1);
       expect(mockPrisma.nguoi_dung.findMany).toHaveBeenCalledTimes(1);
 
       // Second call with same parameters -> Cache Hit -> Skips DB
-      const result2 = await usersService.findAll({ page: 1, limit: 10, search: 'minh' });
+      const result2 = await usersService.findAll({ query: { page: 1, limit: 10, search: 'minh' } });
       expect(result2.items).toHaveLength(1);
       expect(result2.items[0].username).toBe('bs_minhtri');
       // findMany count remains 1!
@@ -143,33 +143,37 @@ describe('Intelligent Cache, Query Normalization & Debounced Mutation Invalidati
     });
 
     it('should hit cache even if query parameters are sent in reverse order', async () => {
-      await usersService.findAll({ page: 1, limit: 10, search: 'minh', role: UserRole.USER });
+      await usersService.findAll({
+        query: { page: 1, limit: 10, search: 'minh', role: UserRole.USER },
+      });
       expect(mockPrisma.nguoi_dung.findMany).toHaveBeenCalledTimes(1);
 
       // Reverse order of parameters
-      await usersService.findAll({ role: UserRole.USER, search: 'minh', limit: 10, page: 1 });
+      await usersService.findAll({
+        query: { role: UserRole.USER, search: 'minh', limit: 10, page: 1 },
+      });
       expect(mockPrisma.nguoi_dung.findMany).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('Detail Caching (users:detail, users:info, profiles:my)', () => {
     it('should cache user detail and return from cache on subsequent calls', async () => {
-      const user = await usersService.findById('uuid-cached-user');
+      const user = await usersService.findById({ id: 'uuid-cached-user' });
       expect(user.ten_dang_nhap).toBe('bs_minhtri');
       expect(mockPrisma.nguoi_dung.findUnique).toHaveBeenCalledTimes(1);
 
       // Subsequent call hits cache
-      const cachedUser = await usersService.findById('uuid-cached-user');
+      const cachedUser = await usersService.findById({ id: 'uuid-cached-user' });
       expect(cachedUser.ten_dang_nhap).toBe('bs_minhtri');
       expect(mockPrisma.nguoi_dung.findUnique).toHaveBeenCalledTimes(1);
     });
 
     it('should cache my-profile in ProfilesService', async () => {
-      const p1 = await profilesService.getMyProfile('uuid-cached-user');
+      const p1 = await profilesService.getMyProfile({ userId: 'uuid-cached-user' });
       expect(p1.fullName).toBe('Bác sĩ Minh Trí');
       expect(mockPrisma.nguoi_dung.findUnique).toHaveBeenCalledTimes(1);
 
-      const p2 = await profilesService.getMyProfile('uuid-cached-user');
+      const p2 = await profilesService.getMyProfile({ userId: 'uuid-cached-user' });
       expect(p2.fullName).toBe('Bác sĩ Minh Trí');
       expect(mockPrisma.nguoi_dung.findUnique).toHaveBeenCalledTimes(1);
     });
@@ -185,14 +189,18 @@ describe('Intelligent Cache, Query Normalization & Debounced Mutation Invalidati
 
     it('should immediately clear In-Memory cache upon mutation so next GET sees fresh data', async () => {
       // 1. Warm up cache
-      await usersService.findAll({ page: 1, limit: 10 });
+      await usersService.findAll({ query: { page: 1, limit: 10 } });
       expect(mockPrisma.nguoi_dung.findMany).toHaveBeenCalledTimes(1);
 
       // 2. Perform a mutation (e.g. admin updates user role)
-      await usersService.updateRole('uuid-cached-user', UserRole.USERPRO, adminUser);
+      await usersService.updateRole({
+        targetUserId: 'uuid-cached-user',
+        newRole: UserRole.USERPRO,
+        currentUser: adminUser,
+      });
 
       // 3. Immediately query list again -> In-Memory was cleared -> Cache Miss -> Fetches DB again!
-      await usersService.findAll({ page: 1, limit: 10 });
+      await usersService.findAll({ query: { page: 1, limit: 10 } });
       expect(mockPrisma.nguoi_dung.findMany).toHaveBeenCalledTimes(2);
     });
 
@@ -229,7 +237,12 @@ describe('Intelligent Cache, Query Normalization & Debounced Mutation Invalidati
       const cacheKey = buildCategoryDetailCacheKey(categoryId);
       const tags = [CACHE_TAG_CATEGORIES, buildCategoryCacheTag(categoryId)];
 
-      await cacheService.set(cacheKey, { id: categoryId, name: 'Sữa chua' }, CACHE_TTL_PERPETUAL, tags);
+      await cacheService.set(
+        cacheKey,
+        { id: categoryId, name: 'Sữa chua' },
+        CACHE_TTL_PERPETUAL,
+        tags,
+      );
 
       // Verify in-memory hit
       const hit = await cacheService.get(cacheKey);

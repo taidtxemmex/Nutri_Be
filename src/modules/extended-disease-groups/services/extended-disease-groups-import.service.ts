@@ -1,11 +1,9 @@
 import { Injectable, BadRequestException, Logger, Optional } from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { CACHE_TAG_EXTENDED_DISEASE_GROUPS } from '../../../config/constants/cache.constants';
-import { ImportResultDto } from '../dto/import-result.dto';
+import { ImportResultDto, ImportExtendedDiseaseGroupsParamsDto } from '../dto';
 import { ExcelStreamReader, ErrorRowItem } from '../../../core/excel-engine';
 
 @Injectable()
@@ -49,55 +47,55 @@ export class ExtendedDiseaseGroupsImportService {
     workbook.created = new Date();
 
     const dataSheet = workbook.addWorksheet(ExtendedDiseaseGroupsImportService.DATA_SHEET);
-      const parentSheet = workbook.addWorksheet(ExtendedDiseaseGroupsImportService.PARENT_SHEET);
+    const parentSheet = workbook.addWorksheet(ExtendedDiseaseGroupsImportService.PARENT_SHEET);
 
-      // 1. Data Sheet Header
-      dataSheet.columns = [
-        { header: ExtendedDiseaseGroupsImportService.EXPECTED_HEADERS[0], key: 'parent', width: 40 },
-        { header: ExtendedDiseaseGroupsImportService.EXPECTED_HEADERS[1], key: 'code', width: 25 },
-        { header: ExtendedDiseaseGroupsImportService.EXPECTED_HEADERS[2], key: 'name', width: 40 },
-      ];
+    // 1. Data Sheet Header
+    dataSheet.columns = [
+      { header: ExtendedDiseaseGroupsImportService.EXPECTED_HEADERS[0], key: 'parent', width: 40 },
+      { header: ExtendedDiseaseGroupsImportService.EXPECTED_HEADERS[1], key: 'code', width: 25 },
+      { header: ExtendedDiseaseGroupsImportService.EXPECTED_HEADERS[2], key: 'name', width: 40 },
+    ];
 
-      const headerRow = dataSheet.getRow(1);
-      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-      headerRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF1976D2' }, // Blue primary
-      };
-      headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-      headerRow.height = 25;
+    const headerRow = dataSheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1976D2' }, // Blue primary
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 25;
 
-      // Set text format for column B (code) to avoid dropping leading zeros
-      dataSheet.getColumn(2).numFmt = '@';
+    // Set text format for column B (code) to avoid dropping leading zeros
+    dataSheet.getColumn(2).numFmt = '@';
 
-      // 2. Parent Sheet Header & Data
-      parentSheet.columns = [{ header: 'Nhóm bệnh cha', key: 'parent', width: 45 }];
-      const parentHeader = parentSheet.getRow(1);
-      parentHeader.font = { bold: true };
+    // 2. Parent Sheet Header & Data
+    parentSheet.columns = [{ header: 'Nhóm bệnh cha', key: 'parent', width: 45 }];
+    const parentHeader = parentSheet.getRow(1);
+    parentHeader.font = { bold: true };
 
-      for (const p of parents) {
-        const label = `${(p.ma_nhom || '').trim()} - ${(p.ten_nhom || '').trim()}`;
-        parentSheet.addRow([label]);
+    for (const p of parents) {
+      const label = `${(p.ma_nhom || '').trim()} - ${(p.ten_nhom || '').trim()}`;
+      parentSheet.addRow([label]);
+    }
+
+    // 3. Dropdown Validation for Sheet 1
+    if (parents.length > 0) {
+      const formula = `'${ExtendedDiseaseGroupsImportService.PARENT_SHEET}'!$A$2:$A$${parents.length + 1}`;
+      for (let rowIdx = 2; rowIdx <= 100; rowIdx++) {
+        dataSheet.getCell(`A${rowIdx}`).dataValidation = {
+          type: 'list',
+          allowBlank: true,
+          formulae: [formula],
+          showErrorMessage: true,
+          errorTitle: 'Nhóm bệnh cha',
+          error: 'Vui lòng chọn từ danh sách nhóm bệnh cha',
+        };
       }
+    }
 
-      // 3. Dropdown Validation for Sheet 1
-      if (parents.length > 0) {
-        const formula = `'${ExtendedDiseaseGroupsImportService.PARENT_SHEET}'!$A$2:$A$${parents.length + 1}`;
-        for (let rowIdx = 2; rowIdx <= 100; rowIdx++) {
-          dataSheet.getCell(`A${rowIdx}`).dataValidation = {
-            type: 'list',
-            allowBlank: true,
-            formulae: [formula],
-            showErrorMessage: true,
-            errorTitle: 'Nhóm bệnh cha',
-            error: 'Vui lòng chọn từ danh sách nhóm bệnh cha',
-          };
-        }
-      }
-
-      const generated = await workbook.xlsx.writeBuffer();
-      const buffer = Buffer.from(generated);
+    const generated = await workbook.xlsx.writeBuffer();
+    const buffer = Buffer.from(generated);
 
     if (
       this.cacheService &&
@@ -111,7 +109,9 @@ export class ExtendedDiseaseGroupsImportService {
         1800,
         CACHE_TAG_EXTENDED_DISEASE_GROUPS,
       );
-      this.logger.debug('💾 Đã lưu template nhóm bệnh mở rộng vào CacheService (tag=extended_disease_groups)');
+      this.logger.debug(
+        '💾 Đã lưu template nhóm bệnh mở rộng vào CacheService (tag=extended_disease_groups)',
+      );
     }
 
     return buffer;
@@ -121,7 +121,10 @@ export class ExtendedDiseaseGroupsImportService {
    * Import nhóm bệnh mở rộng nguyên tử (Atomic transaction - 1 row lỗi là rollback toàn bộ)
    * Sử dụng ExcelStreamReader streaming O(1) RAM và Smart Sheet Signature Detection.
    */
-  async importExcel(userId: string, file: Express.Multer.File): Promise<ImportResultDto> {
+  async importExcel({
+    userId,
+    file,
+  }: ImportExtendedDiseaseGroupsParamsDto): Promise<ImportResultDto> {
     if (!file || !file.buffer) {
       throw new BadRequestException({
         code: 'IMPORT_INVALID_FILE',
@@ -207,7 +210,8 @@ export class ExtendedDiseaseGroupsImportService {
 
           const rawParent = (row.getCell(1).value?.toString() || '').trim();
           const rawCode = (row.getCell(2).value?.toString() || '').trim();
-          const rawName = ExcelStreamReader.readCellString(row.getCell(3), true) || '';
+          const rawName =
+            ExcelStreamReader.readCellString({ cell: row.getCell(3), sanitize: true }) || '';
 
           // Bỏ qua dòng trống hoàn toàn
           if (!rawParent && !rawCode && !rawName) continue;

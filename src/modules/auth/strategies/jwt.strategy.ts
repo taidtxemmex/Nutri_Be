@@ -24,12 +24,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly cacheService?: CacheService,
   ) {
-    const jwtSecret =
-      configService.get<string>('JWT_SECRET') ||
-      process.env.JWT_SECRET;
+    const jwtSecret = configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
 
     if (!jwtSecret && process.env.NODE_ENV === 'production') {
-      throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production!');
+      throw new Error(
+        'FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production!',
+      );
     }
 
     super({
@@ -52,7 +52,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     let role = payload.role;
 
     if (this.prisma) {
-      let user: { id: string; ten_dang_nhap: string; vai_tro: string; active: boolean | null } | null = null;
+      let user: {
+        id: string;
+        ten_dang_nhap: string;
+        vai_tro: string;
+        active: boolean | null;
+      } | null = null;
 
       if (this.cacheService) {
         // Shared Entity Cache / Identity Map: Kiểm tra xem user detail đã có trong cache chưa

@@ -7,9 +7,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import {
-  CreateNutritionGuideDto,
-  UpdateNutritionGuideDto,
   NutritionGuideResponseDto,
+  GetNutritionGuideByIdParamsDto,
+  CreateNutritionGuideParamsDto,
+  UpdateNutritionGuideParamsDto,
+  DeleteNutritionGuideParamsDto,
 } from '../dto';
 
 @Injectable()
@@ -36,7 +38,7 @@ export class NutritionGuidesService {
     return list.map((item) => this.mapToDto(item));
   }
 
-  async getById(id: number): Promise<NutritionGuideResponseDto> {
+  async getById({ id }: GetNutritionGuideByIdParamsDto): Promise<NutritionGuideResponseDto> {
     const entity = await this.prisma.huong_dan_dinh_duong.findUnique({
       where: { id: BigInt(id) },
     });
@@ -48,10 +50,7 @@ export class NutritionGuidesService {
     return this.mapToDto(entity);
   }
 
-  async create(
-    dto: CreateNutritionGuideDto,
-    userId?: string,
-  ): Promise<NutritionGuideResponseDto> {
+  async create({ dto, userId }: CreateNutritionGuideParamsDto): Promise<NutritionGuideResponseDto> {
     const existing = await this.prisma.huong_dan_dinh_duong.findUnique({
       where: { ma_ky_hieu: dto.code },
     });
@@ -65,7 +64,9 @@ export class NutritionGuidesService {
         ma_ky_hieu: dto.code,
         ten_benh: dto.diseaseName,
         nguyen_tac: dto.nutritionPrinciple ?? null,
-        co_cau_khau_phan: dto.dietaryRequirements ? JSON.parse(JSON.stringify(dto.dietaryRequirements)) : null,
+        co_cau_khau_phan: dto.dietaryRequirements
+          ? JSON.parse(JSON.stringify(dto.dietaryRequirements))
+          : null,
         luu_y: dto.note ?? null,
         nguoi_dung_id: userId ?? null,
       },
@@ -74,10 +75,7 @@ export class NutritionGuidesService {
     return this.mapToDto(created);
   }
 
-  async update(
-    id: number,
-    dto: UpdateNutritionGuideDto,
-  ): Promise<NutritionGuideResponseDto> {
+  async update({ id, dto }: UpdateNutritionGuideParamsDto): Promise<NutritionGuideResponseDto> {
     const existing = await this.prisma.huong_dan_dinh_duong.findUnique({
       where: { id: BigInt(id) },
     });
@@ -102,7 +100,11 @@ export class NutritionGuidesService {
         ...(dto.diseaseName ? { ten_benh: dto.diseaseName } : {}),
         ...(dto.nutritionPrinciple !== undefined ? { nguyen_tac: dto.nutritionPrinciple } : {}),
         ...(dto.dietaryRequirements !== undefined
-          ? { co_cau_khau_phan: dto.dietaryRequirements ? JSON.parse(JSON.stringify(dto.dietaryRequirements)) : null }
+          ? {
+              co_cau_khau_phan: dto.dietaryRequirements
+                ? JSON.parse(JSON.stringify(dto.dietaryRequirements))
+                : null,
+            }
           : {}),
         ...(dto.note !== undefined ? { luu_y: dto.note } : {}),
       },
@@ -111,7 +113,7 @@ export class NutritionGuidesService {
     return this.mapToDto(updated);
   }
 
-  async delete(id: number): Promise<void> {
+  async delete({ id }: DeleteNutritionGuideParamsDto): Promise<void> {
     const existing = await this.prisma.huong_dan_dinh_duong.findUnique({
       where: { id: BigInt(id) },
     });

@@ -57,7 +57,7 @@ export class PatientsController {
     description: 'Danh sách bệnh nhân',
   })
   async findAll(@Query() query: PatientQueryDto, @CurrentUser() user: any) {
-    return this.patientsService.findAll(query, user);
+    return this.patientsService.findAll({ query, currentUser: user });
   }
 
   @Get('code-preview')
@@ -69,7 +69,7 @@ export class PatientsController {
     @Query('excludeId') excludeId?: string,
     @CurrentUser() user?: any,
   ): Promise<PatientCodePreviewDto> {
-    return this.patientsService.previewCode(phone, excludeId, user);
+    return this.patientsService.previewCode({ phone, excludeId, currentUser: user });
   }
 
   @Get('import-template')
@@ -78,7 +78,7 @@ export class PatientsController {
     const safeFileName = path.basename('Template_import_benh_nhan.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    setExcelResponseHeaders(res, safeFileName);
+    setExcelResponseHeaders({ res, filename: safeFileName });
 
     if (fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -105,14 +105,17 @@ export class PatientsController {
       });
     }
 
-    const result = await this.patientExcelService.importExcel(file.buffer, user);
+    const result = await this.patientExcelService.importExcel({
+      fileBuffer: file.buffer,
+      currentUser: user,
+    });
 
     if (!result.success && result.errorFileBuffer) {
       res.status(HttpStatus.OK);
-      setExcelResponseHeaders(
+      setExcelResponseHeaders({
         res,
-        result.errorFileName || 'patient_import_result.xlsx',
-      );
+        filename: result.errorFileName || 'patient_import_result.xlsx',
+      });
       return res.end(result.errorFileBuffer);
     }
 
@@ -145,7 +148,7 @@ export class PatientsController {
     @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: any,
   ): Promise<PatientResponseDto> {
-    return this.patientsService.findById(id, user);
+    return this.patientsService.findById({ id, currentUser: user });
   }
 
   @Post()
@@ -160,7 +163,7 @@ export class PatientsController {
     @Body() dto: CreatePatientDto,
     @CurrentUser() user: any,
   ): Promise<PatientResponseDto> {
-    return this.patientsService.create(dto, user);
+    return this.patientsService.create({ dto, currentUser: user });
   }
 
   @Put(':id')
@@ -175,7 +178,7 @@ export class PatientsController {
     @Body() dto: UpdatePatientDto,
     @CurrentUser() user: any,
   ): Promise<PatientResponseDto> {
-    return this.patientsService.update(id, dto, user);
+    return this.patientsService.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -188,7 +191,7 @@ export class PatientsController {
     @Param('id', ParseBigIntPipe) id: bigint,
     @CurrentUser() user: any,
   ): Promise<{ success: boolean; message: string }> {
-    return this.patientsService.delete(id, user);
+    return this.patientsService.delete({ id, currentUser: user });
   }
 
   // ==========================================
@@ -207,7 +210,7 @@ export class PatientsController {
     @Query() query: AnthropometryQueryDto,
     @CurrentUser() user: any,
   ) {
-    return this.patientsService.getAnthropometryHistory(id, query, user);
+    return this.patientsService.getAnthropometryHistory({ id, query, currentUser: user });
   }
 
   @Post(':id/anthropometry')
@@ -224,7 +227,7 @@ export class PatientsController {
     @Body() dto: CreateAnthropometryDto,
     @CurrentUser() user: any,
   ): Promise<AnthropometryResponseDto> {
-    return this.patientsService.createAnthropometry(id, dto, user);
+    return this.patientsService.createAnthropometry({ id, dto, currentUser: user });
   }
 
   @Get(':id/medical-records')
@@ -239,7 +242,7 @@ export class PatientsController {
     @Query() query: MedicalRecordQueryDto,
     @CurrentUser() user: any,
   ) {
-    return this.patientsService.getMedicalRecords(id, query, user);
+    return this.patientsService.getMedicalRecords({ id, query, currentUser: user });
   }
 
   @Post(':id/medical-records')
@@ -256,6 +259,6 @@ export class PatientsController {
     @Body() dto: CreateMedicalRecordDto,
     @CurrentUser() user: any,
   ): Promise<MedicalRecordResponseDto> {
-    return this.patientsService.createMedicalRecord(id, dto, user);
+    return this.patientsService.createMedicalRecord({ id, dto, currentUser: user });
   }
 }

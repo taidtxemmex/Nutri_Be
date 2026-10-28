@@ -94,8 +94,8 @@ describe('DailyIntakesService', () => {
         ],
       });
 
-      const res = await service.create(
-        {
+      const res = await service.create({
+        dto: {
           patientId: '1',
           intakeDate: '2026-02-01',
           inputType: IntakeInputType.BY_MEAL,
@@ -109,8 +109,8 @@ describe('DailyIntakesService', () => {
             },
           ],
         },
-        mockUser,
-      );
+        currentUser: mockUser,
+      });
 
       expect(res.id).toBe('10');
       expect(res.totalDayNutrients.energy).toBeCloseTo(344, 0);
@@ -120,15 +120,15 @@ describe('DailyIntakesService', () => {
       mockPrisma.khau_phan_24h.findFirst.mockResolvedValue({ id: BigInt(10) });
 
       await expect(
-        service.create(
-          {
+        service.create({
+          dto: {
             patientId: '1',
             intakeDate: '2026-02-01',
             inputType: IntakeInputType.BY_MEAL,
             meals: [],
           },
-          mockUser,
-        ),
+          currentUser: mockUser,
+        }),
       ).rejects.toThrow(HttpException);
     });
   });
@@ -176,7 +176,7 @@ describe('DailyIntakesService', () => {
         he_so_hoat_dong: 1.5,
       });
 
-      const rdaReport = await service.getRdaReport('10', mockUser);
+      const rdaReport = await service.getRdaReport({ id: '10', currentUser: mockUser });
 
       expect(rdaReport.demographic.gender).toBe('NAM');
       expect(rdaReport.demographic.ageYears).toBeGreaterThan(30);

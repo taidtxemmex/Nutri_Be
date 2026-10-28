@@ -51,7 +51,9 @@ describe('ExtendedDiseaseGroupsImportService', () => {
 
   describe('importExcel validation', () => {
     it('should throw BadRequestException if file is null or empty', async () => {
-      await expect(service.importExcel('user-1', null as any)).rejects.toThrow(BadRequestException);
+      await expect(service.importExcel({ userId: 'user-1', file: null as any })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should throw BadRequestException if file has invalid headers', async () => {
@@ -73,7 +75,9 @@ describe('ExtendedDiseaseGroupsImportService', () => {
         path: '',
       };
 
-      await expect(service.importExcel('user-1', mockFile)).rejects.toThrow(BadRequestException);
+      await expect(service.importExcel({ userId: 'user-1', file: mockFile })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should successfully import valid rows and call createMany', async () => {
@@ -96,7 +100,7 @@ describe('ExtendedDiseaseGroupsImportService', () => {
         path: '',
       };
 
-      const result = await service.importExcel('user-1', mockFile);
+      const result = await service.importExcel({ userId: 'user-1', file: mockFile });
 
       expect(result.success).toBe(true);
       expect(result.totalImported).toBe(1);
@@ -133,7 +137,7 @@ describe('ExtendedDiseaseGroupsImportService', () => {
         path: '',
       };
 
-      const result = await service.importExcel('user-1', mockFile);
+      const result = await service.importExcel({ userId: 'user-1', file: mockFile });
 
       expect(result.success).toBe(false);
       expect(result.errorFileBytes).toBeDefined();

@@ -10,7 +10,7 @@ import { CACHE_TAG_CATEGORIES } from '../../src/config/constants/cache.constants
 describe('Categories Master E2E & 3-Layer Persistence Validation', () => {
   const helper = new TestAppHelper();
   let adminToken: string;
-  let adminUserId: string;
+  let _adminUserId: string;
   let cacheService: CacheService;
 
   beforeAll(async () => {
@@ -46,7 +46,7 @@ describe('Categories Master E2E & 3-Layer Persistence Validation', () => {
       fullName: 'Quản Trị Viên Category QA',
     });
     adminToken = admin.token;
-    adminUserId = admin.user.id;
+    _adminUserId = admin.user.id;
   });
 
   afterAll(async () => {

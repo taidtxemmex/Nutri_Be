@@ -27,7 +27,9 @@ describe('AccountDowngradeCronService Tests (Task 7.4)', () => {
             rows = rows.filter((u) => u.vai_tro === where.vai_tro);
           }
           if (where.pro_expired_at?.lt) {
-            rows = rows.filter((u) => u.pro_expired_at && u.pro_expired_at < where.pro_expired_at.lt);
+            rows = rows.filter(
+              (u) => u.pro_expired_at && u.pro_expired_at < where.pro_expired_at.lt,
+            );
           }
           if (where.deleted_at === null) {
             rows = rows.filter((u) => u.deleted_at === null);
@@ -55,15 +57,21 @@ describe('AccountDowngradeCronService Tests (Task 7.4)', () => {
             let matches = false;
             if (where.OR) {
               for (const condition of where.OR) {
-                if (condition.nguoi_dung_id?.in && condition.nguoi_dung_id.in.includes(dk.nguoi_dung_id)) {
-                  if (condition.trang_thai?.not && dk.trang_thai !== condition.trang_thai.not) {
-                    matches = true;
-                  }
+                if (
+                  condition.nguoi_dung_id?.in &&
+                  condition.nguoi_dung_id.in.includes(dk.nguoi_dung_id) &&
+                  condition.trang_thai?.not &&
+                  dk.trang_thai !== condition.trang_thai.not
+                ) {
+                  matches = true;
                 }
-                if (condition.ngay_ket_thuc?.lt && dk.ngay_ket_thuc < condition.ngay_ket_thuc.lt) {
-                  if (condition.trang_thai?.not && dk.trang_thai !== condition.trang_thai.not) {
-                    matches = true;
-                  }
+                if (
+                  condition.ngay_ket_thuc?.lt &&
+                  dk.ngay_ket_thuc < condition.ngay_ket_thuc.lt &&
+                  condition.trang_thai?.not &&
+                  dk.trang_thai !== condition.trang_thai.not
+                ) {
+                  matches = true;
                 }
               }
             }
@@ -79,7 +87,7 @@ describe('AccountDowngradeCronService Tests (Task 7.4)', () => {
       ma_xac_thuc: {
         deleteMany: jest.fn(async ({ where }: any) => {
           const beforeLen = maXacThucTable.length;
-          maXacThucTable = maXacThucTable.filter((m) => !(m.ngay_het_han < where.ngay_het_han.lt));
+          maXacThucTable = maXacThucTable.filter((m) => m.ngay_het_han >= where.ngay_het_han.lt);
           return { count: beforeLen - maXacThucTable.length };
         }),
       },
@@ -87,7 +95,9 @@ describe('AccountDowngradeCronService Tests (Task 7.4)', () => {
       dang_ky_cho_xac_thuc: {
         deleteMany: jest.fn(async ({ where }: any) => {
           const beforeLen = dangKyChoXacThucTable.length;
-          dangKyChoXacThucTable = dangKyChoXacThucTable.filter((d) => !(d.expires_at < where.expires_at.lt));
+          dangKyChoXacThucTable = dangKyChoXacThucTable.filter(
+            (d) => d.expires_at >= where.expires_at.lt,
+          );
           return { count: beforeLen - dangKyChoXacThucTable.length };
         }),
       },
@@ -104,7 +114,7 @@ describe('AccountDowngradeCronService Tests (Task 7.4)', () => {
     it('should find expired USERPRO accounts, downgrade to USER, update dang_ky to HET_HAN, and invalidate cache', async () => {
       const now = new Date();
       const pastDate1 = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000); // 2 days ago
-      const pastDate2 = new Date(now.getTime() - 5 * 60 * 1000);            // 5 minutes ago
+      const pastDate2 = new Date(now.getTime() - 5 * 60 * 1000); // 5 minutes ago
       const futureDate = new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000); // 15 days ahead
 
       // User 1: USERPRO - Expired

@@ -18,10 +18,11 @@ import { ACCESS_TOKEN_EXPIRES_IN } from '../../config/constants/auth.constants';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const secret =
-          configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
+        const secret = configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
         if (!secret && process.env.NODE_ENV === 'production') {
-          throw new Error('FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production!');
+          throw new Error(
+            'FATAL SECURITY ERROR: JWT_SECRET environment variable is missing in production!',
+          );
         }
         return {
           secret: secret || 'dev_temporary_jwt_secret_key_minimum_32_chars_12345',

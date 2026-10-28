@@ -2,7 +2,7 @@ import { Get, Post, Put, Delete, Body, Param, HttpCode, HttpStatus } from '@nest
 import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { MealsService } from '../services/meals.service';
 import { CreateMealDto, UpdateMealDto, MealResponseDto } from '../dto';
-import { ApiController, ApiStandardResponse, Auth, CurrentUser } from '../../../common/decorators';
+import { ApiController, ApiStandardResponse, CurrentUser } from '../../../common/decorators';
 
 @ApiController('Meals', ['meal', 'meals'], { auth: true })
 export class MealsController {
@@ -16,7 +16,7 @@ export class MealsController {
     description: 'Tạo bữa ăn thành công',
   })
   async create(@Body() dto: CreateMealDto, @CurrentUser() user: any): Promise<MealResponseDto> {
-    return this.mealsService.create(dto, user);
+    return this.mealsService.create({ dto, currentUser: user });
   }
 
   @Get()
@@ -27,7 +27,7 @@ export class MealsController {
     description: 'Lấy danh sách bữa ăn thành công',
   })
   async getAll(@CurrentUser() user: any): Promise<MealResponseDto[]> {
-    return this.mealsService.findAll(user);
+    return this.mealsService.findAll({ currentUser: user });
   }
 
   @Get(':id')
@@ -38,7 +38,7 @@ export class MealsController {
     description: 'Lấy chi tiết bữa ăn thành công',
   })
   async getById(@Param('id') id: string, @CurrentUser() user: any): Promise<MealResponseDto> {
-    return this.mealsService.findById(id, user);
+    return this.mealsService.findById({ id, currentUser: user });
   }
 
   @Put(':id')
@@ -53,7 +53,7 @@ export class MealsController {
     @Body() dto: UpdateMealDto,
     @CurrentUser() user: any,
   ): Promise<MealResponseDto> {
-    return this.mealsService.update(id, dto, user);
+    return this.mealsService.update({ id, dto, currentUser: user });
   }
 
   @Delete(':id')
@@ -63,6 +63,6 @@ export class MealsController {
     description: 'Xóa bữa ăn thành công',
   })
   async delete(@Param('id') id: string, @CurrentUser() user: any): Promise<{ message: string }> {
-    return this.mealsService.delete(id, user);
+    return this.mealsService.delete({ id, currentUser: user });
   }
 }

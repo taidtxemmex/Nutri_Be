@@ -4,14 +4,24 @@ import { CacheService } from '../../../core/cache/cache.service';
 import { NutritionCalculatorService } from '../../../core/nutrition-engine';
 import { computeRecipeHash } from '../../../core/nutrition-engine/recipe-hash.util';
 import {
-  CreateDishDto,
-  UpdateDishDto,
   DishSummaryDto,
   DishResponseDto,
-  DishCloneRequestDto,
   DishCloneResponseDto,
+  CreateDishParamsDto,
+  GetUserDishesParamsDto,
+  GetPublicDishesParamsDto,
+  FindAllDishesParamsDto,
+  GetAdminDishesParamsDto,
+  AutocompleteDishesParamsDto,
+  FindDishByIdParamsDto,
+  UpdateDishParamsDto,
+  CloneDishParamsDto,
+  ProposeDishParamsDto,
+  ApproveDishParamsDto,
+  RejectDishParamsDto,
+  DeleteDishParamsDto,
 } from '../dto';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import { isAdminRole } from '../../../config/enums/role.enum';
 import { DishStatus } from '../../../config/enums/domain.enum';
 import {
   CACHE_TAG_DISHES,
@@ -20,8 +30,13 @@ import {
   buildDishCacheTag,
   buildDishDetailCacheKey,
   buildIngredientCacheTag,
-  buildIngredientDetailCacheKey,
+  buildIngredientExistsCacheKey,
 } from '../../../config/constants/cache.constants';
+
+export interface MapToSummaryDtoParamDto {
+  dish: any;
+  currentUserId?: string;
+}
 
 @Injectable()
 export class DishesService {
@@ -42,7 +57,18 @@ export class DishesService {
     return dish.trang_thai === DishStatus.DA_DUYET || dish.trang_thai === DishStatus.HE_THONG;
   }
 
-  private mapToSummaryDto(dish: any, currentUserId?: string): DishSummaryDto {
+  private mapToSummaryDto(
+    paramOrDish: MapToSummaryDtoParamDto | any,
+    legacyCurrentUserId?: string,
+  ): DishSummaryDto {
+    const dish =
+      paramOrDish && typeof paramOrDish === 'object' && 'dish' in paramOrDish
+        ? paramOrDish.dish
+        : paramOrDish;
+    const currentUserId =
+      paramOrDish && typeof paramOrDish === 'object' && 'dish' in paramOrDish
+        ? paramOrDish.currentUserId
+        : legacyCurrentUserId;
     const calc = this.nutritionCalculator.calculateDishNutrition({
       id: dish.id,
       ten_mon: dish.ten_mon,
@@ -107,10 +133,7 @@ export class DishesService {
   /**
    * 1. Tạo món ăn mới trong 1 transaction, tính recipe_hash và 86 chỉ tiêu vi chất
    */
-  async create(
-    dto: CreateDishDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<DishResponseDto> {
+  async create({ dto, currentUser }: CreateDishParamsDto): Promise<DishResponseDto> {
     if (!dto.name || !dto.name.trim()) {
       throw new HttpException(
         { code: 'BAD_REQUEST', message: 'Tên món ăn không được để trống' },
@@ -142,7 +165,7 @@ export class DishesService {
       let ing: any;
       if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
         ing = await this.cacheService.getOrSet(
-          buildIngredientDetailCacheKey(d.ingredientId),
+          buildIngredientExistsCacheKey(d.ingredientId),
           CACHE_TTL_PERPETUAL,
           async () => {
             return this.prisma.nguyen_lieu.findFirst({
@@ -220,10 +243,10 @@ export class DishesService {
   /**
    * 2. Xem danh sách món ăn cá nhân (lọc theo statuses)
    */
-  async getUserDishes(
-    statuses?: string | string[],
-    currentUser?: { id: string; role?: string },
-  ): Promise<DishSummaryDto[]> {
+  async getUserDishes({
+    currentUser,
+    statuses,
+  }: GetUserDishesParamsDto): Promise<DishSummaryDto[]> {
     if (!currentUser?.id) {
       throw new HttpException(
         { code: 'AUTH_001', message: 'Chưa được xác thực' },
@@ -234,10 +257,10 @@ export class DishesService {
     let statusList: string[];
     if (statuses) {
       statusList = Array.isArray(statuses)
-        ? statuses
+        ? (statuses as string[])
         : typeof statuses === 'string'
-          ? statuses.split(',').map((s) => s.trim())
-          : [statuses];
+          ? (statuses as string).split(',').map((s) => s.trim())
+          : [statuses as any];
     } else {
       statusList = [DishStatus.RIENG_TU];
     }
@@ -257,13 +280,15 @@ export class DishesService {
       take: 100,
     });
 
-    return dishes.map((d) => this.mapToSummaryDto(d, currentUser.id));
+    return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId: currentUser.id }));
   }
 
   /**
    * 3. Lấy danh sách món ăn công khai (ĐÃ DUYỆT)
    */
-  async getPublicDishes(currentUserId?: string): Promise<DishSummaryDto[]> {
+  async getPublicDishes({ currentUserId }: GetPublicDishesParamsDto = {}): Promise<
+    DishSummaryDto[]
+  > {
     const cacheKey = `dishes:public:${currentUserId || 'anon'}`;
     const fetchDishes = async () => {
       const dishes = await this.prisma.mon_an.findMany({
@@ -280,7 +305,7 @@ export class DishesService {
         take: 100,
       });
 
-      return dishes.map((d) => this.mapToSummaryDto(d, currentUserId));
+      return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId }));
     };
 
     if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
@@ -295,10 +320,10 @@ export class DishesService {
   /**
    * Lấy danh sách món ăn với perpetual cache
    */
-  async findAll(query?: any): Promise<DishSummaryDto[]> {
+  async findAll({ query }: FindAllDishesParamsDto = {}): Promise<DishSummaryDto[]> {
     const cacheKey =
       this.cacheService && typeof this.cacheService.generateKey === 'function'
-        ? this.cacheService.generateKey('dishes:list', query || {})
+        ? this.cacheService.generateKey({ prefix: 'dishes:list', params: query || {} })
         : `dishes:list:${JSON.stringify(query || {})}`;
 
     const fetchDishes = async () => {
@@ -316,7 +341,7 @@ export class DishesService {
         take: 100,
       });
 
-      return dishes.map((d) => this.mapToSummaryDto(d));
+      return dishes.map((d) => this.mapToSummaryDto({ dish: d }));
     };
 
     if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
@@ -331,17 +356,17 @@ export class DishesService {
   /**
    * 4. Admin xem danh sách món đề xuất và duyệt
    */
-  async getAdminDishes(
-    statuses?: string | string[],
-    currentUserId?: string,
-  ): Promise<DishSummaryDto[]> {
+  async getAdminDishes({
+    currentUser,
+    statuses,
+  }: GetAdminDishesParamsDto): Promise<DishSummaryDto[]> {
     let statusList: string[];
     if (statuses) {
       statusList = Array.isArray(statuses)
-        ? statuses
+        ? (statuses as string[])
         : typeof statuses === 'string'
-          ? statuses.split(',').map((s) => s.trim())
-          : [statuses];
+          ? (statuses as string).split(',').map((s) => s.trim())
+          : [statuses as any];
     } else {
       statusList = [DishStatus.CHO_DUYET, DishStatus.DA_DUYET, DishStatus.TU_CHOI];
     }
@@ -360,18 +385,18 @@ export class DishesService {
       take: 100,
     });
 
-    return dishes.map((d) => this.mapToSummaryDto(d, currentUserId));
+    return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId: currentUser?.id }));
   }
 
   /**
    * 5. Autocomplete tìm kiếm món ăn nhanh
    */
-  async autocomplete(
-    dishName: string,
-    limit: number = 10,
-    currentUser?: { id?: string },
-  ): Promise<DishSummaryDto[]> {
-    const keyword = dishName ? dishName.trim() : '';
+  async autocomplete({
+    keyword,
+    limit = 10,
+    currentUser,
+  }: AutocompleteDishesParamsDto & { limit?: number }): Promise<DishSummaryDto[]> {
+    const searchWord = keyword ? keyword.trim() : '';
 
     const whereConditions: any[] = [
       { trang_thai: DishStatus.DA_DUYET },
@@ -385,7 +410,7 @@ export class DishesService {
     const dishes = await this.prisma.mon_an.findMany({
       where: {
         deleted_at: null,
-        ...(keyword ? { ten_mon: { contains: keyword } } : {}),
+        ...(searchWord ? { ten_mon: { contains: searchWord } } : {}),
         OR: whereConditions,
       },
       include: {
@@ -397,16 +422,13 @@ export class DishesService {
       orderBy: { id: 'desc' },
     });
 
-    return dishes.map((d) => this.mapToSummaryDto(d, currentUser?.id));
+    return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId: currentUser?.id }));
   }
 
   /**
    * 6. Lấy chi tiết món ăn (đầy đủ 86 chỉ tiêu vi chất)
    */
-  async findById(
-    id: string | number,
-    currentUser?: { id?: string; role?: string },
-  ): Promise<DishResponseDto> {
+  async findById({ id, currentUser }: FindDishByIdParamsDto): Promise<DishResponseDto> {
     const fetchDish = async () => {
       return this.prisma.mon_an.findFirst({
         where: { id: BigInt(id), deleted_at: null },
@@ -456,11 +478,7 @@ export class DishesService {
    * 7. Cập nhật món ăn
    * Immutability Guard: Chặn sửa món đã duyệt (DA_DUYET hoặc HE_THONG) -> DISH_CANNOT_EDIT (400)
    */
-  async update(
-    id: string | number,
-    dto: UpdateDishDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<DishResponseDto> {
+  async update({ id, dto, currentUser }: UpdateDishParamsDto): Promise<DishResponseDto> {
     const dish = await this.prisma.mon_an.findFirst({
       where: { id: BigInt(id), deleted_at: null },
       include: { chi_tiet_mon_an: true },
@@ -499,7 +517,8 @@ export class DishesService {
     }
 
     const rawDetails = dto.details;
-    let coalescedDetails: Array<{ ingredientId: string; netWeight: number }> | undefined = undefined;
+    let coalescedDetails: Array<{ ingredientId: string; netWeight: number }> | undefined =
+      undefined;
 
     if (rawDetails !== undefined) {
       const mergedMap = new Map<string, number>();
@@ -517,7 +536,7 @@ export class DishesService {
         let ing: any;
         if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
           ing = await this.cacheService.getOrSet(
-            buildIngredientDetailCacheKey(d.ingredientId),
+            buildIngredientExistsCacheKey(d.ingredientId),
             CACHE_TTL_PERPETUAL,
             async () => {
               return this.prisma.nguyen_lieu.findFirst({
@@ -589,10 +608,7 @@ export class DishesService {
 
     if (this.cacheService) {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
-        await this.cacheService.debouncedInvalidateTags([
-          CACHE_TAG_DISHES,
-          buildDishCacheTag(id),
-        ]);
+        await this.cacheService.debouncedInvalidateTags([CACHE_TAG_DISHES, buildDishCacheTag(id)]);
       } else if (typeof this.cacheService.invalidateTag === 'function') {
         await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
       }
@@ -604,11 +620,11 @@ export class DishesService {
    * 8. Clone Món: POST /api/dish/:id/clone
    * Tạo bản sao RIENG_TU, liên kết mon_goc_id
    */
-  async cloneDish(
-    dishId: string | number,
-    request: DishCloneRequestDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<DishCloneResponseDto> {
+  async cloneDish({
+    dishId,
+    request,
+    currentUser,
+  }: CloneDishParamsDto): Promise<DishCloneResponseDto> {
     const original = await this.prisma.mon_an.findFirst({
       where: { id: BigInt(dishId), deleted_at: null },
       include: { chi_tiet_mon_an: true },
@@ -706,12 +722,9 @@ export class DishesService {
    * 9. Đề xuất món ăn: PUT /api/dish/:id/propose (và POST)
    * Tối ưu O(1) chống OOM: Kiểm tra trùng công thức qua index DB recipe_hash (idx_mon_an_recipe_hash)
    */
-  async proposeDish(
-    id: string | number,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ message: string }> {
+  async proposeDish({ dishId, currentUser }: ProposeDishParamsDto): Promise<{ message: string }> {
     const dish = await this.prisma.mon_an.findFirst({
-      where: { id: BigInt(id), deleted_at: null },
+      where: { id: BigInt(dishId), deleted_at: null },
       include: { chi_tiet_mon_an: true },
     });
 
@@ -732,7 +745,7 @@ export class DishesService {
     // Kiểm tra xem món gốc này đã có đề xuất nào đang chờ duyệt hay chưa
     const existingPending = await this.prisma.mon_an.findFirst({
       where: {
-        mon_goc_id: BigInt(id),
+        mon_goc_id: BigInt(dishId),
         trang_thai: DishStatus.CHO_DUYET,
         deleted_at: null,
       },
@@ -778,7 +791,7 @@ export class DishesService {
     }
 
     await this.prisma.mon_an.update({
-      where: { id: BigInt(id) },
+      where: { id: BigInt(dishId) },
       data: {
         trang_thai: DishStatus.CHO_DUYET,
         recipe_hash: hash,
@@ -789,7 +802,7 @@ export class DishesService {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
         await this.cacheService.debouncedInvalidateTags([
           CACHE_TAG_DISHES,
-          buildDishCacheTag(id),
+          buildDishCacheTag(dishId),
         ]);
       } else if (typeof this.cacheService.invalidateTag === 'function') {
         await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
@@ -801,7 +814,7 @@ export class DishesService {
   /**
    * 10. Phê duyệt món ăn: PUT /api/dish/:id/approve (Admin)
    */
-  async approveDish(id: string | number, adminUser: { id: string }): Promise<{ message: string }> {
+  async approveDish({ id, adminUser }: ApproveDishParamsDto): Promise<{ message: string }> {
     const dish = await this.prisma.mon_an.findFirst({
       where: { id: BigInt(id), deleted_at: null },
     });
@@ -832,10 +845,7 @@ export class DishesService {
 
     if (this.cacheService) {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
-        await this.cacheService.debouncedInvalidateTags([
-          CACHE_TAG_DISHES,
-          buildDishCacheTag(id),
-        ]);
+        await this.cacheService.debouncedInvalidateTags([CACHE_TAG_DISHES, buildDishCacheTag(id)]);
       } else if (typeof this.cacheService.invalidateTag === 'function') {
         await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
       }
@@ -846,11 +856,7 @@ export class DishesService {
   /**
    * 11. Từ chối đề xuất món ăn: PUT /api/dish/:id/reject (Admin)
    */
-  async rejectDish(
-    id: string | number,
-    reason: string,
-    adminUser: { id: string },
-  ): Promise<{ message: string }> {
+  async rejectDish({ id, reason, adminUser }: RejectDishParamsDto): Promise<{ message: string }> {
     const dish = await this.prisma.mon_an.findFirst({
       where: { id: BigInt(id), deleted_at: null },
     });
@@ -881,10 +887,7 @@ export class DishesService {
 
     if (this.cacheService) {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
-        await this.cacheService.debouncedInvalidateTags([
-          CACHE_TAG_DISHES,
-          buildDishCacheTag(id),
-        ]);
+        await this.cacheService.debouncedInvalidateTags([CACHE_TAG_DISHES, buildDishCacheTag(id)]);
       } else if (typeof this.cacheService.invalidateTag === 'function') {
         await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
       }
@@ -897,10 +900,10 @@ export class DishesService {
    * Chặn xóa món công khai (DISH_CANNOT_DELETE - 403)
    * Chặn xóa nếu đang trong thực đơn (DISH_IN_USE - 409)
    */
-  async delete(
-    id: string | number,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ message: string }> {
+  async delete({
+    id,
+    currentUser = { id: '' },
+  }: DeleteDishParamsDto): Promise<{ message: string }> {
     const dish = await this.prisma.mon_an.findFirst({
       where: { id: BigInt(id), deleted_at: null },
     });
@@ -950,10 +953,7 @@ export class DishesService {
 
     if (this.cacheService) {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
-        await this.cacheService.debouncedInvalidateTags([
-          CACHE_TAG_DISHES,
-          buildDishCacheTag(id),
-        ]);
+        await this.cacheService.debouncedInvalidateTags([CACHE_TAG_DISHES, buildDishCacheTag(id)]);
       } else if (typeof this.cacheService.invalidateTag === 'function') {
         await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
       }

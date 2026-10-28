@@ -1,6 +1,5 @@
 import { Readable, PassThrough } from 'stream';
 import * as ExcelJS from 'exceljs';
-import { BadRequestException } from '@nestjs/common';
 import { ExcelSecurityUtil } from '../../security/excel/excel-security.util';
 
 export interface SheetSignature {
@@ -30,6 +29,16 @@ export interface GenerateErrorWorkbookOptions {
   sheetName?: string;
   resultHeaderTitle?: string;
   resultColumnWidth?: number;
+}
+
+export interface ReadCellStringParamDto {
+  cell: any;
+  sanitize?: boolean;
+}
+
+export interface MatchSignatureParamDto {
+  actualHeaders: string[];
+  requiredHeaders: string[];
 }
 
 /**
@@ -70,17 +79,32 @@ export class ExcelStreamReader {
    */
   public static normalizeKey(text: string): string {
     if (!text) return '';
-    return text
-      .normalize('NFC')
-      .trim()
-      .replace(/\s+/g, ' ')
-      .toLowerCase();
+    return text.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
   }
 
   /**
    * Đọc giá trị chuỗi từ ô, tự động bóc tách formula/richText, chuẩn hóa NFC và khử độc Formula Injection
    */
-  public static readCellString(cell: any, sanitize = true): string | null {
+  public static readCellString(
+    paramOrCell: ReadCellStringParamDto | any,
+    legacySanitize = true,
+  ): string | null {
+    let cell: any;
+    let sanitize = true;
+
+    if (
+      paramOrCell &&
+      typeof paramOrCell === 'object' &&
+      'cell' in paramOrCell &&
+      (paramOrCell.cell !== undefined || 'sanitize' in paramOrCell)
+    ) {
+      cell = paramOrCell.cell;
+      sanitize = paramOrCell.sanitize !== false;
+    } else {
+      cell = paramOrCell;
+      sanitize = legacySanitize;
+    }
+
     if (cell === null || cell === undefined) return null;
 
     let rawValue: any = cell;
@@ -150,7 +174,8 @@ export class ExcelStreamReader {
 
     let val: any = cell;
     if (typeof cell === 'object' && !(cell instanceof Date)) {
-      val = cell.result !== undefined ? cell.result : cell.value !== undefined ? cell.value : cell.text;
+      val =
+        cell.result !== undefined ? cell.result : cell.value !== undefined ? cell.value : cell.text;
     }
 
     if (val === null || val === undefined || val === '') {
@@ -200,11 +225,7 @@ export class ExcelStreamReader {
       const month = parseInt(dmyMatch[2], 10) - 1;
       const year = parseInt(dmyMatch[3], 10);
       const date = new Date(year, month, day);
-      if (
-        date.getFullYear() !== year ||
-        date.getMonth() !== month ||
-        date.getDate() !== day
-      ) {
+      if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
         return { date: null, birthYearOnly: false, error: 'Ngày tháng không hợp lệ (dd/MM/yyyy)' };
       }
       return { date, birthYearOnly: false };
@@ -217,11 +238,7 @@ export class ExcelStreamReader {
       const month = parseInt(isoMatch[2], 10) - 1;
       const day = parseInt(isoMatch[3], 10);
       const date = new Date(year, month, day);
-      if (
-        date.getFullYear() !== year ||
-        date.getMonth() !== month ||
-        date.getDate() !== day
-      ) {
+      if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) {
         return { date: null, birthYearOnly: false, error: 'Ngày tháng không hợp lệ' };
       }
       return { date, birthYearOnly: false };
@@ -230,7 +247,11 @@ export class ExcelStreamReader {
     // Fallback qua Date parser
     const fallback = new Date(str);
     if (isNaN(fallback.getTime())) {
-      return { date: null, birthYearOnly: false, error: 'Ngày sinh không hợp lệ (dd/MM/yyyy hoặc yyyy)' };
+      return {
+        date: null,
+        birthYearOnly: false,
+        error: 'Ngày sinh không hợp lệ (dd/MM/yyyy hoặc yyyy)',
+      };
     }
 
     return { date: fallback, birthYearOnly: false };
@@ -244,7 +265,8 @@ export class ExcelStreamReader {
 
     let val: any = cell;
     if (typeof cell === 'object' && !(cell instanceof Date)) {
-      val = cell.result !== undefined ? cell.result : cell.value !== undefined ? cell.value : cell.text;
+      val =
+        cell.result !== undefined ? cell.result : cell.value !== undefined ? cell.value : cell.text;
     }
 
     if (val === null || val === undefined || val === '') return { time: null };
@@ -278,13 +300,29 @@ export class ExcelStreamReader {
    * Kiểm tra dòng tiêu đề có khớp với chữ ký cột yêu cầu hay không
    */
   public static matchSignature(
-    actualHeaders: string[],
-    requiredHeaders: string[],
+    paramOrActual: MatchSignatureParamDto | string[],
+    legacyRequired?: string[],
   ): boolean {
+    let actualHeaders: string[];
+    let requiredHeaders: string[];
+
+    if (
+      paramOrActual &&
+      typeof paramOrActual === 'object' &&
+      !Array.isArray(paramOrActual) &&
+      'actualHeaders' in paramOrActual &&
+      'requiredHeaders' in paramOrActual
+    ) {
+      const dto = paramOrActual as MatchSignatureParamDto;
+      actualHeaders = dto.actualHeaders;
+      requiredHeaders = dto.requiredHeaders;
+    } else {
+      actualHeaders = paramOrActual as string[];
+      requiredHeaders = legacyRequired!;
+    }
+
     const actualNormalized = actualHeaders.map((h) => this.normalizeKey(h));
-    return requiredHeaders.every((req) =>
-      actualNormalized.includes(this.normalizeKey(req)),
-    );
+    return requiredHeaders.every((req) => actualNormalized.includes(this.normalizeKey(req)));
   }
 
   /**
@@ -346,13 +384,13 @@ export class ExcelStreamReader {
     for (const r of rows) {
       const hasErrors = r.errors && r.errors.length > 0;
       const statusText = hasErrors
-        ? (r.errors.join('; ').includes('❌ LỖI') ? r.errors.join('; ') : `❌ LỖI: ${r.errors.join('; ')}`)
+        ? r.errors.join('; ').includes('❌ LỖI')
+          ? r.errors.join('; ')
+          : `❌ LỖI: ${r.errors.join('; ')}`
         : r.successNote || 'Hợp lệ';
 
       // Khử độc formula injection trước khi ghi
-      const sanitizedValues = r.rawValues.map((v) =>
-        ExcelSecurityUtil.sanitizeCellValue(v),
-      );
+      const sanitizedValues = r.rawValues.map((v) => ExcelSecurityUtil.sanitizeCellValue(v));
       sanitizedValues.push(statusText);
 
       const addedRow = worksheet.addRow(sanitizedValues);

@@ -185,14 +185,18 @@ describe('DishExcelService', () => {
 
   describe('2. importExcel', () => {
     it('should throw IMPORT_EMPTY_FILE if file buffer is empty or workbook has no data rows', async () => {
-      await expect(service.importExcel(Buffer.alloc(0), 'user-1')).rejects.toThrow(HttpException);
+      await expect(
+        service.importExcel({ fileBuffer: Buffer.alloc(0), userId: 'user-1' }),
+      ).rejects.toThrow(HttpException);
 
       const wb = new ExcelJS.Workbook();
       const sheet = wb.addWorksheet('Mon_an');
       sheet.addRow(['Tên món ăn', 'Tên nguyên liệu', 'KL sống sạch (g)']);
       const emptyBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
-      await expect(service.importExcel(emptyBuffer, 'user-1')).rejects.toThrow(HttpException);
+      await expect(
+        service.importExcel({ fileBuffer: emptyBuffer, userId: 'user-1' }),
+      ).rejects.toThrow(HttpException);
     });
 
     it('should throw IMPORT_INVALID_TEMPLATE if headers do not match expected structure', async () => {
@@ -203,7 +207,7 @@ describe('DishExcelService', () => {
       const invalidBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
       try {
-        await service.importExcel(invalidBuffer, 'user-1');
+        await service.importExcel({ fileBuffer: invalidBuffer, userId: 'user-1' });
         fail('Should throw IMPORT_INVALID_TEMPLATE');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -224,7 +228,7 @@ describe('DishExcelService', () => {
       sheet.addRow(['', 'Gạo tẻ', -20]);
 
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
-      const result = await service.importExcel(buffer, 'user-1');
+      const result = await service.importExcel({ fileBuffer: buffer, userId: 'user-1' });
 
       expect(result.success).toBe(false);
       expect(result.importedCount).toBe(0);
@@ -257,7 +261,7 @@ describe('DishExcelService', () => {
       sheet.addRow(['Cơm trắng gia đình', 'Gạo tẻ', 80]);
 
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
-      const result = await service.importExcel(buffer, 'user-1');
+      const result = await service.importExcel({ fileBuffer: buffer, userId: 'user-1' });
 
       expect(result.success).toBe(true);
       expect(result.importedCount).toBe(2);
@@ -307,7 +311,7 @@ describe('DishExcelService', () => {
       ];
 
       const selectedColumns = ['energy', 'protein', 'fat', 'carbohydrate'];
-      const buffer = await service.exportDishes(dishes, selectedColumns);
+      const buffer = await service.exportDishes({ dtoOrDishes: dishes, columns: selectedColumns });
       expect(buffer).toBeInstanceOf(Buffer);
 
       const wb = new ExcelJS.Workbook();
@@ -345,7 +349,7 @@ describe('DishExcelService', () => {
         },
       ];
 
-      const buffer = await service.exportDishes(dishes);
+      const buffer = await service.exportDishes({ dtoOrDishes: dishes });
       const wb = new ExcelJS.Workbook();
       await wb.xlsx.load(buffer as any);
 

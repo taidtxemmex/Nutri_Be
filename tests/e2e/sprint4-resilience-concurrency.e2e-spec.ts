@@ -2,9 +2,8 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.test', override: true });
 
 import * as request from 'supertest';
-import { Writable, PassThrough } from 'stream';
+import { Writable } from 'stream';
 import * as ExcelJS from 'exceljs';
-import { Prisma } from '@prisma/client';
 import { TestAppHelper } from '../helpers/test-app.helper';
 import { UserRole } from '../../src/config/enums/role.enum';
 import {
@@ -12,8 +11,6 @@ import {
   TargetType,
   IntakeInputType,
   MenuExportType,
-  DailyIntakeClinicalReportType,
-  Gender,
 } from '../../src/config/enums/domain.enum';
 import { MenuExcelService } from '../../src/modules/menus/services/menu-excel.service';
 import { DailyIntakeExcelService } from '../../src/modules/daily-intakes/services/daily-intake-excel.service';
@@ -36,7 +33,7 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
   const helper = new TestAppHelper();
 
   let adminToken: string;
-  let adminUser: any;
+  let _adminUser: any;
   let regularToken: string;
   let regularUser: any;
 
@@ -195,7 +192,7 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
       fullName: 'Quản Trị Viên Chaos Tester',
     });
     adminToken = admin.token;
-    adminUser = admin.user;
+    _adminUser = admin.user;
 
     const regular = await helper.createTestUser({
       username: `user_chaos_${uniqueSuffix}`,
@@ -564,7 +561,13 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
           sheet.addRow([`Bữa ăn ${r}`, '07:00', `Nguyên liệu ma quỷ #${r}`, 100, 'Test rác']);
         } else if (r % 3 === 1) {
           // Khối lượng âm
-          sheet.addRow([`Bữa ăn ${r}`, '12:00', 'Thịt bò bắp tươi Chaos', -50 - r, 'Khối lượng âm']);
+          sheet.addRow([
+            `Bữa ăn ${r}`,
+            '12:00',
+            'Thịt bò bắp tươi Chaos',
+            -50 - r,
+            'Khối lượng âm',
+          ]);
         } else {
           // Giờ ăn sai format
           sheet.addRow([`Bữa ăn ${r}`, '99:88', 'Gạo tẻ máy Chaos', 100, 'Sai format giờ']);
@@ -574,9 +577,12 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
       const dirtyFileBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
       // 1. Kiểm thử trực tiếp qua Service Excel
-      const serviceResult = await dailyIntakeExcelService.importDailyIntakeExcel(dirtyFileBuffer, {
-        patientId: defaultPatientId,
-        userId: regularUser.id,
+      const serviceResult = await dailyIntakeExcelService.importDailyIntakeExcel({
+        fileBuffer: dirtyFileBuffer,
+        options: {
+          patientId: defaultPatientId,
+          userId: regularUser.id,
+        },
       });
 
       expect(serviceResult.success).toBe(false);
@@ -602,7 +608,9 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
         .parse(binaryBufferParser);
 
       expect([200, 201]).toContain(res.status); // Trả về file Excel đánh dấu dòng lỗi, không crash 500
-      expect(res.headers['content-type']).toContain('application/vnd.openxmlformats-officedocument');
+      expect(res.headers['content-type']).toContain(
+        'application/vnd.openxmlformats-officedocument',
+      );
       expect(res.headers['content-disposition']).toContain('attachment');
 
       // Layer 3: Direct Database Verification - CSDL hoàn toàn sạch bóng, không bản ghi nào lọt vào
@@ -715,9 +723,13 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
       });
 
       // Thực thi stream thực đơn 600 món ăn
-      await menuExcelService.streamMenuExcel(hugeMenu, writableStream, {
-        exportType: MenuExportType.FULL,
-        columns: NUTRIENT_CODES.slice(0, 30), // 30 cột vi chất trọng yếu
+      await menuExcelService.streamMenuExcel({
+        menuIdOrData: hugeMenu,
+        outputStream: writableStream,
+        options: {
+          exportType: MenuExportType.FULL,
+          columns: NUTRIENT_CODES.slice(0, 30), // 30 cột vi chất trọng yếu
+        },
       });
 
       const memAfter = process.memoryUsage().heapUsed;
@@ -919,9 +931,7 @@ describe('Sprint 4: Chaos, Resilience & High-Concurrency E2E Suite', () => {
       // Layer 2: API Contract Error Envelope
       expect(res.body).toHaveProperty('error');
       expect(res.body.error.code).toBe('ING_002');
-      expect(res.body.error.message).toContain(
-        'khẩu phần 24h hoặc hệ số sống chín',
-      );
+      expect(res.body.error.message).toContain('khẩu phần 24h hoặc hệ số sống chín');
 
       // Layer 3: Direct Database State Persistence
       // Nguyên liệu vẫn tồn tại trong CSDL và deleted_at = null

@@ -110,6 +110,40 @@ export interface MenuRangeNutritionResult {
   decimalNutrients: DecimalMap;
 }
 
+export interface CalculateDishNutritionParamDto {
+  dish: DishInput;
+  ingredientMap?: Map<string | number | bigint, RawIngredientInput>;
+  options?: CalculationOptions;
+}
+
+export interface CalculateMealNutritionParamDto {
+  meal: MealInput;
+  ingredientMap?: Map<string | number | bigint, RawIngredientInput>;
+  options?: CalculationOptions;
+}
+
+export interface CalculateMenuDayNutritionParamDto {
+  menuDayMeals: MealInput[];
+  ingredientMap?: Map<string | number | bigint, RawIngredientInput>;
+  options?: CalculationOptions;
+}
+
+export interface CalculateMenuRangeNutritionParamDto {
+  menu: MenuInput;
+  ingredientMap?: Map<string | number | bigint, RawIngredientInput>;
+  options?: CalculationOptions;
+}
+
+export interface CalculateDishCookedWeightParamDto {
+  dish: DishInput;
+  fallbackNetWeight?: Decimal;
+}
+
+export interface GetMenuEnergyDisplayParamDto {
+  menu: MenuInput;
+  ingredientMap?: Map<string | number | bigint, RawIngredientInput>;
+}
+
 @Injectable()
 export class NutritionCalculatorService {
   private readonly logger = new Logger(NutritionCalculatorService.name);
@@ -119,10 +153,24 @@ export class NutritionCalculatorService {
    * Giữ nguyên Decimal trong mọi bước cộng dồn, chỉ làm tròn ở output
    */
   public calculateDishNutrition(
-    dish: DishInput,
-    ingredientMap?: Map<string | number | bigint, RawIngredientInput>,
-    options: CalculationOptions = {},
+    paramOrDish: CalculateDishNutritionParamDto | DishInput,
+    legacyIngredientMap?: Map<string | number | bigint, RawIngredientInput>,
+    legacyOptions: CalculationOptions = {},
   ): DishNutritionResult {
+    let dish: DishInput;
+    let ingredientMap: Map<string | number | bigint, RawIngredientInput> | undefined;
+    let options: CalculationOptions;
+
+    if (paramOrDish && typeof paramOrDish === 'object' && 'dish' in paramOrDish) {
+      dish = paramOrDish.dish;
+      ingredientMap = paramOrDish.ingredientMap;
+      options = paramOrDish.options || {};
+    } else {
+      dish = paramOrDish as DishInput;
+      ingredientMap = legacyIngredientMap;
+      options = legacyOptions || {};
+    }
+
     const rawItems = dish.details || dish.chi_tiet_mon_an || [];
     const accumulated = NutritionEngine.createEmptyDecimalMap();
     let totalRawWeight = NutritionEngine.ZERO;
@@ -151,16 +199,23 @@ export class NutritionCalculatorService {
         item.isNetWeight ??
         (item.khoi_luong_song_sach !== undefined || item.netWeight !== undefined);
 
-      const ingResult = NutritionEngine.calculateIngredientNutrients(ingredient, weightVal, {
-        ...options,
-        isNetWeight: isNet,
-        preserveDecimals: true,
+      const ingResult = NutritionEngine.calculateIngredientNutrients({
+        ingredient,
+        weightGrams: weightVal,
+        options: {
+          ...options,
+          isNetWeight: isNet,
+          preserveDecimals: true,
+        },
       });
 
       totalRawWeight = totalRawWeight.plus(ingResult.rawWeightGrams);
       totalNetWeight = totalNetWeight.plus(ingResult.netWeightGrams);
 
-      NutritionEngine.accumulateNutrients(accumulated, ingResult.nutrients);
+      NutritionEngine.accumulateNutrients({
+        target: accumulated,
+        source: ingResult.nutrients,
+      });
 
       breakdown.push({
         ingredientId: ingId,
@@ -170,10 +225,10 @@ export class NutritionCalculatorService {
         netWeightGrams: ingResult.netWeightGrams
           .toDecimalPlaces(1, Decimal.ROUND_HALF_UP)
           .toNumber(),
-        nutrients: NutritionEngine.roundDecimalMap(
-          ingResult.nutrients,
-          options.targetDecimalPlaces ?? 2,
-        ),
+        nutrients: NutritionEngine.roundDecimalMap({
+          map: ingResult.nutrients,
+          decimalPlaces: options.targetDecimalPlaces ?? 2,
+        }),
       });
     }
 
@@ -185,7 +240,7 @@ export class NutritionCalculatorService {
       rawWeightGrams: totalRawWeight.toDecimalPlaces(1, Decimal.ROUND_HALF_UP).toNumber(),
       netWeightGrams: totalNetWeight.toDecimalPlaces(1, Decimal.ROUND_HALF_UP).toNumber(),
       cookedWeightGrams: cookedWeight.toDecimalPlaces(1, Decimal.ROUND_HALF_UP).toNumber(),
-      nutrients: NutritionEngine.roundDecimalMap(accumulated, decimalPlaces),
+      nutrients: NutritionEngine.roundDecimalMap({ map: accumulated, decimalPlaces }),
       decimalNutrients: accumulated,
       ingredientBreakdown: breakdown,
     };
@@ -194,11 +249,25 @@ export class NutritionCalculatorService {
   /**
    * Tính khối lượng chín của món ăn dựa trên hệ số sống/chín (Shrinkage/Yield Coefficient)
    */
-  public calculateDishCookedWeight(dish: DishInput, fallbackNetWeight?: Decimal): Decimal {
+  public calculateDishCookedWeight(
+    paramOrDish: CalculateDishCookedWeightParamDto | DishInput,
+    legacyFallbackNetWeight?: Decimal,
+  ): Decimal {
+    let dish: DishInput;
+    let fallbackNetWeight: Decimal | undefined;
+
+    if (paramOrDish && typeof paramOrDish === 'object' && 'dish' in paramOrDish) {
+      dish = paramOrDish.dish;
+      fallbackNetWeight = paramOrDish.fallbackNetWeight;
+    } else {
+      dish = paramOrDish as DishInput;
+      fallbackNetWeight = legacyFallbackNetWeight;
+    }
+
     const rawItems = dish.details || dish.chi_tiet_mon_an || [];
     const dishCoeff =
       dish.he_so_song_chin != null
-        ? NutritionEngine.toDecimal(dish.he_so_song_chin, 1)
+        ? NutritionEngine.toDecimal({ val: dish.he_so_song_chin, fallback: 1 })
         : new Decimal(1);
 
     if (rawItems.length === 0 && fallbackNetWeight) {
@@ -211,12 +280,12 @@ export class NutritionCalculatorService {
     for (const item of rawItems) {
       if (!item) continue;
       const weightVal = item.khoi_luong_song_sach ?? item.netWeight ?? item.weightGrams ?? 0;
-      const netWeight = NutritionEngine.toDecimal(weightVal, 0);
+      const netWeight = NutritionEngine.toDecimal({ val: weightVal, fallback: 0 });
 
       // Nếu từng dòng có hệ số riêng
       if (item['he_so_song_chin'] != null) {
         hasItemCoeff = true;
-        const coeff = NutritionEngine.toDecimal(item['he_so_song_chin'], 1);
+        const coeff = NutritionEngine.toDecimal({ val: item['he_so_song_chin'], fallback: 1 });
         totalCooked = totalCooked.plus(netWeight.times(coeff));
       } else {
         totalCooked = totalCooked.plus(netWeight.times(dishCoeff));
@@ -235,10 +304,24 @@ export class NutritionCalculatorService {
    * Gộp các món ăn ở mức Decimal chính xác tuyệt đối, loại trừ sai số làm tròn non
    */
   public calculateMealNutrition(
-    meal: MealInput,
-    ingredientMap?: Map<string | number | bigint, RawIngredientInput>,
-    options: CalculationOptions = {},
+    paramOrMeal: CalculateMealNutritionParamDto | MealInput,
+    legacyIngredientMap?: Map<string | number | bigint, RawIngredientInput>,
+    legacyOptions: CalculationOptions = {},
   ): MealNutritionResult {
+    let meal: MealInput;
+    let ingredientMap: Map<string | number | bigint, RawIngredientInput> | undefined;
+    let options: CalculationOptions;
+
+    if (paramOrMeal && typeof paramOrMeal === 'object' && 'meal' in paramOrMeal) {
+      meal = paramOrMeal.meal;
+      ingredientMap = paramOrMeal.ingredientMap;
+      options = paramOrMeal.options || {};
+    } else {
+      meal = paramOrMeal as MealInput;
+      ingredientMap = legacyIngredientMap;
+      options = legacyOptions || {};
+    }
+
     const mealItems = meal.mealDetails || meal.chi_tiet_bua_an || [];
     const accumulated = NutritionEngine.createEmptyDecimalMap();
     const dishResults: DishNutritionResult[] = [];
@@ -255,7 +338,7 @@ export class NutritionCalculatorService {
 
       // Nếu chi tiết bữa ăn có hệ số sống/chín ghi đè
       if (item.he_so_song_chin != null) {
-        const mealDishCoeff = NutritionEngine.toDecimal(item.he_so_song_chin, 1);
+        const mealDishCoeff = NutritionEngine.toDecimal({ val: item.he_so_song_chin, fallback: 1 });
         const netWeight = new Decimal(dishResult.netWeightGrams);
         dishResult.cookedWeightGrams = netWeight
           .times(mealDishCoeff)
@@ -264,7 +347,10 @@ export class NutritionCalculatorService {
       }
 
       dishResults.push(dishResult);
-      NutritionEngine.accumulateNutrients(accumulated, dishResult.decimalNutrients);
+      NutritionEngine.accumulateNutrients({
+        target: accumulated,
+        source: dishResult.decimalNutrients,
+      });
     }
 
     const decimalPlaces = options.targetDecimalPlaces ?? 2;
@@ -273,7 +359,7 @@ export class NutritionCalculatorService {
       mealId: meal.id,
       mealName: meal.mealName ?? meal.ten_bua_an,
       dishes: dishResults,
-      nutrients: NutritionEngine.roundDecimalMap(accumulated, decimalPlaces),
+      nutrients: NutritionEngine.roundDecimalMap({ map: accumulated, decimalPlaces }),
       decimalNutrients: accumulated,
     };
   }
@@ -282,10 +368,24 @@ export class NutritionCalculatorService {
    * Tính toán dinh dưỡng 1 ngày (Menu Day)
    */
   public calculateMenuDayNutrition(
-    menuDayMeals: MealInput[],
-    ingredientMap?: Map<string | number | bigint, RawIngredientInput>,
-    options: CalculationOptions = {},
+    paramOrMeals: CalculateMenuDayNutritionParamDto | MealInput[],
+    legacyIngredientMap?: Map<string | number | bigint, RawIngredientInput>,
+    legacyOptions: CalculationOptions = {},
   ): { nutrients: RoundedNutrientMap; decimalNutrients: DecimalMap; meals: MealNutritionResult[] } {
+    let menuDayMeals: MealInput[];
+    let ingredientMap: Map<string | number | bigint, RawIngredientInput> | undefined;
+    let options: CalculationOptions;
+
+    if (paramOrMeals && typeof paramOrMeals === 'object' && 'menuDayMeals' in paramOrMeals) {
+      menuDayMeals = paramOrMeals.menuDayMeals;
+      ingredientMap = paramOrMeals.ingredientMap;
+      options = paramOrMeals.options || {};
+    } else {
+      menuDayMeals = paramOrMeals as MealInput[];
+      ingredientMap = legacyIngredientMap;
+      options = legacyOptions || {};
+    }
+
     const accumulated = NutritionEngine.createEmptyDecimalMap();
     const mealResults: MealNutritionResult[] = [];
 
@@ -296,14 +396,17 @@ export class NutritionCalculatorService {
         preserveDecimals: true,
       });
       mealResults.push(mealResult);
-      NutritionEngine.accumulateNutrients(accumulated, mealResult.decimalNutrients);
+      NutritionEngine.accumulateNutrients({
+        target: accumulated,
+        source: mealResult.decimalNutrients,
+      });
     }
 
     const decimalPlaces = options.targetDecimalPlaces ?? 2;
 
     return {
       meals: mealResults,
-      nutrients: NutritionEngine.roundDecimalMap(accumulated, decimalPlaces),
+      nutrients: NutritionEngine.roundDecimalMap({ map: accumulated, decimalPlaces }),
       decimalNutrients: accumulated,
     };
   }
@@ -313,10 +416,24 @@ export class NutritionCalculatorService {
    * Gom nhóm theo ngày, tính Min/Max năng lượng, trung bình ngày và tổng thực đơn
    */
   public calculateMenuRangeNutrition(
-    menu: MenuInput,
-    ingredientMap?: Map<string | number | bigint, RawIngredientInput>,
-    options: CalculationOptions = {},
+    paramOrMenu: CalculateMenuRangeNutritionParamDto | MenuInput,
+    legacyIngredientMap?: Map<string | number | bigint, RawIngredientInput>,
+    legacyOptions: CalculationOptions = {},
   ): MenuRangeNutritionResult {
+    let menu: MenuInput;
+    let ingredientMap: Map<string | number | bigint, RawIngredientInput> | undefined;
+    let options: CalculationOptions;
+
+    if (paramOrMenu && typeof paramOrMenu === 'object' && 'menu' in paramOrMenu) {
+      menu = paramOrMenu.menu;
+      ingredientMap = paramOrMenu.ingredientMap;
+      options = paramOrMenu.options || {};
+    } else {
+      menu = paramOrMenu as MenuInput;
+      ingredientMap = legacyIngredientMap;
+      options = legacyOptions || {};
+    }
+
     const details = menu.menuDetails || menu.chi_tiet_thuc_don || [];
     const menuType = String(menu.menuType || 'NGAY').toUpperCase();
 
@@ -354,7 +471,10 @@ export class NutritionCalculatorService {
       if (dayEnergy.lessThan(minEnergy)) minEnergy = dayEnergy;
       if (dayEnergy.greaterThan(maxEnergy)) maxEnergy = dayEnergy;
 
-      NutritionEngine.accumulateNutrients(totalAccumulated, dayCalc.decimalNutrients);
+      NutritionEngine.accumulateNutrients({
+        target: totalAccumulated,
+        source: dayCalc.decimalNutrients,
+      });
 
       dayResults.push({
         dayKey,
@@ -398,8 +518,11 @@ export class NutritionCalculatorService {
       menuId: menu.id,
       menuType,
       days: dayResults,
-      totalNutrients: NutritionEngine.roundDecimalMap(totalAccumulated, decimalPlaces),
-      averageDailyNutrients: NutritionEngine.roundDecimalMap(avgAccumulated, decimalPlaces),
+      totalNutrients: NutritionEngine.roundDecimalMap({ map: totalAccumulated, decimalPlaces }),
+      averageDailyNutrients: NutritionEngine.roundDecimalMap({
+        map: avgAccumulated,
+        decimalPlaces,
+      }),
       minEnergyKcal: actualMin.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber(),
       maxEnergyKcal: maxEnergy.toDecimalPlaces(0, Decimal.ROUND_HALF_UP).toNumber(),
       averageEnergyKcal: avgEnergy,
@@ -412,10 +535,21 @@ export class NutritionCalculatorService {
    * Tính chuỗi hiển thị năng lượng tóm tắt cho thực đơn
    */
   public getMenuEnergyDisplay(
-    menu: MenuInput,
-    ingredientMap?: Map<string | number | bigint, RawIngredientInput>,
+    paramOrMenu: GetMenuEnergyDisplayParamDto | MenuInput,
+    legacyIngredientMap?: Map<string | number | bigint, RawIngredientInput>,
   ): string {
-    const rangeResult = this.calculateMenuRangeNutrition(menu, ingredientMap);
+    let menu: MenuInput;
+    let ingredientMap: Map<string | number | bigint, RawIngredientInput> | undefined;
+
+    if (paramOrMenu && typeof paramOrMenu === 'object' && 'menu' in paramOrMenu) {
+      menu = paramOrMenu.menu;
+      ingredientMap = paramOrMenu.ingredientMap;
+    } else {
+      menu = paramOrMenu as MenuInput;
+      ingredientMap = legacyIngredientMap;
+    }
+
+    const rangeResult = this.calculateMenuRangeNutrition({ menu, ingredientMap });
     return rangeResult.energyDisplay;
   }
 }

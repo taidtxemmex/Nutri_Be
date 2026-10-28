@@ -15,15 +15,20 @@ import {
   buildIngredientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import {
-  CreateIngredientDto,
-  UpdateIngredientDto,
-  IngredientQueryDto,
   IngredientSummaryDto,
   IngredientListItemDto,
   IngredientDetailDto,
-  CalculateSummaryDto,
   CalculateSummaryResponseDto,
   CalculateSummaryItemResultDto,
+  ExistsByMaterialParamsDto,
+  FindAllIngredientsParamsDto,
+  FindIngredientByIdParamsDto,
+  CreateIngredientParamsDto,
+  UpdateIngredientParamsDto,
+  DeleteIngredientParamsDto,
+  ApproveIngredientParamsDto,
+  RejectIngredientParamsDto,
+  CalculateSummaryParamsDto,
 } from '../dto';
 
 export function normalizeVietnameseNFC(str: string): string {
@@ -45,7 +50,7 @@ export class IngredientsService {
    * Kiểm tra trùng tên nguyên liệu có tính đến Collation & Unicode Normalization NFC
    * Bảo toàn phân biệt dấu tiếng Việt chính xác ("Dứa" vs "Dừa")
    */
-  async existsByMaterial(material: string, excludeId?: bigint | number | string): Promise<boolean> {
+  async existsByMaterial({ material, excludeId }: ExistsByMaterialParamsDto): Promise<boolean> {
     const normalizedName = normalizeVietnameseNFC(material);
     if (!normalizedName) return false;
 
@@ -73,20 +78,23 @@ export class IngredientsService {
    * Bounded Paginated Query với Lean Query Projection (Rule 11)
    * TUYỆT ĐỐI KHÔNG nạp 77 cột vi chất trong list queries để chống tràn RAM (Anti-OOM)
    */
-  async findAll(query: IngredientQueryDto) {
+  async findAll({ query = {} }: FindAllIngredientsParamsDto = {}) {
     const page = query.page && query.page > 0 ? query.page : 1;
     const limit = query.limit && query.limit > 0 ? Math.min(100, query.limit) : 20;
     const skip = (page - 1) * limit;
 
-    const cacheKey = this.cacheService?.generateKey('ingredients:list', {
-      page,
-      limit,
-      keyword: query.keyword || query.search,
-      categoryId: query.categoryId,
-      loaiProtein: query.loaiProtein,
-      trangThai: query.trangThai,
-      sortBy: query.sortBy,
-      sortOrder: query.sortOrder,
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'ingredients:list',
+      params: {
+        page,
+        limit,
+        keyword: query.keyword || query.search,
+        categoryId: query.categoryId,
+        loaiProtein: query.loaiProtein,
+        trangThai: query.trangThai,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+      },
     });
 
     if (this.cacheService && cacheKey) {
@@ -207,7 +215,7 @@ export class IngredientsService {
    * Tích lũy 86 vi chất chính xác tuyệt đối qua Decimal.js
    * Tính tổng khối lượng sống (Gross), khối lượng ăn được (Edible/Net) và khối lượng chín (Cooked)
    */
-  async calculateSummary(dto: CalculateSummaryDto): Promise<CalculateSummaryResponseDto> {
+  async calculateSummary({ dto }: CalculateSummaryParamsDto): Promise<CalculateSummaryResponseDto> {
     if (!dto || !dto.items || !Array.isArray(dto.items) || dto.items.length === 0) {
       throw new HttpException(
         {
@@ -291,7 +299,7 @@ export class IngredientsService {
 
       const edibleRateVal =
         ingredient.edible !== undefined && ingredient.edible !== null
-          ? NutritionEngine.toDecimal(ingredient.edible, 100)
+          ? NutritionEngine.toDecimal({ val: ingredient.edible, fallback: 100 })
           : NutritionEngine.ONE_HUNDRED;
 
       const clampedEdibleRate = Decimal.max(
@@ -305,30 +313,37 @@ export class IngredientsService {
 
       if (isNetWeight) {
         // Khối lượng nhập là phần ăn được
-        edibleWeightDec = NutritionEngine.toDecimal(inputWeight, 0);
+        edibleWeightDec = NutritionEngine.toDecimal({ val: inputWeight, fallback: 0 });
         grossWeightDec = edibleRatio.isPositive()
           ? edibleWeightDec.dividedBy(edibleRatio)
           : edibleWeightDec;
       } else {
         // Khối lượng nhập là cả vỏ/xương thô
-        grossWeightDec = NutritionEngine.toDecimal(inputWeight, 0);
+        grossWeightDec = NutritionEngine.toDecimal({ val: inputWeight, fallback: 0 });
         edibleWeightDec = grossWeightDec.times(edibleRatio);
       }
 
-      const coeffDec = NutritionEngine.toDecimal(coefficient, 1);
+      const coeffDec = NutritionEngine.toDecimal({ val: coefficient, fallback: 1 });
       const cookedWeightDec = edibleWeightDec.times(coeffDec);
 
       // Tính toán vi chất dinh dưỡng của từng thành phần
-      const detailed = NutritionEngine.calculateIngredientNutrients(ingredient, inputWeight, {
-        isNetWeight,
-        preserveDecimals: true,
+      const detailed = NutritionEngine.calculateIngredientNutrients({
+        ingredient,
+        weightGrams: inputWeight,
+        options: {
+          isNetWeight,
+          preserveDecimals: true,
+        },
       });
 
       // Tích lũy vào tổng chung
       totalGrossWeight = totalGrossWeight.plus(grossWeightDec);
       totalEdibleWeight = totalEdibleWeight.plus(edibleWeightDec);
       totalCookedWeight = totalCookedWeight.plus(cookedWeightDec);
-      NutritionEngine.accumulateNutrients(accumulatedNutrients, detailed.nutrients);
+      NutritionEngine.accumulateNutrients({
+        target: accumulatedNutrients,
+        source: detailed.nutrients,
+      });
 
       itemResults.push({
         ingredientId: Number(ingredient.id),
@@ -339,7 +354,7 @@ export class IngredientsService {
         cookedWeight: cookedWeightDec.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
         coefficient: coeffDec.toNumber(),
         isNetWeight,
-        nutrients: NutritionEngine.roundDecimalMap(detailed.nutrients, 2),
+        nutrients: NutritionEngine.roundDecimalMap({ map: detailed.nutrients, decimalPlaces: 2 }),
       });
     }
 
@@ -347,7 +362,7 @@ export class IngredientsService {
       totalGrossWeight: totalGrossWeight.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
       totalEdibleWeight: totalEdibleWeight.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
       totalCookedWeight: totalCookedWeight.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
-      nutrients: NutritionEngine.roundDecimalMap(accumulatedNutrients, 2),
+      nutrients: NutritionEngine.roundDecimalMap({ map: accumulatedNutrients, decimalPlaces: 2 }),
       items: itemResults,
     };
   }
@@ -355,7 +370,7 @@ export class IngredientsService {
   /**
    * Chi tiết nguyên liệu: Nạp đầy đủ 86 chỉ tiêu dinh dưỡng (Tái sử dụng Identity Map vĩnh viễn)
    */
-  async findById(id: bigint | number | string): Promise<IngredientDetailDto> {
+  async findById({ id }: FindIngredientByIdParamsDto): Promise<IngredientDetailDto> {
     const ingredientId = BigInt(id);
     const fetchIngredient = async () => {
       const item = await this.prisma.nguyen_lieu.findFirst({
@@ -394,10 +409,7 @@ export class IngredientsService {
    * Tạo nguyên liệu mới
    * Phân nhánh Role: USER/USERPRO -> CHO_DUYET; ADMIN/SUPERADMIN -> DA_DUYET
    */
-  async create(
-    dto: CreateIngredientDto,
-    currentUser?: { id?: string; role?: string },
-  ): Promise<IngredientDetailDto> {
+  async create({ dto, currentUser }: CreateIngredientParamsDto): Promise<IngredientDetailDto> {
     const material = normalizeVietnameseNFC(dto.material || dto.name || '');
     if (!material) {
       throw new HttpException(
@@ -430,7 +442,7 @@ export class IngredientsService {
     }
 
     // Bắt trùng tên
-    const isDuplicate = await this.existsByMaterial(material);
+    const isDuplicate = await this.existsByMaterial({ material });
     if (isDuplicate) {
       throw new HttpException(
         { code: 'PROP_014', message: 'Tên nguyên liệu đã tồn tại trong hệ thống' },
@@ -479,11 +491,7 @@ export class IngredientsService {
    * Chỉ cho phép sửa khi trang_thai == DA_DUYET (nếu không ném ING_001 - 400)
    * Nếu là USER -> tạo bản ghi mới chờ duyệt; nếu là ADMIN -> cập nhật trực tiếp
    */
-  async update(
-    id: bigint | number | string,
-    dto: UpdateIngredientDto,
-    currentUser?: { id?: string; role?: string },
-  ): Promise<IngredientDetailDto> {
+  async update({ id, dto, currentUser }: UpdateIngredientParamsDto): Promise<IngredientDetailDto> {
     const existing = await this.prisma.nguyen_lieu.findFirst({
       where: {
         id: BigInt(id),
@@ -535,9 +543,9 @@ export class IngredientsService {
       const pendingData: any = {};
       for (const field of BASE_NUTRIENT_CODES) {
         pendingData[field] =
-          dto[field as keyof UpdateIngredientDto] !== undefined
-            ? dto[field as keyof UpdateIngredientDto] !== null
-              ? Number(dto[field as keyof UpdateIngredientDto])
+          (dto as any)[field] !== undefined
+            ? (dto as any)[field] !== null
+              ? Number((dto as any)[field])
               : null
             : (existing as any)[field];
       }
@@ -577,7 +585,10 @@ export class IngredientsService {
       newMaterial &&
       newMaterial.toLowerCase() !== normalizeVietnameseNFC(existing.ten_nguyen_lieu).toLowerCase()
     ) {
-      const isDuplicate = await this.existsByMaterial(newMaterial, existing.id);
+      const isDuplicate = await this.existsByMaterial({
+        material: newMaterial,
+        excludeId: existing.id,
+      });
       if (isDuplicate) {
         throw new HttpException(
           { code: 'PROP_014', message: 'Tên nguyên liệu đã tồn tại trong hệ thống' },
@@ -626,7 +637,7 @@ export class IngredientsService {
    * khau_phan_24h_nguyen_lieu, he_so_song_chin. Nếu > 0 ném ING_002 (409)
    * Hỗ trợ soft-delete (deleted_at)
    */
-  async delete(id: bigint | number | string): Promise<{ message: string }> {
+  async delete({ id }: DeleteIngredientParamsDto): Promise<{ message: string }> {
     const existing = await this.prisma.nguyen_lieu.findFirst({
       where: {
         id: BigInt(id),
@@ -699,7 +710,7 @@ export class IngredientsService {
   /**
    * Phê duyệt nguyên liệu đề xuất (Admin)
    */
-  async approve(pendingId: bigint | number | string): Promise<IngredientDetailDto> {
+  async approve({ pendingId }: ApproveIngredientParamsDto): Promise<IngredientDetailDto> {
     const pending = await this.prisma.nguyen_lieu.findFirst({
       where: { id: BigInt(pendingId), deleted_at: null },
     });
@@ -731,17 +742,17 @@ export class IngredientsService {
     return this.mapToDetailDto(approved);
   }
 
-  async approvePending(pendingId: bigint | number | string): Promise<IngredientDetailDto> {
-    return this.approve(pendingId);
+  async approvePending({ pendingId }: ApproveIngredientParamsDto): Promise<IngredientDetailDto> {
+    return this.approve({ pendingId });
   }
 
   /**
    * Từ chối nguyên liệu đề xuất (Admin)
    */
-  async rejectPending(
-    pendingId: bigint | number | string,
-    reason?: string,
-  ): Promise<IngredientDetailDto> {
+  async rejectPending({
+    pendingId,
+    reason: _reason,
+  }: RejectIngredientParamsDto): Promise<IngredientDetailDto> {
     const pending = await this.prisma.nguyen_lieu.findFirst({
       where: { id: BigInt(pendingId), deleted_at: null },
     });
@@ -773,8 +784,8 @@ export class IngredientsService {
     return this.mapToDetailDto(rejected);
   }
 
-  async reject(pendingId: bigint | number | string, reason?: string): Promise<IngredientDetailDto> {
-    return this.rejectPending(pendingId, reason);
+  async reject({ pendingId, reason }: RejectIngredientParamsDto): Promise<IngredientDetailDto> {
+    return this.rejectPending({ pendingId, reason });
   }
 
   /**
@@ -793,7 +804,7 @@ export class IngredientsService {
   /**
    * Chuyển đổi Entity sang Detail DTO đầy đủ 86 chỉ tiêu (Bao gồm các chỉ số tự tính toán bằng NutritionEngine)
    */
-  public mapToDetailDto(item: any): IngredientDetailDto {
+  private mapToDetailDto(item: any): IngredientDetailDto {
     const carbDecimal = NutritionEngine.calculateCarbohydrate(
       item.water,
       item.protein,

@@ -1,11 +1,7 @@
 import Decimal from 'decimal.js';
 import {
-  ALL_INDICATOR_CODES,
-  AllIndicatorCode,
   ATWATER_FACTORS,
   BASE_NUTRIENT_CODES,
-  NUTRIENT_METADATA_MAP,
-  RAE_CONVERSION,
 } from '../../../core/nutrition-engine/nutrition.constants';
 import {
   DecimalMap,
@@ -163,6 +159,34 @@ export interface DailyIntakeCalculationResult {
   ingredients?: CalculatedIngredientDetail[]; // Chỉ có trong mode INGREDIENT_ONLY
 }
 
+export class IntakeToDecimalParamDto {
+  val: unknown;
+  fallback?: number;
+}
+
+export class IntakeCalculateNetWeightParamDto {
+  rawWeightInput: unknown;
+  edibleInput?: unknown;
+  isNetWeight?: boolean;
+}
+
+export class IntakeCalculateNutrientValueParamDto {
+  nutrientPer100g: unknown;
+  netWeightGrams: Decimal;
+  retentionFactor?: unknown;
+}
+
+export class IntakeCalculateIngredientParamDto {
+  ingredient: IntakeIngredientItemInput;
+  rawWeightInput?: unknown;
+  options?: IntakeCalculationOptions;
+}
+
+export class IntakeCalculateDishParamDto {
+  dish: IntakeDishItemInput;
+  options?: IntakeCalculationOptions;
+}
+
 /**
  * PURE INTAKE CALCULATION ENGINE
  * Động cơ tính toán dinh dưỡng khẩu phần 24h chuẩn Bộ Y Tế & Viện Dinh Dưỡng
@@ -176,8 +200,20 @@ export class IntakeCalculationEngine {
   /**
    * Chuyển đổi an toàn giá trị bất kỳ sang Decimal (Tái sử dụng NutritionEngine - DRY D1)
    */
-  public static toDecimal(val: unknown, fallback = 0): Decimal {
-    return NutritionEngine.toDecimal(val, fallback);
+  public static toDecimal(
+    paramOrVal: IntakeToDecimalParamDto | unknown,
+    legacyFallback = 0,
+  ): Decimal {
+    if (
+      paramOrVal &&
+      typeof paramOrVal === 'object' &&
+      !(paramOrVal instanceof Decimal) &&
+      'val' in paramOrVal
+    ) {
+      const dto = paramOrVal as IntakeToDecimalParamDto;
+      return NutritionEngine.toDecimal({ val: dto.val, fallback: dto.fallback ?? 0 });
+    }
+    return NutritionEngine.toDecimal({ val: paramOrVal, fallback: legacyFallback });
   }
 
   /**
@@ -186,11 +222,28 @@ export class IntakeCalculationEngine {
    * netWeight = rawWeight * (edible / 100)
    */
   public static calculateNetWeight(
-    rawWeightInput: unknown,
-    edibleInput?: unknown,
-    isNetWeight = false,
+    paramOrRawWeight: IntakeCalculateNetWeightParamDto | unknown,
+    legacyEdibleInput?: unknown,
+    legacyIsNetWeight = false,
   ): Decimal {
-    return NutritionEngine.calculateNetWeight(rawWeightInput, edibleInput, isNetWeight);
+    if (
+      paramOrRawWeight &&
+      typeof paramOrRawWeight === 'object' &&
+      !(paramOrRawWeight instanceof Decimal) &&
+      'rawWeightInput' in paramOrRawWeight
+    ) {
+      const dto = paramOrRawWeight as IntakeCalculateNetWeightParamDto;
+      return NutritionEngine.calculateNetWeight(
+        dto.rawWeightInput,
+        dto.edibleInput,
+        dto.isNetWeight || false,
+      );
+    }
+    return NutritionEngine.calculateNetWeight(
+      paramOrRawWeight,
+      legacyEdibleInput,
+      legacyIsNetWeight,
+    );
   }
 
   /**
@@ -202,10 +255,30 @@ export class IntakeCalculationEngine {
    * @param retentionFactor Hệ số lưu giữ vi chất sau chế biến (0 - 1.0, mặc định 1.0)
    */
   public static calculateNutrientValue(
-    nutrientPer100g: unknown,
-    netWeightGrams: Decimal,
-    retentionFactor: unknown = 1.0,
+    paramOrPer100: IntakeCalculateNutrientValueParamDto | unknown,
+    legacyNetWeightGrams?: Decimal,
+    legacyRetentionFactor: unknown = 1.0,
   ): Decimal {
+    let nutrientPer100g: unknown;
+    let netWeightGrams: Decimal;
+    let retentionFactor: unknown;
+
+    if (
+      paramOrPer100 &&
+      typeof paramOrPer100 === 'object' &&
+      !(paramOrPer100 instanceof Decimal) &&
+      'nutrientPer100g' in paramOrPer100
+    ) {
+      const dto = paramOrPer100 as IntakeCalculateNutrientValueParamDto;
+      nutrientPer100g = dto.nutrientPer100g;
+      netWeightGrams = dto.netWeightGrams;
+      retentionFactor = dto.retentionFactor;
+    } else {
+      nutrientPer100g = paramOrPer100;
+      netWeightGrams = legacyNetWeightGrams!;
+      retentionFactor = legacyRetentionFactor;
+    }
+
     const per100 = this.toDecimal(nutrientPer100g, 0);
     const retention =
       retentionFactor !== undefined && retentionFactor !== null && retentionFactor !== ''
@@ -220,10 +293,28 @@ export class IntakeCalculationEngine {
    * Tính toán dinh dưỡng chi tiết cho 1 nguyên liệu đơn lẻ
    */
   public static calculateIngredient(
-    ingredient: IntakeIngredientItemInput,
-    rawWeightInput?: unknown,
-    options: IntakeCalculationOptions = {},
+    paramOrIngredient: IntakeCalculateIngredientParamDto | IntakeIngredientItemInput,
+    legacyRawWeightInput?: unknown,
+    legacyOptions: IntakeCalculationOptions = {},
   ): CalculatedIngredientDetail {
+    let ingredient: IntakeIngredientItemInput;
+    let rawWeightInput: unknown;
+    let options: IntakeCalculationOptions;
+
+    if (
+      paramOrIngredient &&
+      typeof paramOrIngredient === 'object' &&
+      'ingredient' in paramOrIngredient
+    ) {
+      const dto = paramOrIngredient as IntakeCalculateIngredientParamDto;
+      ingredient = dto.ingredient;
+      rawWeightInput = dto.rawWeightInput;
+      options = dto.options || {};
+    } else {
+      ingredient = paramOrIngredient as IntakeIngredientItemInput;
+      rawWeightInput = legacyRawWeightInput;
+      options = legacyOptions;
+    }
     const rawWeightVal = rawWeightInput !== undefined ? rawWeightInput : ingredient.rawWeight;
     const rawWeight = Decimal.max(this.ZERO, this.toDecimal(rawWeightVal, 0));
 
@@ -263,25 +354,28 @@ export class IntakeCalculationEngine {
 
     // 1. Tính toán 77 chỉ tiêu cơ sở
     for (const code of BASE_NUTRIENT_CODES) {
-      const valPer100g = NutritionEngine.extractNutrientValue(ingredient, code);
+      const valPer100g = NutritionEngine.extractNutrientValue({ source: ingredient, code });
       decimalMap[code] = valPer100g.times(factor).times(retentionFactor);
     }
 
     // 2. Tính Carbohydrate khả dụng chuẩn FAO:
     // Available Carb = max(0, 100 - (Water + Protein + Fat + Ash + Fiber))
-    const waterPer100 = NutritionEngine.extractNutrientValue(ingredient, 'water');
-    const proteinPer100 = NutritionEngine.extractNutrientValue(ingredient, 'protein');
-    const fatPer100 = NutritionEngine.extractNutrientValue(ingredient, 'fat');
-    const ashPer100 = NutritionEngine.extractNutrientValue(ingredient, 'ash');
-    const fiberPer100 = NutritionEngine.extractNutrientValue(ingredient, 'fiber');
+    const waterPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'water' });
+    const proteinPer100 = NutritionEngine.extractNutrientValue({
+      source: ingredient,
+      code: 'protein',
+    });
+    const fatPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'fat' });
+    const ashPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'ash' });
+    const fiberPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'fiber' });
 
-    const carbPer100 = NutritionEngine.calculateCarbohydrate(
-      waterPer100,
-      proteinPer100,
-      fatPer100,
-      ashPer100,
-      fiberPer100,
-    );
+    const carbPer100 = NutritionEngine.calculateCarbohydrate({
+      water: waterPer100,
+      protein: proteinPer100,
+      fat: fatPer100,
+      ash: ashPer100,
+      fiber: fiberPer100,
+    });
     decimalMap.carbohydrate = carbPer100.times(factor).times(retentionFactor);
 
     // 3. Tính Năng lượng Atwater chuẩn hóa:
@@ -297,20 +391,29 @@ export class IntakeCalculationEngine {
 
     // 4. Tính Vitamin A RAE (Retinol Activity Equivalent) theo FAO/WHO:
     // RAE = Retinol + (Beta-Carotene / 12) + (Alpha-Carotene / 24) + (Beta-Cryptoxanthin / 24)
-    const retinolPer100 = NutritionEngine.extractNutrientValue(ingredient, 'retinol');
-    const betaCarotenePer100 = NutritionEngine.extractNutrientValue(ingredient, 'betaCarotene');
-    const alphaCarotenePer100 = NutritionEngine.extractNutrientValue(ingredient, 'alphaCarotene');
-    const betaCryptoxanthinPer100 = NutritionEngine.extractNutrientValue(
-      ingredient,
-      'betaCryptoxanthin',
-    );
+    const retinolPer100 = NutritionEngine.extractNutrientValue({
+      source: ingredient,
+      code: 'retinol',
+    });
+    const betaCarotenePer100 = NutritionEngine.extractNutrientValue({
+      source: ingredient,
+      code: 'betaCarotene',
+    });
+    const alphaCarotenePer100 = NutritionEngine.extractNutrientValue({
+      source: ingredient,
+      code: 'alphaCarotene',
+    });
+    const betaCryptoxanthinPer100 = NutritionEngine.extractNutrientValue({
+      source: ingredient,
+      code: 'betaCryptoxanthin',
+    });
 
-    const raePer100 = NutritionEngine.calculateVitaminARae(
-      retinolPer100,
-      betaCarotenePer100,
-      alphaCarotenePer100,
-      betaCryptoxanthinPer100,
-    );
+    const raePer100 = NutritionEngine.calculateVitaminARae({
+      retinol: retinolPer100,
+      betaCarotene: betaCarotenePer100,
+      alphaCarotene: alphaCarotenePer100,
+      betaCryptoxanthin: betaCryptoxanthinPer100,
+    });
     decimalMap.vitaminARae = raePer100.times(factor).times(retentionFactor);
 
     // 5. Phân loại nguồn gốc Động vật / Thực vật
@@ -365,7 +468,10 @@ export class IntakeCalculationEngine {
     }
 
     const decimalPlaces = options.targetDecimalPlaces ?? 2;
-    const roundedNutrients = NutritionEngine.roundDecimalMap(decimalMap, decimalPlaces);
+    const roundedNutrients = NutritionEngine.roundDecimalMap({
+      map: decimalMap,
+      decimalPlaces,
+    });
 
     const name =
       ingredient.ingredientName ||
@@ -402,9 +508,21 @@ export class IntakeCalculationEngine {
    * Tính toán dinh dưỡng cho một món ăn (Dish) bao gồm danh sách nguyên liệu
    */
   public static calculateDish(
-    dish: IntakeDishItemInput,
-    options: IntakeCalculationOptions = {},
+    paramOrDish: IntakeCalculateDishParamDto | IntakeDishItemInput,
+    legacyOptions: IntakeCalculationOptions = {},
   ): CalculatedDishDetail {
+    let dish: IntakeDishItemInput;
+    let options: IntakeCalculationOptions;
+
+    if (paramOrDish && typeof paramOrDish === 'object' && 'dish' in paramOrDish) {
+      const dto = paramOrDish as IntakeCalculateDishParamDto;
+      dish = dto.dish;
+      options = dto.options || {};
+    } else {
+      dish = paramOrDish as IntakeDishItemInput;
+      options = legacyOptions;
+    }
+
     const quantity = dish.quantity !== undefined && dish.quantity > 0 ? dish.quantity : 1;
     const qtyDecimal = new Decimal(quantity);
     const dishRetention =
@@ -447,13 +565,19 @@ export class IntakeCalculationEngine {
       totalNet = totalNet.plus(this.toDecimal(ingDetail.netWeightGrams));
 
       if (ingDetail.decimalNutrients) {
-        NutritionEngine.accumulateNutrients(accumulatedNutrients, ingDetail.decimalNutrients);
+        NutritionEngine.accumulateNutrients({
+          target: accumulatedNutrients,
+          source: ingDetail.decimalNutrients,
+        });
       }
     }
 
     NutritionEngine.recalculateDerivedRatios(accumulatedNutrients);
     const decimalPlaces = options.targetDecimalPlaces ?? 2;
-    const roundedNutrients = NutritionEngine.roundDecimalMap(accumulatedNutrients, decimalPlaces);
+    const roundedNutrients = NutritionEngine.roundDecimalMap({
+      map: accumulatedNutrients,
+      decimalPlaces,
+    });
 
     return {
       dishId: dish.dishId ?? dish.id,
@@ -516,7 +640,10 @@ export class IntakeCalculationEngine {
             mealNetWeight = mealNetWeight.plus(this.toDecimal(dishDetail.netWeightGrams));
 
             if (dishDetail.decimalNutrients) {
-              NutritionEngine.accumulateNutrients(mealNutrients, dishDetail.decimalNutrients);
+              NutritionEngine.accumulateNutrients({
+                target: mealNutrients,
+                source: dishDetail.decimalNutrients,
+              });
             }
           } else {
             // Nguyên liệu trực tiếp trong bữa
@@ -543,7 +670,10 @@ export class IntakeCalculationEngine {
             mealNetWeight = mealNetWeight.plus(this.toDecimal(ingDetail.netWeightGrams));
 
             if (ingDetail.decimalNutrients) {
-              NutritionEngine.accumulateNutrients(mealNutrients, ingDetail.decimalNutrients);
+              NutritionEngine.accumulateNutrients({
+                target: mealNutrients,
+                source: ingDetail.decimalNutrients,
+              });
             }
           }
         }
@@ -552,7 +682,10 @@ export class IntakeCalculationEngine {
 
         totalRawWeight = totalRawWeight.plus(mealRawWeight);
         totalNetWeight = totalNetWeight.plus(mealNetWeight);
-        NutritionEngine.accumulateNutrients(accumulatedTotalNutrients, mealNutrients);
+        NutritionEngine.accumulateNutrients({
+          target: accumulatedTotalNutrients,
+          source: mealNutrients,
+        });
 
         calculatedMeals.push({
           mealId: meal.mealId,
@@ -569,7 +702,10 @@ export class IntakeCalculationEngine {
             .toDecimalPlaces(decimalPlaces, Decimal.ROUND_HALF_UP)
             .toNumber(),
           energyPercentOfDaily: 0, // Tính sau khi có tổng năng lượng cả ngày
-          nutrients: NutritionEngine.roundDecimalMap(mealNutrients, decimalPlaces),
+          nutrients: NutritionEngine.roundDecimalMap({
+            map: mealNutrients,
+            decimalPlaces,
+          }),
           items: calculatedItems,
           ...(options.preserveDecimals ? { decimalNutrients: mealNutrients } : {}),
         });
@@ -591,10 +727,10 @@ export class IntakeCalculationEngine {
       }
 
       NutritionEngine.recalculateDerivedRatios(accumulatedTotalNutrients);
-      const totalRoundedNutrients = NutritionEngine.roundDecimalMap(
-        accumulatedTotalNutrients,
+      const totalRoundedNutrients = NutritionEngine.roundDecimalMap({
+        map: accumulatedTotalNutrients,
         decimalPlaces,
-      );
+      });
 
       return {
         mode: 'BY_MEAL',
@@ -641,16 +777,19 @@ export class IntakeCalculationEngine {
         totalNetWeight = totalNetWeight.plus(this.toDecimal(detail.netWeightGrams));
 
         if (detail.decimalNutrients) {
-          NutritionEngine.accumulateNutrients(accumulatedTotalNutrients, detail.decimalNutrients);
+          NutritionEngine.accumulateNutrients({
+            target: accumulatedTotalNutrients,
+            source: detail.decimalNutrients,
+          });
         }
       }
 
       NutritionEngine.recalculateDerivedRatios(accumulatedTotalNutrients);
       const dailyEnergy = accumulatedTotalNutrients.energy || this.ZERO;
-      const totalRoundedNutrients = NutritionEngine.roundDecimalMap(
-        accumulatedTotalNutrients,
+      const totalRoundedNutrients = NutritionEngine.roundDecimalMap({
+        map: accumulatedTotalNutrients,
         decimalPlaces,
-      );
+      });
 
       return {
         mode: 'INGREDIENT_ONLY',

@@ -1,12 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
-import {
-  QueueService,
-  EnqueueOptions,
-  Job,
-  DlqJob,
-  JobHandler,
-} from './queue.interface';
+import { QueueService, EnqueueOptions, Job, DlqJob, JobHandler } from './queue.interface';
+
+export interface EnqueueJobParamDto<T = any> {
+  queueName: string;
+  payload: T;
+  options?: EnqueueOptions;
+}
+
+export interface ProcessJobParamDto<T = any, R = any> {
+  queueName: string;
+  handler: JobHandler<T, R>;
+}
+
+export interface GetDlqParamDto {
+  queueName?: string;
+  limit?: number;
+}
 
 @Injectable()
 export class MysqlQueueService implements QueueService {
@@ -19,17 +29,34 @@ export class MysqlQueueService implements QueueService {
    * Đẩy một công việc mới vào hàng đợi CSDL _system_jobs
    */
   async enqueue<T = any>(
-    queueName: string,
-    payload: T,
-    options?: EnqueueOptions,
+    paramOrQueueName: EnqueueJobParamDto<T> | string,
+    legacyPayload?: T,
+    legacyOptions?: EnqueueOptions,
   ): Promise<Job<T>> {
+    let queueName: string;
+    let payload: T;
+    let options: EnqueueOptions | undefined;
+
+    if (
+      paramOrQueueName &&
+      typeof paramOrQueueName === 'object' &&
+      'queueName' in paramOrQueueName &&
+      'payload' in paramOrQueueName
+    ) {
+      queueName = paramOrQueueName.queueName;
+      payload = paramOrQueueName.payload;
+      options = paramOrQueueName.options;
+    } else {
+      queueName = paramOrQueueName as string;
+      payload = legacyPayload as T;
+      options = legacyOptions;
+    }
+
     const runAt =
-      options?.runAt ||
-      (options?.delayMs ? new Date(Date.now() + options.delayMs) : new Date());
+      options?.runAt || (options?.delayMs ? new Date(Date.now() + options.delayMs) : new Date());
     const priority = options?.priority ?? 0;
     const maxAttempts = options?.maxAttempts ?? 3;
-    const payloadStr =
-      typeof payload === 'string' ? payload : JSON.stringify(payload);
+    const payloadStr = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
     const created = await this.prisma.systemJob.create({
       data: {
@@ -49,11 +76,28 @@ export class MysqlQueueService implements QueueService {
   /**
    * Đăng ký một processor handler cho queueName
    */
-  process<T = any, R = any>(queueName: string, handler: JobHandler<T, R>): void {
+  process<T = any, R = any>(
+    paramOrQueueName: ProcessJobParamDto<T, R> | string,
+    legacyHandler?: JobHandler<T, R>,
+  ): void {
+    let queueName: string;
+    let handler: JobHandler<T, R>;
+
+    if (
+      paramOrQueueName &&
+      typeof paramOrQueueName === 'object' &&
+      'queueName' in paramOrQueueName &&
+      'handler' in paramOrQueueName
+    ) {
+      queueName = paramOrQueueName.queueName;
+      handler = paramOrQueueName.handler;
+    } else {
+      queueName = paramOrQueueName as string;
+      handler = legacyHandler!;
+    }
+
     if (this.handlers.has(queueName)) {
-      this.logger.warn(
-        `Processor cho queue "${queueName}" đã tồn tại. Đang ghi đè processor mới.`,
-      );
+      this.logger.warn(`Processor cho queue "${queueName}" đã tồn tại. Đang ghi đè processor mới.`);
     }
     this.handlers.set(queueName, handler);
     this.logger.log(`Đã đăng ký processor thành công cho queue: [${queueName}]`);
@@ -83,7 +127,22 @@ export class MysqlQueueService implements QueueService {
   /**
    * Lấy danh sách jobs lỗi từ bảng Dead Letter Queue (_system_jobs_dlq)
    */
-  async getDlq(queueName?: string, limit = 100): Promise<DlqJob[]> {
+  async getDlq(paramOrQueueName?: GetDlqParamDto | string, legacyLimit = 100): Promise<DlqJob[]> {
+    let queueName: string | undefined;
+    let limit = 100;
+
+    if (
+      paramOrQueueName &&
+      typeof paramOrQueueName === 'object' &&
+      ('queueName' in paramOrQueueName || 'limit' in paramOrQueueName)
+    ) {
+      queueName = paramOrQueueName.queueName;
+      limit = paramOrQueueName.limit ?? 100;
+    } else {
+      queueName = paramOrQueueName as string | undefined;
+      limit = legacyLimit;
+    }
+
     const records = await this.prisma.systemJobDlq.findMany({
       where: queueName ? { queueName } : undefined,
       take: limit,

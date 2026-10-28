@@ -40,8 +40,7 @@ export class DailyIntakeExportRequestDto {
   patientId?: string | number;
 
   @ApiPropertyOptional({
-    description:
-      'Chế độ xuất chi tiết (dùng cho mẫu 3: BY_MEAL / MEAL hoặc INGREDIENT_ONLY / ALL)',
+    description: 'Chế độ xuất chi tiết (dùng cho mẫu 3: BY_MEAL / MEAL hoặc INGREDIENT_ONLY / ALL)',
     example: 'BY_MEAL',
   })
   @IsOptional()

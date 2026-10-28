@@ -13,11 +13,11 @@ describe('Subscriptions & Plans E2E (Task 7.1: Cumulative Extension & Transactio
   let adminUserId: string;
   let userToken: string;
   let userId: string;
-  let cacheService: CacheService;
+  let _cacheService: CacheService;
 
   beforeAll(async () => {
     await helper.init();
-    cacheService = helper.getApp().get<CacheService>(CacheService);
+    _cacheService = helper.getApp().get<CacheService>(CacheService);
   });
 
   afterAll(async () => {
@@ -172,7 +172,7 @@ describe('Subscriptions & Plans E2E (Task 7.1: Cumulative Extension & Transactio
       const prisma = helper.getPrisma();
 
       // 1. Tạo gói cước 30 ngày
-      const pkg = await prisma.goi.create({
+      const _pkg = await prisma.goi.create({
         data: {
           ma_goi: 'PRO_30D',
           ten_goi: 'Gói Pro 30 Ngày',
@@ -378,4 +378,3 @@ describe('Subscriptions & Plans E2E (Task 7.1: Cumulative Extension & Transactio
     });
   });
 });
-

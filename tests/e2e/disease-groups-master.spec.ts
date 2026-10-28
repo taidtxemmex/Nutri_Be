@@ -16,7 +16,7 @@ describe('Disease Groups & Extended Disease Groups Master E2E (IDOR & 3-Layer Pe
   let doctorAToken: string;
   let doctorAUser: any;
   let doctorBToken: string;
-  let doctorBUser: any;
+  let _doctorBUser: any;
   let cacheService: CacheService;
 
   beforeAll(async () => {
@@ -70,7 +70,7 @@ describe('Disease Groups & Extended Disease Groups Master E2E (IDOR & 3-Layer Pe
       fullName: 'Bác Sĩ Trần Thị B',
     });
     doctorBToken = doctorB.token;
-    doctorBUser = doctorB.user;
+    _doctorBUser = doctorB.user;
   });
 
   afterAll(async () => {

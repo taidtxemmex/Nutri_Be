@@ -246,7 +246,8 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
         height: 168.0,
         activityFactor: 1.4,
         phoneNumber: '0912345678',
-        notes: 'Bệnh nhân nội trú: Đái tháo đường Type 2 kiểm soát kém, biến chứng thận nhẹ, PAL 1.4',
+        notes:
+          'Bệnh nhân nội trú: Đái tháo đường Type 2 kiểm soát kém, biến chứng thận nhẹ, PAL 1.4',
       };
 
       // Layer 1: HTTP 201 Created
@@ -530,7 +531,9 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
         where: { id: BigInt(clonedMenuId) },
       });
       expect(dbCloned).not.toBeNull();
-      expect(dbCloned?.ten_thuc_don).toBe('[Bản sao] Thực đơn tuần kiểm soát đường huyết Bệnh nhân A');
+      expect(dbCloned?.ten_thuc_don).toBe(
+        '[Bản sao] Thực đơn tuần kiểm soát đường huyết Bệnh nhân A',
+      );
 
       // Đảm bảo bữa ăn của bản sao độc lập hoàn toàn với bản gốc
       const originalDetails = await prisma.chi_tiet_thuc_don.findMany({
@@ -633,7 +636,7 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
             mealTime: '11:30',
             ingredients: [
               { ingredientId: medicalOatIngId, rawWeight: 100 }, // edible 100% -> sạch 100g
-              { ingredientId: specialMilkIngId, rawWeight: 50 },  // edible 100% -> sạch 50g
+              { ingredientId: specialMilkIngId, rawWeight: 50 }, // edible 100% -> sạch 50g
             ],
           },
         ],
@@ -726,7 +729,9 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
     it('8.2 Bác sĩ tải file Excel báo cáo lâm sàng tổng hợp (ALL_IN_ONE) -> Layer 3 verify file ZIP/PK', async () => {
       // Layer 1: HTTP 200 OK
       const res = await request(helper.getHttpServer())
-        .get(`/api/daily-intakes/${dailyIntakeId}/export?reportType=${DailyIntakeClinicalReportType.ALL_IN_ONE}`)
+        .get(
+          `/api/daily-intakes/${dailyIntakeId}/export?reportType=${DailyIntakeClinicalReportType.ALL_IN_ONE}`,
+        )
         .set('Authorization', `Bearer ${doctorToken}`)
         .buffer(true)
         .parse(binaryBufferParser)

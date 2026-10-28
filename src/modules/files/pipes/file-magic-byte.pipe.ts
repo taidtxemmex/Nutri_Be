@@ -1,14 +1,6 @@
-import {
-  PipeTransform,
-  Injectable,
-  Optional,
-  BadRequestException,
-} from '@nestjs/common';
+import { PipeTransform, Injectable, Optional, BadRequestException } from '@nestjs/common';
 import * as path from 'path';
-import {
-  FILE_SECURITY_CONFIG,
-  AllowedMimeType,
-} from '../../../config/constants/file.constants';
+import { FILE_SECURITY_CONFIG, AllowedMimeType } from '../../../config/constants/file.constants';
 
 export interface FileMagicBytePipeOptions {
   allowImages?: boolean;
@@ -21,13 +13,10 @@ export interface DetectedFileType {
 }
 
 @Injectable()
-export class FileMagicBytePipe
-  implements
-    PipeTransform<
-      Express.Multer.File | Express.Multer.File[],
-      Promise<Express.Multer.File | Express.Multer.File[]>
-    >
-{
+export class FileMagicBytePipe implements PipeTransform<
+  Express.Multer.File | Express.Multer.File[],
+  Promise<Express.Multer.File | Express.Multer.File[]>
+> {
   private readonly options: Required<FileMagicBytePipeOptions>;
 
   constructor(@Optional() options?: FileMagicBytePipeOptions) {
@@ -63,9 +52,7 @@ export class FileMagicBytePipe
   /**
    * Xác thực độc lập từng tệp tin
    */
-  public async validateFile(
-    file: Express.Multer.File,
-  ): Promise<Express.Multer.File> {
+  public async validateFile(file: Express.Multer.File): Promise<Express.Multer.File> {
     if (!file || !file.buffer || !Buffer.isBuffer(file.buffer)) {
       throw new BadRequestException({
         code: 'FILE_INVALID',
@@ -156,11 +143,7 @@ export class FileMagicBytePipe
     const mb = FILE_SECURITY_CONFIG.MAGIC_BYTES;
 
     // JPEG: FF D8 FF
-    if (
-      buffer[0] === mb.JPEG[0] &&
-      buffer[1] === mb.JPEG[1] &&
-      buffer[2] === mb.JPEG[2]
-    ) {
+    if (buffer[0] === mb.JPEG[0] && buffer[1] === mb.JPEG[1] && buffer[2] === mb.JPEG[2]) {
       return { mime: 'image/jpeg', ext: '.jpg' };
     }
 
@@ -243,7 +226,10 @@ export class FileMagicBytePipe
 
     if (buffer.length > 4096) {
       const tailLength = Math.min(buffer.length - 4096, 4096);
-      const tailText = buffer.subarray(buffer.length - tailLength).toString('binary').toLowerCase();
+      const tailText = buffer
+        .subarray(buffer.length - tailLength)
+        .toString('binary')
+        .toLowerCase();
       for (const pattern of dangerousPatterns) {
         if (tailText.includes(pattern)) {
           throw new BadRequestException({

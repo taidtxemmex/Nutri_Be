@@ -47,7 +47,7 @@ export class UsersController {
     description: 'Lấy thông tin tài khoản và hồ sơ thành công',
   })
   async getMe(@CurrentUserId() userId: string) {
-    return this.usersService.getMe(userId);
+    return this.usersService.getMe({ currentUserId: userId });
   }
 
   @Put('me')
@@ -55,7 +55,7 @@ export class UsersController {
   @ApiStandardResponse({ description: 'Cập nhật hồ sơ cá nhân thành công' })
   async updateMe(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateUserInfoReqDto) {
     dto.userId = user.id;
-    return this.usersService.updateUserInfo(dto, user);
+    return this.usersService.updateUserInfo({ dto, currentUser: user });
   }
 
   @Post('batch')
@@ -72,7 +72,7 @@ export class UsersController {
     @Body() dto: BatchCreateUsersDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.createBatch(dto.users, currentUser);
+    return this.usersService.createBatch({ dtoList: dto.users, currentUser });
   }
 
   @Post(['getInfo', '/api/users/getInfo'])
@@ -87,7 +87,7 @@ export class UsersController {
     @Body() dto: UserInfoRequestDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.getUserInfo(dto.userId, currentUser);
+    return this.usersService.getUserInfo({ targetUserId: dto.userId, currentUser });
   }
 
   @Put(['update-info', '/api/users/update-info'])
@@ -98,7 +98,7 @@ export class UsersController {
     @Body() dto: UpdateUserInfoReqDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.updateUserInfo(dto, currentUser);
+    return this.usersService.updateUserInfo({ dto, currentUser });
   }
 
   @Get('')
@@ -109,7 +109,7 @@ export class UsersController {
     description: 'Danh sách người dùng chuẩn phân trang',
   })
   async findAll(@Query() query: QueryUsersDto) {
-    return this.usersService.findAll(query);
+    return this.usersService.findAll({ query });
   }
 
   @Put([':id/role', 'update-role'])
@@ -126,7 +126,7 @@ export class UsersController {
     if (!targetUserId) {
       throw new BadRequestException('Vui lòng cung cấp ID người dùng cần phân quyền.');
     }
-    return this.usersService.updateRole(targetUserId, dto.newRole, currentUser);
+    return this.usersService.updateRole({ targetUserId, newRole: dto.newRole, currentUser });
   }
 
   @Put('batch-status')
@@ -142,7 +142,11 @@ export class UsersController {
     @Body() dto: BatchUpdateUserStatusDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.updateStatusBatch(dto.userIds, dto.isActive, currentUser);
+    return this.usersService.updateStatusBatch({
+      userIds: dto.userIds,
+      isActive: dto.isActive,
+      currentUser,
+    });
   }
 
   @Put([':id/status', 'update-user-active-satus'])
@@ -163,7 +167,7 @@ export class UsersController {
     if (typeof isActive !== 'boolean') {
       throw new BadRequestException('Vui lòng cung cấp giá trị boolean cho isActive/active.');
     }
-    return this.usersService.updateStatus(targetUserId, isActive, currentUser);
+    return this.usersService.updateStatus({ targetUserId, isActive, currentUser });
   }
 
   @Get(['check-profile', '/api/users/check-profile'])
@@ -172,7 +176,7 @@ export class UsersController {
   })
   @ApiStandardResponse({ description: 'Trả về profileComplete boolean' })
   async checkProfile(@CurrentUserId() userId: string) {
-    return this.usersService.checkProfile(userId);
+    return this.usersService.checkProfile({ userId });
   }
 
   @Get(':id')
@@ -184,7 +188,7 @@ export class UsersController {
     description: 'Chi tiết tài khoản người dùng',
   })
   async findById(@Param('id') id: string) {
-    return this.usersService.findById(id);
+    return this.usersService.findById({ id });
   }
 
   @Delete('batch')
@@ -198,7 +202,7 @@ export class UsersController {
     @Body() dto: BatchUserIdsDto,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.softDeleteBatch(dto.userIds, currentUser);
+    return this.usersService.softDeleteBatch({ userIds: dto.userIds, currentUser });
   }
 
   @Delete(':id')
@@ -207,6 +211,6 @@ export class UsersController {
   @ApiParam({ name: 'id', description: 'User ID' })
   @ApiStandardResponse({ description: 'Xóa mềm người dùng thành công' })
   async softDelete(@Param('id') id: string, @CurrentUser() currentUser: AuthenticatedUser) {
-    return this.usersService.softDeleteUser(id, currentUser);
+    return this.usersService.softDeleteUser({ targetUserId: id, currentUser });
   }
 }

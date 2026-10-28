@@ -65,7 +65,7 @@ export class DishesController {
     @Query('statuses') statuses: string | string[] | undefined,
     @CurrentUser() user: any,
   ): Promise<DishSummaryDto[]> {
-    return this.dishesService.getUserDishes(statuses, user);
+    return this.dishesService.getUserDishes({ currentUser: user, statuses: statuses as any });
   }
 
   @Get('public')
@@ -76,7 +76,7 @@ export class DishesController {
     description: 'Lấy danh sách món công khai thành công',
   })
   async getPublicDishes(@CurrentUser() user?: any): Promise<DishSummaryDto[]> {
-    return this.dishesService.getPublicDishes(user?.id);
+    return this.dishesService.getPublicDishes({ currentUserId: user?.id });
   }
 
   @Get('admin')
@@ -92,7 +92,7 @@ export class DishesController {
     @Query('statuses') statuses: string | string[] | undefined,
     @CurrentUser() user: any,
   ): Promise<DishSummaryDto[]> {
-    return this.dishesService.getAdminDishes(statuses, user?.id);
+    return this.dishesService.getAdminDishes({ currentUser: user, statuses: statuses as any });
   }
 
   @Get('autocomplete')
@@ -109,7 +109,11 @@ export class DishesController {
     @Query('limit') limit?: number,
     @CurrentUser() user?: any,
   ): Promise<DishSummaryDto[]> {
-    return this.dishesService.autocomplete(dishName, limit || 10, user);
+    return this.dishesService.autocomplete({
+      keyword: dishName,
+      limit: limit || 10,
+      currentUser: user,
+    });
   }
 
   @Get('import-template')
@@ -119,7 +123,7 @@ export class DishesController {
     const safeFileName = path.basename('Template_import_mon_an.xlsx');
     const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
-    setExcelResponseHeaders(res, safeFileName);
+    setExcelResponseHeaders({ res, filename: safeFileName });
 
     if (fs.existsSync(filePath)) {
       return fs.createReadStream(filePath).pipe(res);
@@ -148,13 +152,16 @@ export class DishesController {
       );
     }
 
-    const result = await this.excelService.importExcel(file.buffer, user?.id);
+    const result = await this.excelService.importExcel({
+      fileBuffer: file.buffer,
+      userId: user?.id,
+    });
 
     if (!result.success && result.errorFileBuffer) {
-      setExcelResponseHeaders(
+      setExcelResponseHeaders({
         res,
-        result.errorFileName || 'dish_import_errors.xlsx',
-      );
+        filename: result.errorFileName || 'dish_import_errors.xlsx',
+      });
       return res.end(result.errorFileBuffer);
     }
 
@@ -178,7 +185,11 @@ export class DishesController {
   @SkipTransform()
   @ApiOperation({ summary: 'Xuất danh sách món ăn ra tập tin Excel' })
   async exportDishes(@Body() dto: ExportDishDto, @CurrentUser() user: any, @Res() res: Response) {
-    await this.excelService.streamExportDishes(dto, user, res);
+    await this.excelService.streamExportDishes({
+      dtoOrDishes: dto,
+      currentUser: user,
+      stream: res,
+    });
   }
 
   @Get(':id')
@@ -189,7 +200,7 @@ export class DishesController {
     description: 'Lấy chi tiết món ăn thành công',
   })
   async getById(@Param('id') id: string, @CurrentUser() user?: any): Promise<DishResponseDto> {
-    return this.dishesService.findById(id, user);
+    return this.dishesService.findById({ id, currentUser: user });
   }
 
   @Post()
@@ -204,7 +215,7 @@ export class DishesController {
     description: 'Tạo món ăn thành công',
   })
   async create(@Body() dto: CreateDishDto, @CurrentUser() user: any): Promise<DishResponseDto> {
-    return this.dishesService.create(dto, user);
+    return this.dishesService.create({ dto, currentUser: user });
   }
 
   @Put(':id')
@@ -220,7 +231,7 @@ export class DishesController {
     @Body() dto: UpdateDishDto,
     @CurrentUser() user: any,
   ): Promise<DishResponseDto> {
-    return this.dishesService.update(id, dto, user);
+    return this.dishesService.update({ id, dto, currentUser: user });
   }
 
   @Post(':id/clone')
@@ -236,7 +247,7 @@ export class DishesController {
     @Body() dto: DishCloneRequestDto,
     @CurrentUser() user: any,
   ): Promise<DishCloneResponseDto> {
-    return this.dishesService.cloneDish(id, dto, user);
+    return this.dishesService.cloneDish({ dishId: id, request: dto, currentUser: user });
   }
 
   @Put(':id/propose')
@@ -248,7 +259,7 @@ export class DishesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ message: string }> {
-    return this.dishesService.proposeDish(id, user);
+    return this.dishesService.proposeDish({ dishId: id, currentUser: user });
   }
 
   @Post(':id/propose')
@@ -260,7 +271,7 @@ export class DishesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ message: string }> {
-    return this.dishesService.proposeDish(id, user);
+    return this.dishesService.proposeDish({ dishId: id, currentUser: user });
   }
 
   @Put(':id/approve')
@@ -272,7 +283,7 @@ export class DishesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ message: string }> {
-    return this.dishesService.approveDish(id, user);
+    return this.dishesService.approveDish({ id, adminUser: user });
   }
 
   @Post(':id/approve')
@@ -284,7 +295,7 @@ export class DishesController {
     @Param('id') id: string,
     @CurrentUser() user: any,
   ): Promise<{ message: string }> {
-    return this.dishesService.approveDish(id, user);
+    return this.dishesService.approveDish({ id, adminUser: user });
   }
 
   @Put(':id/reject')
@@ -297,7 +308,7 @@ export class DishesController {
     @Body() dto: RejectDishDto,
     @CurrentUser() user: any,
   ): Promise<{ message: string }> {
-    return this.dishesService.rejectDish(id, dto.reason, user);
+    return this.dishesService.rejectDish({ id, reason: dto.reason, adminUser: user });
   }
 
   @Post(':id/reject')
@@ -310,7 +321,7 @@ export class DishesController {
     @Body() dto: RejectDishDto,
     @CurrentUser() user: any,
   ): Promise<{ message: string }> {
-    return this.dishesService.rejectDish(id, dto.reason, user);
+    return this.dishesService.rejectDish({ id, reason: dto.reason, adminUser: user });
   }
 
   @Delete(':id')
@@ -321,6 +332,6 @@ export class DishesController {
   @ApiParam({ name: 'id', description: 'ID món ăn' })
   @ApiStandardResponse({ description: 'Xóa món ăn thành công' })
   async delete(@Param('id') id: string, @CurrentUser() user: any): Promise<{ message: string }> {
-    return this.dishesService.delete(id, user);
+    return this.dishesService.delete({ id, currentUser: user });
   }
 }

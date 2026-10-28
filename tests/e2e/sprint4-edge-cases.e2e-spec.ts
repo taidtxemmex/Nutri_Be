@@ -25,12 +25,12 @@ jest.setTimeout(60000);
 describe('Sprint 4: Edge Cases & Hostile Adversarial E2E Suite (Module 07)', () => {
   const helper = new TestAppHelper();
 
-  let adminToken: string;
-  let adminUser: any;
+  let _adminToken: string;
+  let _adminUser: any;
   let regularToken: string;
   let regularUser: any;
-  let otherToken: string;
-  let otherUser: any;
+  let _otherToken: string;
+  let _otherUser: any;
 
   let categoryId: number;
   let beefIngId: number;
@@ -163,8 +163,8 @@ describe('Sprint 4: Edge Cases & Hostile Adversarial E2E Suite (Module 07)', () 
       role: UserRole.ADMIN,
       fullName: 'Quản Trị Viên Sprint 4',
     });
-    adminToken = admin.token;
-    adminUser = admin.user;
+    _adminToken = admin.token;
+    _adminUser = admin.user;
 
     const regular = await helper.createTestUser({
       username: `user_s4_${uniqueSuffix}`,
@@ -179,8 +179,8 @@ describe('Sprint 4: Edge Cases & Hostile Adversarial E2E Suite (Module 07)', () 
       role: UserRole.USER,
       fullName: 'Người Dùng Khác Sprint 4',
     });
-    otherToken = other.token;
-    otherUser = other.user;
+    _otherToken = other.token;
+    _otherUser = other.user;
 
     // 5. Tạo hồ sơ bệnh nhân cho regular user
     const patient = await prisma.benh_nhan.create({
@@ -327,7 +327,7 @@ describe('Sprint 4: Edge Cases & Hostile Adversarial E2E Suite (Module 07)', () 
       expect(menuBDetail).not.toBeNull();
       expect(menuBDetail?.bua_an_id).not.toBe(mealM.id);
 
-      const clonedMealId = menuBDetail?.bua_an_id!;
+      const clonedMealId = menuBDetail!.bua_an_id;
       const clonedMeal = await prisma.bua_an.findUnique({
         where: { id: clonedMealId },
         include: { chi_tiet_bua_an: true },

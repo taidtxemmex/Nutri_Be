@@ -2,8 +2,16 @@ import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { CACHE_TTL_PERPETUAL } from '../../../config/constants/cache.constants';
-import { CreateCoefficientDto, UpdateCoefficientDto, CoefficientResponseDto } from '../dto';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import {
+  CoefficientResponseDto,
+  CreateCoefficientParamsDto,
+  FindAllCoefficientsParamsDto,
+  FindMyCoefficientsParamsDto,
+  FindCoefficientByIdParamsDto,
+  UpdateCoefficientParamsDto,
+  DeleteCoefficientParamsDto,
+} from '../dto';
+import { isAdminRole } from '../../../config/enums/role.enum';
 
 @Injectable()
 export class CoefficientsService {
@@ -31,10 +39,7 @@ export class CoefficientsService {
     };
   }
 
-  async create(
-    dto: CreateCoefficientDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<CoefficientResponseDto> {
+  async create({ dto, currentUser }: CreateCoefficientParamsDto): Promise<CoefficientResponseDto> {
     if (dto.coefficient < 0.1 || dto.coefficient > 5.0) {
       throw new HttpException(
         {
@@ -125,7 +130,9 @@ export class CoefficientsService {
     }
   }
 
-  async findAll(currentUser?: { id?: string; role?: string }): Promise<CoefficientResponseDto[]> {
+  async findAll({ currentUser }: FindAllCoefficientsParamsDto = {}): Promise<
+    CoefficientResponseDto[]
+  > {
     const isAdminUser = this.isAdmin(currentUser);
 
     const whereClause: any = isAdminUser
@@ -179,7 +186,7 @@ export class CoefficientsService {
     );
   }
 
-  async findMy(currentUser: { id: string }): Promise<CoefficientResponseDto[]> {
+  async findMy({ currentUser }: FindMyCoefficientsParamsDto): Promise<CoefficientResponseDto[]> {
     const cacheKey = `${this.CACHE_TAG}:my:${currentUser.id}`;
     return this.cacheService.getOrSet(
       cacheKey,
@@ -205,7 +212,7 @@ export class CoefficientsService {
     );
   }
 
-  async findById(id: string | number): Promise<CoefficientResponseDto> {
+  async findById({ id }: FindCoefficientByIdParamsDto): Promise<CoefficientResponseDto> {
     const cacheKey = `${this.CACHE_TAG}:detail:${id}`;
     return this.cacheService.getOrSet(
       cacheKey,
@@ -231,11 +238,11 @@ export class CoefficientsService {
     );
   }
 
-  async update(
-    id: string | number,
-    dto: UpdateCoefficientDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<CoefficientResponseDto> {
+  async update({
+    id,
+    dto,
+    currentUser,
+  }: UpdateCoefficientParamsDto): Promise<CoefficientResponseDto> {
     if (dto.coefficient !== undefined && (dto.coefficient < 0.1 || dto.coefficient > 5.0)) {
       throw new HttpException(
         {
@@ -302,10 +309,7 @@ export class CoefficientsService {
     return this.mapToDto(updated);
   }
 
-  async delete(
-    id: string | number,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ message: string }> {
+  async delete({ id, currentUser }: DeleteCoefficientParamsDto): Promise<{ message: string }> {
     const existing = await this.prisma.he_so_song_chin.findUnique({
       where: { id: BigInt(id) },
     });

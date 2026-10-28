@@ -4,7 +4,23 @@ import {
   AUTH_ERROR_IDOR_VIOLATION,
   AUTH_ERROR_UNAUTHORIZED,
 } from '../../config/constants/auth.constants';
-import { UserRole, isAdminRole } from '../../config/enums/role.enum';
+import { isAdminRole } from '../../config/enums/role.enum';
+
+export interface AssertOwnershipParamDto {
+  currentUserId: string;
+  currentUserRole: string;
+  targetUserId?: string;
+}
+
+export interface IsOwnerParamDto {
+  currentUserId?: string;
+  targetUserId?: string;
+}
+
+export interface SanitizePiiParamDto<T extends Record<string, any>> {
+  data: T;
+  isPrivileged: boolean;
+}
 
 @Injectable()
 export class IdorDefenseService {
@@ -18,7 +34,22 @@ export class IdorDefenseService {
   /**
    * Check if current user owns the target resource
    */
-  isOwner(currentUserId?: string, targetUserId?: string): boolean {
+  isOwner(paramOrCurrentUserId?: IsOwnerParamDto | string, legacyTargetUserId?: string): boolean {
+    let currentUserId: string | undefined;
+    let targetUserId: string | undefined;
+
+    if (
+      paramOrCurrentUserId &&
+      typeof paramOrCurrentUserId === 'object' &&
+      'currentUserId' in paramOrCurrentUserId
+    ) {
+      currentUserId = paramOrCurrentUserId.currentUserId;
+      targetUserId = paramOrCurrentUserId.targetUserId;
+    } else {
+      currentUserId = paramOrCurrentUserId as string | undefined;
+      targetUserId = legacyTargetUserId;
+    }
+
     if (!currentUserId || !targetUserId) return false;
     return String(currentUserId).trim() === String(targetUserId).trim();
   }
@@ -28,10 +59,28 @@ export class IdorDefenseService {
    * Throws 403 Forbidden with ERR_IDOR_VIOLATION if unauthorized.
    */
   assertUserOwnershipOrAdmin(
-    currentUserId: string,
-    currentUserRole: string,
-    targetUserId?: string,
+    paramOrCurrentUserId: AssertOwnershipParamDto | string,
+    legacyCurrentUserRole?: string,
+    legacyTargetUserId?: string,
   ): void {
+    let currentUserId: string;
+    let currentUserRole: string;
+    let targetUserId: string | undefined;
+
+    if (
+      paramOrCurrentUserId &&
+      typeof paramOrCurrentUserId === 'object' &&
+      'currentUserId' in paramOrCurrentUserId
+    ) {
+      currentUserId = paramOrCurrentUserId.currentUserId;
+      currentUserRole = paramOrCurrentUserId.currentUserRole;
+      targetUserId = paramOrCurrentUserId.targetUserId;
+    } else {
+      currentUserId = paramOrCurrentUserId as string;
+      currentUserRole = legacyCurrentUserRole!;
+      targetUserId = legacyTargetUserId;
+    }
+
     if (!currentUserId) {
       throw new UnauthorizedException({
         code: AUTH_ERROR_UNAUTHORIZED,
@@ -50,7 +99,7 @@ export class IdorDefenseService {
     }
 
     // Strict ownership verification
-    if (!this.isOwner(currentUserId, targetUserId)) {
+    if (!this.isOwner({ currentUserId, targetUserId })) {
       throw new ForbiddenException({
         code: AUTH_ERROR_IDOR_VIOLATION,
         message: 'Bạn không có quyền truy cập dữ liệu của người dùng khác.',
@@ -74,7 +123,21 @@ export class IdorDefenseService {
   /**
    * Strip sensitive PII fields if user is neither admin nor the owner
    */
-  sanitizePii<T extends Record<string, any>>(data: T, isPrivileged: boolean): Partial<T> {
+  sanitizePii<T extends Record<string, any>>(
+    paramOrData: SanitizePiiParamDto<T> | T,
+    legacyIsPrivileged?: boolean,
+  ): Partial<T> {
+    let data: T;
+    let isPrivileged: boolean;
+
+    if (paramOrData && typeof paramOrData === 'object' && 'data' in paramOrData) {
+      data = paramOrData.data;
+      isPrivileged = Boolean(paramOrData.isPrivileged);
+    } else {
+      data = paramOrData as T;
+      isPrivileged = Boolean(legacyIsPrivileged);
+    }
+
     // Mật khẩu hash tuyệt đối KHÔNG bao giờ được trả về cho bất kỳ ai (kể cả Admin)
     const { mat_khau: _mat_khau, ...rest } = data;
     if (isPrivileged) {

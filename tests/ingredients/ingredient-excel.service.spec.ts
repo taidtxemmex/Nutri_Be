@@ -68,7 +68,7 @@ describe('IngredientExcelService', () => {
 
   describe('exportIngredients', () => {
     it('should export ingredients to an Excel buffer with correct formatting', async () => {
-      const buffer = await excelService.exportIngredients({});
+      const buffer = await excelService.exportIngredients({ dto: {} });
       expect(buffer).toBeInstanceOf(Buffer);
 
       const wb = new ExcelJS.Workbook();
@@ -91,7 +91,7 @@ describe('IngredientExcelService', () => {
       const emptyBuffer = Buffer.from(await wb.xlsx.writeBuffer());
 
       try {
-        await excelService.importExcel(emptyBuffer);
+        await excelService.importExcel({ fileBuffer: emptyBuffer });
         fail('Should have thrown IMPORT_EMPTY_FILE');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -110,7 +110,7 @@ describe('IngredientExcelService', () => {
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
 
       try {
-        await excelService.importExcel(buffer);
+        await excelService.importExcel({ fileBuffer: buffer });
         fail('Should have thrown IMPORT_TOO_MANY_ROWS');
       } catch (err: any) {
         expect(err).toBeInstanceOf(HttpException);
@@ -141,7 +141,7 @@ describe('IngredientExcelService', () => {
 
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
 
-      const result = await excelService.importExcel(buffer, 'admin-id');
+      const result = await excelService.importExcel({ fileBuffer: buffer, userId: 'admin-id' });
 
       expect(result.success).toBe(true);
       expect(result.totalImported).toBe(1);
@@ -156,7 +156,7 @@ describe('IngredientExcelService', () => {
 
       const buffer = Buffer.from(await wb.xlsx.writeBuffer());
 
-      const result = await excelService.importExcel(buffer, 'admin-id');
+      const result = await excelService.importExcel({ fileBuffer: buffer, userId: 'admin-id' });
 
       expect(result.success).toBe(false);
       expect(result.errorFileBuffer).toBeInstanceOf(Buffer);

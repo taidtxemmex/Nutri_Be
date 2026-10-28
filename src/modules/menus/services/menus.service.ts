@@ -1,17 +1,9 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
-import {
-  NutritionCalculatorService,
-  DishInput,
-  MealInput,
-  MenuInput,
-} from '../../../core/nutrition-engine';
+import { NutritionCalculatorService, MealInput, MenuInput } from '../../../core/nutrition-engine';
 import { computeRecipeHash } from '../../../core/nutrition-engine/recipe-hash.util';
 import {
-  CreateMenuDto,
-  UpdateMenuDto,
-  MenuQueryDto,
   MenuListDto,
   MenuDetailResponseDto,
   MenuFullResponseDto,
@@ -19,19 +11,48 @@ import {
   ResolveDishDto,
   MenuMealDto,
   MenuDishDto,
+  GetAllMenusParamsDto,
+  GetMenuByIdParamsDto,
+  GetFullMenuParamsDto,
+  CreateMenuParamsDto,
+  UpdateMenuParamsDto,
+  DeleteMenuParamsDto,
+  CloneMenuParamsDto,
+  ResolveDishForMenuParamsDto,
 } from '../dto';
-import { MenuType, TargetType, DishStatus } from '../../../config/enums/domain.enum';
-import { UserRole, isAdminRole } from '../../../config/enums/role.enum';
+import { MenuType, DishStatus } from '../../../config/enums/domain.enum';
+import { isAdminRole } from '../../../config/enums/role.enum';
 import {
-  CACHE_TAG_MENUS,
   CACHE_TAG_PATIENTS,
   CACHE_TTL_PERPETUAL,
-  buildMenuCacheTag,
   buildPatientCacheTag,
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import { PatientsService } from '../../patients/services/patients.service';
 import { Optional } from '@nestjs/common';
+
+export interface UpdateMenuEnergyDisplayParamDto {
+  menuId: bigint;
+  tx?: any;
+}
+
+export interface HandleMealInTransactionParamDto {
+  mealDto: MenuMealDto;
+  currentUser: { id: string; role?: string };
+  tx: any;
+}
+
+export interface ResolveDishInTransactionParamDto {
+  dishDto: MenuDishDto | ResolveDishDto;
+  currentUser: { id: string; role?: string };
+  tx: any;
+}
+
+export interface ResolveMealWithCopyOnWriteParamDto {
+  mealDto: MenuMealDto;
+  currentUser: { id: string; role?: string };
+  tx: any;
+}
 
 @Injectable()
 export class MenusService {
@@ -130,7 +151,19 @@ export class MenusService {
   /**
    * Tính và cập nhật chuỗi hiển thị tổng năng lượng (kcal) cho thực đơn
    */
-  private async updateMenuEnergyDisplay(menuId: bigint, tx?: any): Promise<string> {
+  private async updateMenuEnergyDisplay(
+    paramOrMenuId: UpdateMenuEnergyDisplayParamDto | bigint,
+    legacyTx?: any,
+  ): Promise<string> {
+    let menuId: bigint;
+    let tx: any;
+    if (paramOrMenuId && typeof paramOrMenuId === 'object' && 'menuId' in paramOrMenuId) {
+      menuId = paramOrMenuId.menuId;
+      tx = paramOrMenuId.tx;
+    } else {
+      menuId = paramOrMenuId as bigint;
+      tx = legacyTx;
+    }
     const client = tx || this.prisma;
     const fullMenu = await this.loadFullMenuEntityForCalculation(menuId);
     if (!fullMenu) return '0 kcal';
@@ -149,10 +182,12 @@ export class MenusService {
   /**
    * 1. GET /api/menus & /api/menu: Lấy danh sách thực đơn phân trang (Anti-Overfetching)
    */
-  async getAll(
-    query: MenuQueryDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ items: MenuListDto[]; total: number; page: number; limit: number }> {
+  async getAll({ query, currentUser }: GetAllMenusParamsDto): Promise<{
+    items: MenuListDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
     const skip = (page - 1) * limit;
@@ -250,12 +285,12 @@ export class MenusService {
   /**
    * 2. GET /api/menus/:id & /api/menu/:id: Lấy chi tiết thực đơn theo ngày/tuần
    */
-  async getById(
-    id: string | number | bigint,
-    weekNo?: number,
-    dayOfWeek?: number,
-    currentUser?: { id: string; role?: string },
-  ): Promise<MenuDetailResponseDto> {
+  async getById({
+    id,
+    weekNo,
+    dayOfWeek,
+    currentUser,
+  }: GetMenuByIdParamsDto): Promise<MenuDetailResponseDto> {
     const menuId = BigInt(id);
     const menu = await this.prisma.thuc_don.findFirst({
       where: { id: menuId, deleted_at: null },
@@ -401,10 +436,7 @@ export class MenusService {
   /**
    * 3. GET /api/menus/:id/full & /api/menu/:id/full: Lấy toàn bộ cây 5 cấp thực đơn
    */
-  async getFullMenu(
-    id: string | number | bigint,
-    currentUser?: { id: string; role?: string },
-  ): Promise<MenuFullResponseDto> {
+  async getFullMenu({ id, currentUser }: GetFullMenuParamsDto): Promise<MenuFullResponseDto> {
     const menuId = BigInt(id);
     const menu = await this.prisma.thuc_don.findFirst({
       where: { id: menuId, deleted_at: null },
@@ -520,10 +552,23 @@ export class MenusService {
    * Helper: Xử lý hoặc tạo bữa ăn trong Transaction
    */
   private async handleMealInTransaction(
-    mealDto: MenuMealDto,
-    currentUser: { id: string; role?: string },
-    tx: any,
+    paramOrDto: HandleMealInTransactionParamDto | MenuMealDto,
+    legacyCurrentUser?: { id: string; role?: string },
+    legacyTx?: any,
   ): Promise<bigint> {
+    let mealDto: MenuMealDto;
+    let currentUser: { id: string; role?: string };
+    let tx: any;
+
+    if (paramOrDto && typeof paramOrDto === 'object' && 'mealDto' in paramOrDto) {
+      mealDto = paramOrDto.mealDto;
+      currentUser = paramOrDto.currentUser;
+      tx = paramOrDto.tx;
+    } else {
+      mealDto = paramOrDto as MenuMealDto;
+      currentUser = legacyCurrentUser!;
+      tx = legacyTx;
+    }
     let mealId: bigint;
 
     if (mealDto.mealId) {
@@ -555,7 +600,7 @@ export class MenusService {
     // Nếu có danh sách món ăn, tạo các chi tiết món ăn cho bữa ăn này
     if (mealDto.dishes && mealDto.dishes.length > 0) {
       for (const dishDto of mealDto.dishes) {
-        const dishId = await this.resolveDishInTransaction(dishDto, currentUser, tx);
+        const dishId = await this.resolveDishInTransaction({ dishDto, currentUser, tx });
 
         await tx.chi_tiet_bua_an.upsert({
           where: {
@@ -583,10 +628,23 @@ export class MenusService {
    * Helper: Xử lý gắn món có sẵn hoặc tạo món inline theo recipe
    */
   private async resolveDishInTransaction(
-    dishDto: MenuDishDto | ResolveDishDto,
-    currentUser: { id: string; role?: string },
-    tx: any,
+    paramOrDto: ResolveDishInTransactionParamDto | MenuDishDto | ResolveDishDto,
+    legacyCurrentUser?: { id: string; role?: string },
+    legacyTx?: any,
   ): Promise<bigint> {
+    let dishDto: MenuDishDto | ResolveDishDto;
+    let currentUser: { id: string; role?: string };
+    let tx: any;
+
+    if (paramOrDto && typeof paramOrDto === 'object' && 'dishDto' in paramOrDto) {
+      dishDto = paramOrDto.dishDto;
+      currentUser = paramOrDto.currentUser;
+      tx = paramOrDto.tx;
+    } else {
+      dishDto = paramOrDto as MenuDishDto | ResolveDishDto;
+      currentUser = legacyCurrentUser!;
+      tx = legacyTx;
+    }
     // 1. Nếu có dishId và không có chi tiết nguyên liệu -> dùng lại món có sẵn
     if (dishDto.dishId && (!dishDto.details || dishDto.details.length === 0)) {
       const dish = await tx.mon_an.findFirst({
@@ -668,15 +726,12 @@ export class MenusService {
   /**
    * 4. POST /api/menus & /api/menu: Tạo mới thực đơn lồng 5 cấp trong 1 Transaction nguyên tử
    */
-  async create(
-    dto: CreateMenuDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<MenuMutationResponseDto> {
+  async create({ dto, currentUser }: CreateMenuParamsDto): Promise<MenuMutationResponseDto> {
     // Kiểm tra bệnh nhân thuộc user (nếu có) - Tái sử dụng Cache thực thể 0ms
     if (dto.patientId) {
       let patient: any;
       if (this.patientsService) {
-        patient = await this.patientsService.getPatientEntity(dto.patientId);
+        patient = await this.patientsService.getPatientEntity({ id: dto.patientId });
       } else if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
         patient = await this.cacheService.getOrSet(
           buildPatientDetailCacheKey(dto.patientId),
@@ -727,7 +782,7 @@ export class MenusService {
         if (dto.menuType === MenuType.NGAY && dto.meals && dto.meals.length > 0) {
           for (let i = 0; i < dto.meals.length; i++) {
             const mealDto = dto.meals[i];
-            const mealId = await this.handleMealInTransaction(mealDto, currentUser, tx);
+            const mealId = await this.handleMealInTransaction({ mealDto, currentUser, tx });
 
             await tx.chi_tiet_thuc_don.create({
               data: {
@@ -749,7 +804,7 @@ export class MenusService {
               if (!day.meals) continue;
               for (let i = 0; i < day.meals.length; i++) {
                 const mealDto = day.meals[i];
-                const mealId = await this.handleMealInTransaction(mealDto, currentUser, tx);
+                const mealId = await this.handleMealInTransaction({ mealDto, currentUser, tx });
 
                 await tx.chi_tiet_thuc_don.create({
                   data: {
@@ -771,7 +826,7 @@ export class MenusService {
     );
 
     // Tính toán năng lượng tổng và lưu lại
-    const totalEnergy = await this.updateMenuEnergyDisplay(createdMenu.id);
+    const totalEnergy = await this.updateMenuEnergyDisplay({ menuId: createdMenu.id });
     await this.cacheService.invalidateTag(this.CACHE_TAG);
 
     return {
@@ -786,11 +841,7 @@ export class MenusService {
   /**
    * 5. PUT /api/menus/:id & /api/menu/:id: Cập nhật thực đơn với cơ chế Copy-on-Write (CoW) cho bữa ăn
    */
-  async update(
-    id: string | number | bigint,
-    dto: UpdateMenuDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<MenuMutationResponseDto> {
+  async update({ id, dto, currentUser }: UpdateMenuParamsDto): Promise<MenuMutationResponseDto> {
     const menuId = BigInt(id);
 
     const existingMenu = await this.prisma.thuc_don.findFirst({
@@ -875,11 +926,11 @@ export class MenusService {
           if (isDaily && dto.meals) {
             for (let i = 0; i < dto.meals.length; i++) {
               const mealDto = dto.meals[i];
-              const resolvedMealId = await this.resolveMealWithCopyOnWrite(
+              const resolvedMealId = await this.resolveMealWithCopyOnWrite({
                 mealDto,
                 currentUser,
                 tx,
-              );
+              });
 
               await tx.chi_tiet_thuc_don.create({
                 data: {
@@ -897,11 +948,11 @@ export class MenusService {
                 if (!day.meals) continue;
                 for (let i = 0; i < day.meals.length; i++) {
                   const mealDto = day.meals[i];
-                  const resolvedMealId = await this.resolveMealWithCopyOnWrite(
+                  const resolvedMealId = await this.resolveMealWithCopyOnWrite({
                     mealDto,
                     currentUser,
                     tx,
-                  );
+                  });
 
                   await tx.chi_tiet_thuc_don.create({
                     data: {
@@ -923,7 +974,7 @@ export class MenusService {
       { timeout: 15000 },
     );
 
-    const totalEnergy = await this.updateMenuEnergyDisplay(menuId);
+    const totalEnergy = await this.updateMenuEnergyDisplay({ menuId });
     await this.cacheService.invalidateTag(this.CACHE_TAG);
 
     return {
@@ -940,12 +991,25 @@ export class MenusService {
    * Nếu mealId được dùng chung bởi nhiều thực đơn khác -> TẠO BẢN SAO (Clone) thay vì ghi đè làm biến dạng thực đơn khác!
    */
   private async resolveMealWithCopyOnWrite(
-    mealDto: MenuMealDto,
-    currentUser: { id: string; role?: string },
-    tx: any,
+    paramOrDto: ResolveMealWithCopyOnWriteParamDto | MenuMealDto,
+    legacyCurrentUser?: { id: string; role?: string },
+    legacyTx?: any,
   ): Promise<bigint> {
+    let mealDto: MenuMealDto;
+    let currentUser: { id: string; role?: string };
+    let tx: any;
+
+    if (paramOrDto && typeof paramOrDto === 'object' && 'mealDto' in paramOrDto) {
+      mealDto = paramOrDto.mealDto;
+      currentUser = paramOrDto.currentUser;
+      tx = paramOrDto.tx;
+    } else {
+      mealDto = paramOrDto as MenuMealDto;
+      currentUser = legacyCurrentUser!;
+      tx = legacyTx;
+    }
     if (!mealDto.mealId) {
-      return this.handleMealInTransaction(mealDto, currentUser, tx);
+      return this.handleMealInTransaction({ mealDto, currentUser, tx });
     }
 
     const originalMealId = BigInt(mealDto.mealId);
@@ -955,7 +1019,7 @@ export class MenusService {
     });
 
     if (!originalMeal) {
-      return this.handleMealInTransaction(mealDto, currentUser, tx);
+      return this.handleMealInTransaction({ mealDto, currentUser, tx });
     }
 
     // Đếm số lượng thực đơn đang sử dụng chung bữa ăn này
@@ -985,7 +1049,7 @@ export class MenusService {
       // Nếu người dùng gửi dishes mới thì dùng dishes mới, không thì clone dishes cũ
       if (mealDto.dishes && mealDto.dishes.length > 0) {
         for (const dishDto of mealDto.dishes) {
-          const dishId = await this.resolveDishInTransaction(dishDto, currentUser, tx);
+          const dishId = await this.resolveDishInTransaction({ dishDto, currentUser, tx });
           await tx.chi_tiet_bua_an.create({
             data: {
               bua_an_id: cloneMeal.id,
@@ -1027,7 +1091,7 @@ export class MenusService {
       });
 
       for (const dishDto of mealDto.dishes) {
-        const dishId = await this.resolveDishInTransaction(dishDto, currentUser, tx);
+        const dishId = await this.resolveDishInTransaction({ dishDto, currentUser, tx });
         await tx.chi_tiet_bua_an.create({
           data: {
             bua_an_id: originalMealId,
@@ -1044,10 +1108,10 @@ export class MenusService {
   /**
    * 6. DELETE /api/menus/:id & /api/menu/:id: Xóa thực đơn an toàn
    */
-  async delete(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ success: boolean; message: string }> {
+  async delete({
+    id,
+    currentUser,
+  }: DeleteMenuParamsDto): Promise<{ success: boolean; message: string }> {
     const menuId = BigInt(id);
 
     const menu = await this.prisma.thuc_don.findFirst({
@@ -1098,10 +1162,7 @@ export class MenusService {
   /**
    * 7. POST /api/menus/:id/clone & /api/menu/:id/clone: Deep clone cây thực đơn sang ID mới
    */
-  async clone(
-    id: string | number | bigint,
-    currentUser: { id: string; role?: string },
-  ): Promise<MenuMutationResponseDto> {
+  async clone({ id, currentUser }: CloneMenuParamsDto): Promise<MenuMutationResponseDto> {
     const originalMenuId = BigInt(id);
 
     const original = await this.prisma.thuc_don.findFirst({
@@ -1187,7 +1248,7 @@ export class MenusService {
       { timeout: 15000 },
     );
 
-    const totalEnergy = await this.updateMenuEnergyDisplay(clonedMenu.id);
+    const totalEnergy = await this.updateMenuEnergyDisplay({ menuId: clonedMenu.id });
     await this.cacheService.invalidateTag(this.CACHE_TAG);
 
     return {
@@ -1202,12 +1263,13 @@ export class MenusService {
   /**
    * 8. POST /api/menus/:id/resolve-dish & /api/menu/:id/resolve-dish: Giải quyết món ăn nhanh
    */
-  async resolveDishForMenu(
-    dto: ResolveDishDto,
-    currentUser: { id: string; role?: string },
-  ): Promise<{ dishId: string; name: string; recipeHash?: string | null }> {
+  async resolveDishForMenu({ dto, currentUser }: ResolveDishForMenuParamsDto): Promise<{
+    dishId: string;
+    name: string;
+    recipeHash?: string | null;
+  }> {
     return this.prisma.$transaction(async (tx) => {
-      const dishId = await this.resolveDishInTransaction(dto, currentUser, tx);
+      const dishId = await this.resolveDishInTransaction({ dishDto: dto, currentUser, tx });
       const dish = await tx.mon_an.findUnique({
         where: { id: dishId },
         select: { id: true, ten_mon: true, recipe_hash: true },

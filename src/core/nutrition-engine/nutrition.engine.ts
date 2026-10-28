@@ -43,6 +43,59 @@ export interface DetailedNutrientResult {
   roundedNutrients?: RoundedNutrientMap;
 }
 
+export class ToDecimalParamDto {
+  val: unknown;
+  fallback?: number;
+}
+
+export class CalculateNetWeightParamDto {
+  weightGrams: unknown;
+  edibleRateInput?: unknown;
+  isNetWeight?: boolean;
+}
+
+export class CalculateCarbohydrateParamDto {
+  water: unknown;
+  protein: unknown;
+  fat: unknown;
+  ash: unknown;
+  fiber: unknown;
+}
+
+export class CalculateEnergyParamDto {
+  protein: unknown;
+  fat: unknown;
+  carbohydrate: unknown;
+}
+
+export class CalculateVitaminARaeParamDto {
+  retinol: unknown;
+  betaCarotene: unknown;
+  alphaCarotene: unknown;
+  betaCryptoxanthin: unknown;
+}
+
+export class ExtractNutrientValueParamDto {
+  source: RawIngredientInput;
+  code: AllIndicatorCode;
+}
+
+export class CalculateIngredientNutrientsParamDto {
+  ingredient: RawIngredientInput;
+  weightGrams: unknown;
+  options?: CalculationOptions;
+}
+
+export class AccumulateNutrientsParamDto {
+  target: DecimalMap;
+  source: DecimalMap;
+}
+
+export class RoundDecimalMapParamDto {
+  map: DecimalMap;
+  decimalPlaces?: number;
+}
+
 /**
  * PURE NUTRITION CALCULATION ENGINE
  * Động cơ toán học dinh dưỡng chuẩn xác cao 100% bằng Decimal.js
@@ -69,7 +122,18 @@ export class NutritionEngine {
   /**
    * Chuyển đổi an toàn bất kỳ kiểu dữ liệu nào sang Decimal
    */
-  public static toDecimal(val: unknown, fallback = 0): Decimal {
+  public static toDecimal(paramOrVal: ToDecimalParamDto | unknown, legacyFallback = 0): Decimal {
+    if (
+      paramOrVal &&
+      typeof paramOrVal === 'object' &&
+      !(paramOrVal instanceof Decimal) &&
+      'val' in paramOrVal
+    ) {
+      const dto = paramOrVal as ToDecimalParamDto;
+      return this.toDecimal(dto.val, dto.fallback ?? 0);
+    }
+    const val = paramOrVal;
+    const fallback = legacyFallback;
     if (val === null || val === undefined || val === '') {
       return new Decimal(fallback);
     }
@@ -90,10 +154,30 @@ export class NutritionEngine {
    * Net Weight: Cân phần ăn được -> netWeight = weight
    */
   public static calculateNetWeight(
-    weightGrams: unknown,
-    edibleRateInput?: unknown,
-    isNetWeight = false,
+    paramOrWeight: CalculateNetWeightParamDto | unknown,
+    legacyEdibleRateInput?: unknown,
+    legacyIsNetWeight = false,
   ): Decimal {
+    let weightGrams: unknown;
+    let edibleRateInput: unknown;
+    let isNetWeight: boolean;
+
+    if (
+      paramOrWeight &&
+      typeof paramOrWeight === 'object' &&
+      !(paramOrWeight instanceof Decimal) &&
+      'weightGrams' in paramOrWeight
+    ) {
+      const dto = paramOrWeight as CalculateNetWeightParamDto;
+      weightGrams = dto.weightGrams;
+      edibleRateInput = dto.edibleRateInput;
+      isNetWeight = dto.isNetWeight || false;
+    } else {
+      weightGrams = paramOrWeight;
+      edibleRateInput = legacyEdibleRateInput;
+      isNetWeight = legacyIsNetWeight;
+    }
+
     const rawWeight = Decimal.max(this.ZERO, this.toDecimal(weightGrams, 0));
     if (isNetWeight) {
       return rawWeight;
@@ -116,12 +200,39 @@ export class NutritionEngine {
    * BẮT BUỘC TRỪ FIBER (Chất xơ) theo đúng chuẩn FAO/WHO và Viện Dinh Dưỡng Quốc Gia (NIN).
    */
   public static calculateCarbohydrate(
-    water: unknown,
-    protein: unknown,
-    fat: unknown,
-    ash: unknown,
-    fiber: unknown,
+    paramOrWater: CalculateCarbohydrateParamDto | unknown,
+    legacyProtein?: unknown,
+    legacyFat?: unknown,
+    legacyAsh?: unknown,
+    legacyFiber?: unknown,
   ): Decimal {
+    let water: unknown;
+    let protein: unknown;
+    let fat: unknown;
+    let ash: unknown;
+    let fiber: unknown;
+
+    if (
+      paramOrWater &&
+      typeof paramOrWater === 'object' &&
+      !(paramOrWater instanceof Decimal) &&
+      'water' in paramOrWater &&
+      'protein' in paramOrWater
+    ) {
+      const dto = paramOrWater as CalculateCarbohydrateParamDto;
+      water = dto.water;
+      protein = dto.protein;
+      fat = dto.fat;
+      ash = dto.ash;
+      fiber = dto.fiber;
+    } else {
+      water = paramOrWater;
+      protein = legacyProtein;
+      fat = legacyFat;
+      ash = legacyAsh;
+      fiber = legacyFiber;
+    }
+
     const w = Decimal.max(this.ZERO, this.toDecimal(water, 0));
     const p = Decimal.max(this.ZERO, this.toDecimal(protein, 0));
     const f = Decimal.max(this.ZERO, this.toDecimal(fat, 0));
@@ -136,7 +247,32 @@ export class NutritionEngine {
    * Tính Năng lượng Atwater chuẩn hóa:
    * Energy (kcal) = (4 * Protein) + (9 * Fat) + (4 * AvailableCarb)
    */
-  public static calculateEnergy(protein: unknown, fat: unknown, carbohydrate: unknown): Decimal {
+  public static calculateEnergy(
+    paramOrProtein: CalculateEnergyParamDto | unknown,
+    legacyFat?: unknown,
+    legacyCarbohydrate?: unknown,
+  ): Decimal {
+    let protein: unknown;
+    let fat: unknown;
+    let carbohydrate: unknown;
+
+    if (
+      paramOrProtein &&
+      typeof paramOrProtein === 'object' &&
+      !(paramOrProtein instanceof Decimal) &&
+      'protein' in paramOrProtein &&
+      'fat' in paramOrProtein
+    ) {
+      const dto = paramOrProtein as CalculateEnergyParamDto;
+      protein = dto.protein;
+      fat = dto.fat;
+      carbohydrate = dto.carbohydrate;
+    } else {
+      protein = paramOrProtein;
+      fat = legacyFat;
+      carbohydrate = legacyCarbohydrate;
+    }
+
     const p = Decimal.max(this.ZERO, this.toDecimal(protein, 0));
     const f = Decimal.max(this.ZERO, this.toDecimal(fat, 0));
     const c = Decimal.max(this.ZERO, this.toDecimal(carbohydrate, 0));
@@ -153,11 +289,34 @@ export class NutritionEngine {
    * RAE = Retinol + (Beta-Carotene / 12) + (Alpha-Carotene / 24) + (Beta-Cryptoxanthin / 24)
    */
   public static calculateVitaminARae(
-    retinol: unknown,
-    betaCarotene: unknown,
-    alphaCarotene: unknown,
-    betaCryptoxanthin: unknown,
+    paramOrRetinol: CalculateVitaminARaeParamDto | unknown,
+    legacyBetaCarotene?: unknown,
+    legacyAlphaCarotene?: unknown,
+    legacyBetaCryptoxanthin?: unknown,
   ): Decimal {
+    let retinol: unknown;
+    let betaCarotene: unknown;
+    let alphaCarotene: unknown;
+    let betaCryptoxanthin: unknown;
+
+    if (
+      paramOrRetinol &&
+      typeof paramOrRetinol === 'object' &&
+      !(paramOrRetinol instanceof Decimal) &&
+      'retinol' in paramOrRetinol
+    ) {
+      const dto = paramOrRetinol as CalculateVitaminARaeParamDto;
+      retinol = dto.retinol;
+      betaCarotene = dto.betaCarotene;
+      alphaCarotene = dto.alphaCarotene;
+      betaCryptoxanthin = dto.betaCryptoxanthin;
+    } else {
+      retinol = paramOrRetinol;
+      betaCarotene = legacyBetaCarotene;
+      alphaCarotene = legacyAlphaCarotene;
+      betaCryptoxanthin = legacyBetaCryptoxanthin;
+    }
+
     const ret = Decimal.max(this.ZERO, this.toDecimal(retinol, 0));
     const beta = Decimal.max(this.ZERO, this.toDecimal(betaCarotene, 0));
     const alpha = Decimal.max(this.ZERO, this.toDecimal(alphaCarotene, 0));
@@ -174,7 +333,26 @@ export class NutritionEngine {
    * Trích xuất giá trị chỉ tiêu dinh dưỡng từ đối tượng nguyên liệu (hỗ trợ nhiều format khác nhau)
    * Sử dụng Static Map tra cứu O(1), loại bỏ hoàn toàn Java Reflection
    */
-  public static extractNutrientValue(source: RawIngredientInput, code: AllIndicatorCode): Decimal {
+  public static extractNutrientValue(
+    paramOrSource: ExtractNutrientValueParamDto | RawIngredientInput,
+    legacyCode?: AllIndicatorCode,
+  ): Decimal {
+    let source: RawIngredientInput;
+    let code: AllIndicatorCode;
+
+    if (
+      paramOrSource &&
+      typeof paramOrSource === 'object' &&
+      'source' in paramOrSource &&
+      'code' in paramOrSource
+    ) {
+      const dto = paramOrSource as ExtractNutrientValueParamDto;
+      source = dto.source;
+      code = dto.code;
+    } else {
+      source = paramOrSource as RawIngredientInput;
+      code = legacyCode!;
+    }
     // 1. Kiểm tra trực tiếp trên root object
     if (source[code] !== undefined && source[code] !== null && source[code] !== '') {
       return this.toDecimal(source[code], 0);
@@ -215,10 +393,29 @@ export class NutritionEngine {
    * Bảo toàn nguyên vẹn Decimal qua mọi bước, tuyệt đối KHÔNG làm tròn non
    */
   public static calculateIngredientNutrients(
-    ingredient: RawIngredientInput,
-    weightGrams: unknown,
-    options: CalculationOptions = {},
+    paramOrIngredient: CalculateIngredientNutrientsParamDto | RawIngredientInput,
+    legacyWeightGrams?: unknown,
+    legacyOptions: CalculationOptions = {},
   ): DetailedNutrientResult {
+    let ingredient: RawIngredientInput;
+    let weightGrams: unknown;
+    let options: CalculationOptions;
+
+    if (
+      paramOrIngredient &&
+      typeof paramOrIngredient === 'object' &&
+      'ingredient' in paramOrIngredient
+    ) {
+      const dto = paramOrIngredient as CalculateIngredientNutrientsParamDto;
+      ingredient = dto.ingredient;
+      weightGrams = dto.weightGrams;
+      options = dto.options || {};
+    } else {
+      ingredient = paramOrIngredient as RawIngredientInput;
+      weightGrams = legacyWeightGrams;
+      options = legacyOptions;
+    }
+
     const rawWeight = Decimal.max(this.ZERO, this.toDecimal(weightGrams, 0));
     const edibleRate =
       ingredient.edible !== undefined && ingredient.edible !== null
@@ -236,42 +433,55 @@ export class NutritionEngine {
 
     // 1. Trích xuất 77 chỉ tiêu cơ sở tính trên 100g
     for (const code of BASE_NUTRIENT_CODES) {
-      const valPer100g = this.extractNutrientValue(ingredient, code);
+      const valPer100g = this.extractNutrientValue({ source: ingredient, code });
       decimalMap[code] = valPer100g.times(factor);
     }
 
     // 2. Tính Available Carbohydrate chuẩn FAO
-    const waterPer100 = this.extractNutrientValue(ingredient, 'water');
-    const proteinPer100 = this.extractNutrientValue(ingredient, 'protein');
-    const fatPer100 = this.extractNutrientValue(ingredient, 'fat');
-    const ashPer100 = this.extractNutrientValue(ingredient, 'ash');
-    const fiberPer100 = this.extractNutrientValue(ingredient, 'fiber');
+    const waterPer100 = this.extractNutrientValue({ source: ingredient, code: 'water' });
+    const proteinPer100 = this.extractNutrientValue({ source: ingredient, code: 'protein' });
+    const fatPer100 = this.extractNutrientValue({ source: ingredient, code: 'fat' });
+    const ashPer100 = this.extractNutrientValue({ source: ingredient, code: 'ash' });
+    const fiberPer100 = this.extractNutrientValue({ source: ingredient, code: 'fiber' });
 
-    const carbPer100 = this.calculateCarbohydrate(
-      waterPer100,
-      proteinPer100,
-      fatPer100,
-      ashPer100,
-      fiberPer100,
-    );
+    const carbPer100 = this.calculateCarbohydrate({
+      water: waterPer100,
+      protein: proteinPer100,
+      fat: fatPer100,
+      ash: ashPer100,
+      fiber: fiberPer100,
+    });
     decimalMap.carbohydrate = carbPer100.times(factor);
 
     // 3. Tính Năng lượng Atwater chuẩn
-    const energyPer100 = this.calculateEnergy(proteinPer100, fatPer100, carbPer100);
+    const energyPer100 = this.calculateEnergy({
+      protein: proteinPer100,
+      fat: fatPer100,
+      carbohydrate: carbPer100,
+    });
     decimalMap.energy = energyPer100.times(factor);
 
     // 4. Tính Vitamin A RAE chuẩn FAO/WHO
-    const retinolPer100 = this.extractNutrientValue(ingredient, 'retinol');
-    const betaCarotenePer100 = this.extractNutrientValue(ingredient, 'betaCarotene');
-    const alphaCarotenePer100 = this.extractNutrientValue(ingredient, 'alphaCarotene');
-    const betaCryptoxanthinPer100 = this.extractNutrientValue(ingredient, 'betaCryptoxanthin');
+    const retinolPer100 = this.extractNutrientValue({ source: ingredient, code: 'retinol' });
+    const betaCarotenePer100 = this.extractNutrientValue({
+      source: ingredient,
+      code: 'betaCarotene',
+    });
+    const alphaCarotenePer100 = this.extractNutrientValue({
+      source: ingredient,
+      code: 'alphaCarotene',
+    });
+    const betaCryptoxanthinPer100 = this.extractNutrientValue({
+      source: ingredient,
+      code: 'betaCryptoxanthin',
+    });
 
-    const raePer100 = this.calculateVitaminARae(
-      retinolPer100,
-      betaCarotenePer100,
-      alphaCarotenePer100,
-      betaCryptoxanthinPer100,
-    );
+    const raePer100 = this.calculateVitaminARae({
+      retinol: retinolPer100,
+      betaCarotene: betaCarotenePer100,
+      alphaCarotene: alphaCarotenePer100,
+      betaCryptoxanthin: betaCryptoxanthinPer100,
+    });
     decimalMap.vitaminARae = raePer100.times(factor);
 
     // 5. Phân loại nguồn gốc Động vật / Thực vật
@@ -346,7 +556,27 @@ export class NutritionEngine {
    * Tích lũy (cộng dồn) các bản đồ vi chất Decimal mà không làm tròn sớm
    * Tránh hoàn toàn việc xóa sổ các vi chất lượng vết (Trace Minerals / Vitamins)
    */
-  public static accumulateNutrients(target: DecimalMap, source: DecimalMap): DecimalMap {
+  public static accumulateNutrients(
+    paramOrTarget: AccumulateNutrientsParamDto | DecimalMap,
+    legacySource?: DecimalMap,
+  ): DecimalMap {
+    let target: DecimalMap;
+    let source: DecimalMap;
+
+    if (
+      paramOrTarget &&
+      typeof paramOrTarget === 'object' &&
+      'target' in paramOrTarget &&
+      'source' in paramOrTarget
+    ) {
+      const dto = paramOrTarget as AccumulateNutrientsParamDto;
+      target = dto.target;
+      source = dto.source;
+    } else {
+      target = paramOrTarget as DecimalMap;
+      source = legacySource!;
+    }
+
     for (const code of ALL_INDICATOR_CODES) {
       const srcVal = source[code];
       if (srcVal && !srcVal.isZero()) {
@@ -416,7 +646,22 @@ export class NutritionEngine {
   /**
    * Làm tròn DecimalMap ở biên Presentation Layer (mặc định 2 chữ số thập phân)
    */
-  public static roundDecimalMap(map: DecimalMap, decimalPlaces = 2): RoundedNutrientMap {
+  public static roundDecimalMap(
+    paramOrMap: RoundDecimalMapParamDto | DecimalMap,
+    legacyDecimalPlaces = 2,
+  ): RoundedNutrientMap {
+    let map: DecimalMap;
+    let decimalPlaces: number;
+
+    if (paramOrMap && typeof paramOrMap === 'object' && 'map' in paramOrMap) {
+      const dto = paramOrMap as RoundDecimalMapParamDto;
+      map = dto.map;
+      decimalPlaces = dto.decimalPlaces ?? 2;
+    } else {
+      map = paramOrMap as DecimalMap;
+      decimalPlaces = legacyDecimalPlaces;
+    }
+
     const result: RoundedNutrientMap = {};
     for (const [code, decVal] of Object.entries(map)) {
       if (decVal instanceof Decimal) {

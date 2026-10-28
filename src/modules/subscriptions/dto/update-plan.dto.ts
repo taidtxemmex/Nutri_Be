@@ -14,13 +14,19 @@ export class UpdatePlanDto {
   @MaxLength(255, { message: 'Tên gói cước tối đa 255 ký tự' })
   ten_goi?: string;
 
-  @ApiPropertyOptional({ example: 'Gói Pro 1 Tháng Cập Nhật', description: 'Tên gói cước (alias name)' })
+  @ApiPropertyOptional({
+    example: 'Gói Pro 1 Tháng Cập Nhật',
+    description: 'Tên gói cước (alias name)',
+  })
   @IsOptional()
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   name?: string;
 
-  @ApiPropertyOptional({ example: 'Gói Pro 1 Tháng Cập Nhật', description: 'Tên gói cước (alias packageName)' })
+  @ApiPropertyOptional({
+    example: 'Gói Pro 1 Tháng Cập Nhật',
+    description: 'Tên gói cước (alias packageName)',
+  })
   @IsOptional()
   @IsString()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

@@ -5,6 +5,12 @@ import * as path from 'path';
 export type SupportedLocale = 'vi' | 'en' | 'zh';
 export const DEFAULT_LOCALE: SupportedLocale = 'vi';
 
+export interface TranslateParamDto {
+  key: string;
+  locale?: string;
+  args?: Record<string, any>;
+}
+
 @Injectable()
 export class I18nService {
   private readonly logger = new Logger(I18nService.name);
@@ -52,10 +58,24 @@ export class I18nService {
    * Dịch mã thông báo theo locale yêu cầu, tự động fallback về tiếng Việt
    */
   public translate(
-    key: string,
-    locale: string = DEFAULT_LOCALE,
-    args?: Record<string, any>,
+    paramOrKey: TranslateParamDto | string,
+    legacyLocale: string = DEFAULT_LOCALE,
+    legacyArgs?: Record<string, any>,
   ): string {
+    let key: string;
+    let locale: string;
+    let args: Record<string, any> | undefined;
+
+    if (paramOrKey && typeof paramOrKey === 'object' && 'key' in paramOrKey) {
+      key = paramOrKey.key;
+      locale = paramOrKey.locale || DEFAULT_LOCALE;
+      args = paramOrKey.args;
+    } else {
+      key = paramOrKey as string;
+      locale = legacyLocale;
+      args = legacyArgs;
+    }
+
     if (!key) return '';
 
     // Xóa dấu ngoặc nhọn nếu key truyền dạng "{error.username.invalid}"
