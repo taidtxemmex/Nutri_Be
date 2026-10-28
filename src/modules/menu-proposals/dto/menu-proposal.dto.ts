@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsInt, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsInt, Min, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RejectProposalDto {
@@ -8,12 +8,14 @@ export class RejectProposalDto {
     example: 'Cơ cấu đạm vượt quá ngưỡng an toàn cho bệnh nhân suy thận',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
+  @MaxLength(500, { message: 'Lý do từ chối không được vượt quá 500 ký tự' })
   reason?: string;
 
   @ApiPropertyOptional({ description: 'Lý do từ chối (alias tương thích FE)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
+  @MaxLength(500, { message: 'Lý do từ chối không được vượt quá 500 ký tự' })
   rejectReason?: string;
 }
 
@@ -24,6 +26,7 @@ export class MenuProposalQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(100, { message: 'Trạng thái lọc tối đa 100 ký tự' })
   statuses?: string;
 
   @ApiPropertyOptional({ description: 'Trang hiện tại (1-based)', default: 1 })

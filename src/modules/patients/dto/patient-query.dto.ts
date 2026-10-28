@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -6,11 +6,13 @@ export class PatientQueryDto {
   @ApiPropertyOptional({ description: 'Tìm kiếm theo tên, số điện thoại, mã bệnh nhân' })
   @IsOptional()
   @IsString()
+  @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
   search?: string;
 
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm (alias của search)' })
   @IsOptional()
   @IsString()
+  @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
   keyword?: string;
 
   @ApiPropertyOptional({ default: 1, description: 'Số trang' })

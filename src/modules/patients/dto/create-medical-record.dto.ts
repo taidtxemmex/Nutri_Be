@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, IsDateString, MaxLength, IsInt } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  IsDateString,
+  MaxLength,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class CreateMedicalRecordDto {
@@ -52,7 +60,8 @@ export class CreateMedicalRecordDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'ID nhóm bệnh phải là số nguyên' })
+  @Min(1, { message: 'ID nhóm bệnh phải lớn hơn 0' })
   diseaseGroupId?: number;
 
   @ApiPropertyOptional({
@@ -61,6 +70,7 @@ export class CreateMedicalRecordDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(5000, { message: 'Triệu chứng lâm sàng tối đa 5000 ký tự' })
   clinicalSymptoms?: string;
 
   @ApiPropertyOptional({
@@ -69,6 +79,7 @@ export class CreateMedicalRecordDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(5000, { message: 'Tiền sử bệnh lý tối đa 5000 ký tự' })
   medicalHistory?: string;
 
   @ApiPropertyOptional({
@@ -77,6 +88,7 @@ export class CreateMedicalRecordDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(5000, { message: 'Hướng điều trị tối đa 5000 ký tự' })
   treatmentPlan?: string;
 
   @ApiPropertyOptional({
@@ -92,5 +104,6 @@ export class CreateMedicalRecordDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(2000, { message: 'Ghi chú tối đa 2000 ký tự' })
   notes?: string;
 }

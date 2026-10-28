@@ -1,4 +1,4 @@
-import { IsOptional, IsInt, Min, Max, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsString, IsIn, MaxLength } from 'class-validator';
 import { Type, Transform, Expose } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
@@ -100,11 +100,13 @@ export class BasePaginationQueryDto {
   @ApiPropertyOptional({ description: 'Search keyword' })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   search?: string;
 
   @ApiPropertyOptional({ default: 'id', description: 'Sort by field' })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   sortBy?: string = 'id';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc', description: 'Sort order' })

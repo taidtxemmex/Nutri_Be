@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsNotEmpty, IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Transform, Expose } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../../config/enums/role.enum';
@@ -6,12 +6,14 @@ import { UserRole } from '../../../config/enums/role.enum';
 export class UpdateUserRoleDto {
   @ApiPropertyOptional({ description: 'Keycloak User ID hoặc UUID tương ứng' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'keycloakUserId phải là chuỗi' })
+  @MaxLength(255, { message: 'keycloakUserId tối đa 255 ký tự' })
   keycloakUserId?: string;
 
   @ApiPropertyOptional({ description: 'User ID (UUID)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'userId phải là chuỗi' })
+  @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
   userId?: string;
 
   @ApiPropertyOptional({ enum: UserRole, description: 'Alias for newRole' })

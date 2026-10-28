@@ -107,13 +107,11 @@ export class LocalStorageService {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // Lấy phần mở rộng chuẩn hóa
-    const originalExt = path.extname(file.originalname || '').toLowerCase();
-    const safeExt = originalExt || '.bin';
-
-    // Sinh tên file duy nhất bằng UUIDv4
+    // Chuẩn hóa tên file gốc và sinh tên file duy nhất khớp chuẩn Java cũ: UUID + "-" + originalFilename
+    const rawOriginalName = path.basename(file.originalname || 'file.bin');
+    const safeOriginalName = rawOriginalName.replace(/[/\\?%*:|"<>]/g, '_');
     const fileUuid = crypto.randomUUID();
-    const generatedFileName = `${fileUuid}${safeExt}`;
+    const generatedFileName = `${fileUuid}-${safeOriginalName}`;
     const fullFilePath = path.join(targetDir, generatedFileName);
 
     // Ghi buffer trực tiếp vào đĩa cứng

@@ -2072,7 +2072,14 @@ export class DailyIntakeExcelService {
     };
 
     if (userId) {
-      where.nguoi_dung_id = userId;
+      const user = await this.prisma.nguoi_dung.findUnique({
+        where: { id: userId },
+        select: { vai_tro: true },
+      });
+      const isAdmin = user && (user.vai_tro === 'ADMIN' || user.vai_tro === 'SUPERADMIN');
+      if (!isAdmin) {
+        where.nguoi_dung_id = userId;
+      }
     }
 
     return this.prisma.khau_phan_24h.findFirst({

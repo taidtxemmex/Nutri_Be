@@ -1,11 +1,12 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, Max, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsDateString, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class DailyIntakeQueryDto {
   @ApiPropertyOptional({ description: 'ID bệnh nhân lọc' })
   @IsOptional()
   @IsString()
+  @MaxLength(50, { message: 'ID bệnh nhân tối đa 50 ký tự' })
   patientId?: string;
 
   @ApiPropertyOptional({ description: 'Ngày ăn cụ thể (YYYY-MM-DD)' })

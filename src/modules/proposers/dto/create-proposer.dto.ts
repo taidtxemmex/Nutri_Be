@@ -40,6 +40,7 @@ export class CreateProposerDto {
 
   @ApiPropertyOptional({ example: 'uuid-1', description: 'User ID (tùy chọn)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'userId phải là chuỗi' })
+  @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
   userId?: string;
 }

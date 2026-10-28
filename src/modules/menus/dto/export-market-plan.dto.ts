@@ -1,4 +1,4 @@
-import { IsInt, IsOptional, IsString, Min, Max } from 'class-validator';
+import { IsInt, IsOptional, IsString, Min, Max, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -21,6 +21,7 @@ export class ExportMarketPlanDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   cycle?: 'ALL' | 'WEEK' | 'DAY' | string = 'ALL';
 
   @ApiPropertyOptional({ description: 'Tuần số cần xuất (nếu cycle=WEEK hoặc DAY)' })
@@ -28,6 +29,7 @@ export class ExportMarketPlanDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(52)
   week?: number;
 
   @ApiPropertyOptional({ description: 'Thứ trong tuần (1..7 hoặc 2..8) nếu cycle=DAY' })

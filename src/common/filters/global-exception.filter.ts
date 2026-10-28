@@ -66,32 +66,34 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
     // 2. Prisma ORM errors
     else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      const isProduction = process.env.NODE_ENV === 'production';
       switch (exception.code) {
         case 'P2002':
           status = HttpStatus.CONFLICT;
           errorCode = 'DATA_CONFLICT';
-          const fields = (exception.meta?.target as string[]) || [];
-          message = isProduction
-            ? 'Dữ liệu đã tồn tại trong hệ thống (vi phạm tính duy nhất).'
-            : `Dữ liệu bị trùng lặp ở trường: ${fields.join(', ')}`;
+          message = this.i18nService
+            ? this.i18nService.translate(errorCode, locale)
+            : 'Dữ liệu đã tồn tại trong hệ thống (vi phạm tính duy nhất).';
           break;
         case 'P2025':
           status = HttpStatus.NOT_FOUND;
           errorCode = 'RESOURCE_NOT_FOUND';
-          message = 'Bản ghi yêu cầu không tồn tại trong cơ sở dữ liệu';
+          message = this.i18nService
+            ? this.i18nService.translate(errorCode, locale)
+            : 'Bản ghi yêu cầu không tồn tại trong cơ sở dữ liệu';
           break;
         case 'P2003':
           status = HttpStatus.BAD_REQUEST;
           errorCode = 'FOREIGN_KEY_CONSTRAINT_VIOLATION';
-          message = 'Không thể thực hiện thao tác do dữ liệu đang được sử dụng ở bảng khác';
+          message = this.i18nService
+            ? this.i18nService.translate(errorCode, locale)
+            : 'Không thể thực hiện thao tác do dữ liệu đang được sử dụng ở bảng khác';
           break;
         default:
           status = HttpStatus.BAD_REQUEST;
-          errorCode = isProduction ? 'DATABASE_ERROR' : `DATABASE_ERROR_${exception.code}`;
-          message = isProduction
-            ? 'Lỗi xử lý cơ sở dữ liệu hệ thống.'
-            : `Lỗi truy vấn cơ sở dữ liệu [Prisma ${exception.code}]`;
+          errorCode = 'DATABASE_ERROR';
+          message = this.i18nService
+            ? this.i18nService.translate(errorCode, locale)
+            : 'Lỗi xử lý cơ sở dữ liệu hệ thống.';
       }
     }
     // 3. Unknown errors
@@ -104,10 +106,56 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     if (this.i18nService) {
-      if (this.i18nService.hasKey(message)) {
-        message = this.i18nService.translate(message, locale);
-      } else if (this.i18nService.hasKey(errorCode)) {
+      const nestDefaultMessages = [
+        'Not Found',
+        'Bad Request',
+        'Unauthorized',
+        'Forbidden',
+        'Conflict',
+        'Internal Server Error',
+        'Too Many Requests',
+      ];
+
+      if (nestDefaultMessages.includes(message) && this.i18nService.hasKey(errorCode)) {
         message = this.i18nService.translate(errorCode, locale);
+      } else {
+        const hasCatalogKey = this.i18nService.hasKey(message);
+        const translated = this.i18nService.translateTextOrKey(message, locale);
+        if (hasCatalogKey) {
+          message = translated || this.i18nService.translate(message, locale);
+        } else if (translated && translated !== message) {
+          message = translated;
+        } else if (this.i18nService.hasKey(errorCode)) {
+          message = this.i18nService.translate(errorCode, locale);
+        }
+      }
+
+      // Dịch chi tiết mảng details
+      if (Array.isArray(details)) {
+        details = details.map((item) => ({ ...item }));
+        for (const item of details) {
+          if (item.message) {
+            const hasKey = this.i18nService.hasKey(item.message);
+            const translated = this.i18nService.translateTextOrKey(item.message, locale);
+            if (hasKey || (translated && translated !== item.message)) {
+              item.message = translated;
+            } else if (item.code && item.field) {
+              item.message = this.i18nService.translateValidationConstraint({
+                code: item.code,
+                field: item.field,
+                locale,
+              });
+            } else {
+              item.message = translated;
+            }
+          } else if (item.code && item.field) {
+            item.message = this.i18nService.translateValidationConstraint({
+              code: item.code,
+              field: item.field,
+              locale,
+            });
+          }
+        }
       }
     }
 

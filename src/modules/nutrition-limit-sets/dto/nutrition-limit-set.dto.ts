@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsBoolean, IsObject } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsBoolean, IsObject, MaxLength } from 'class-validator';
 import { NutritionLimitWarning } from '../../../config/enums/domain.enum';
 
 export class CreateNutritionLimitSetDto {
@@ -8,7 +8,8 @@ export class CreateNutritionLimitSetDto {
     example: 'Giới hạn tiểu đường Type 2',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Tên bộ giới hạn phải là chuỗi' })
+  @MaxLength(255, { message: 'Tên bộ giới hạn tối đa 255 ký tự' })
   name?: string;
 
   @ApiPropertyOptional({
@@ -39,7 +40,8 @@ export class UpdateNutritionLimitSetDto {
     example: 'Giới hạn tiểu đường Type 2 (Cập nhật)',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Tên bộ giới hạn phải là chuỗi' })
+  @MaxLength(255, { message: 'Tên bộ giới hạn tối đa 255 ký tự' })
   name?: string;
 
   @ApiPropertyOptional({

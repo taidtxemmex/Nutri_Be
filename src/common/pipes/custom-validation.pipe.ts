@@ -11,9 +11,7 @@ export class CustomValidationPipe extends ValidationPipe {
         const details = this.flattenErrors(errors);
         return new BadRequestException({
           code: 'VALIDATION_FAILED',
-          message: this.i18nService
-            ? this.i18nService.translate('error.validation.failed')
-            : 'Dữ liệu gửi lên không hợp lệ',
+          message: 'VALIDATION_FAILED',
           details,
         });
       },

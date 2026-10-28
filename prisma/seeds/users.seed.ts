@@ -116,6 +116,31 @@ export async function seedUsers(prisma: PrismaClient): Promise<void> {
 
   await prisma.$transaction(upsertOps);
 
+  // Đảm bảo Admin có ít nhất 1 món ăn cá nhân RIENG_TU phục vụ màn hình DishTable FE
+  const adminDish = await prisma.mon_an.findFirst({
+    where: { nguoi_dung_id: '00000000-0000-0000-0000-000000000001', deleted_at: null },
+  });
+  if (!adminDish) {
+    await prisma.mon_an.create({
+      data: {
+        nguoi_dung_id: '00000000-0000-0000-0000-000000000001',
+        ten_mon: 'Cơm gạo tẻ cá nhân',
+        trang_thai: 'RIENG_TU',
+        chi_tiet_mon_an: {
+          create: {
+            nguyen_lieu_id: 1,
+            khoi_luong_song_sach: 100,
+          },
+        },
+      },
+    });
+  } else if (adminDish.trang_thai !== 'RIENG_TU') {
+    await prisma.mon_an.update({
+      where: { id: adminDish.id },
+      data: { trang_thai: 'RIENG_TU' },
+    });
+  }
+
   console.log(
     `   ✅ Đã khởi tạo/cập nhật thành công ${initialUsers.length} tài khoản người dùng theo chuẩn Enum.`,
   );

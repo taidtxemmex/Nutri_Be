@@ -1,7 +1,7 @@
 import { Get, Post, Put, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { IngredientProposalsService } from '../services/ingredient-proposals.service';
-import { CreateIngredientProposalDto } from '../dto/create-ingredient-proposal.dto';
+import { CreateIngredientProposalDto, RejectIngredientProposalDto } from '../dto';
 import { ApiController, ApiStandardResponse, Auth, CurrentUser } from '../../../common/decorators';
 import { ParseBigIntPipe } from '../../../common/pipes/parse-bigint.pipe';
 import { UserRole } from '../../../config/enums/role.enum';
@@ -53,9 +53,9 @@ export class IngredientProposalsController {
   @ApiParam({ name: 'id', description: 'ID đề xuất' })
   async reject(
     @Param('id', ParseBigIntPipe) id: bigint,
-    @Body('reason') reason: string,
+    @Body() dto: RejectIngredientProposalDto,
     @CurrentUser() user: any,
   ): Promise<any> {
-    return this.service.reject({ id, reason, currentUser: user });
+    return this.service.reject({ id, reason: dto?.reason, currentUser: user });
   }
 }

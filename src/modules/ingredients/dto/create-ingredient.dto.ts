@@ -24,6 +24,7 @@ export class CreateIngredientDto {
   @ApiPropertyOptional({ description: 'Tên nguyên liệu (alias)', example: 'Gạo tẻ' })
   @IsOptional()
   @IsString()
+  @MaxLength(255, { message: 'Tên nguyên liệu tối đa 255 ký tự' })
   name?: string;
 
   @ApiPropertyOptional({ description: 'ID danh mục nhóm thực phẩm', example: 1 })
@@ -52,6 +53,7 @@ export class CreateIngredientDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   @IsIn(['THUC_VAT', 'DONG_VAT'])
   loaiProtein?: string;
 

@@ -8,6 +8,8 @@ import {
   IsPositive,
   ValidateNested,
   ArrayMinSize,
+  ArrayMaxSize,
+  Max,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -28,12 +30,14 @@ export class CalculateSummaryItemDto {
   @IsOptional()
   @IsNumber({}, { message: 'validation.is_number' })
   @IsPositive({ message: 'validation.is_positive' })
+  @Max(10000, { message: 'Khối lượng tối đa 10000 gam' })
   weight?: number;
 
   @ApiPropertyOptional({ example: 100, description: 'Khối lượng (gam, alias weightGrams)' })
   @IsOptional()
   @IsNumber({}, { message: 'validation.is_number' })
   @IsPositive({ message: 'validation.is_positive' })
+  @Max(10000, { message: 'Khối lượng tối đa 10000 gam' })
   weightGrams?: number;
 
   @ApiPropertyOptional({
@@ -53,6 +57,7 @@ export class CalculateSummaryItemDto {
   @IsOptional()
   @IsNumber({}, { message: 'validation.is_number' })
   @IsPositive({ message: 'validation.is_positive' })
+  @Max(10, { message: 'Hệ số sống chín tối đa 10' })
   coefficient?: number;
 }
 
@@ -63,6 +68,7 @@ export class CalculateSummaryDto {
   })
   @IsArray({ message: 'validation.is_array' })
   @ArrayMinSize(1, { message: 'validation.array_min_size' })
+  @ArrayMaxSize(500, { message: 'validation.array_max_size' })
   @ValidateNested({ each: true })
   @Type(() => CalculateSummaryItemDto)
   items: CalculateSummaryItemDto[];

@@ -18,4 +18,16 @@ export class NutritionGuideResponseDto {
 
   @ApiPropertyOptional({ description: 'Ghi chú và cảnh báo lâm sàng' })
   note?: string;
+
+  @ApiPropertyOptional({ description: 'Tiêu đề hướng dẫn' })
+  title?: string;
+
+  @ApiPropertyOptional({ description: 'Tên bệnh (tiếng Việt)' })
+  tenBenh?: string;
+
+  @ApiPropertyOptional({ description: 'Mã ký hiệu (tiếng Việt)' })
+  maKyHieu?: string;
+
+  @ApiPropertyOptional({ description: 'Mô tả hướng dẫn' })
+  description?: string;
 }

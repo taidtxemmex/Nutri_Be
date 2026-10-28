@@ -550,6 +550,7 @@ export class SubscriptionsService {
           request = lockedRequests[0];
         }
       } catch (err: any) {
+        this.logger.warn(`Lỗi khi lock row đăng ký gói: ${err?.message}`);
         // Fallback to findUnique
       }
 

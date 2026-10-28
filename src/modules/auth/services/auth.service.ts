@@ -291,12 +291,71 @@ export class AuthService {
       });
     }
 
-    const isMatch = await bcrypt.compare(dto.password, user.mat_khau);
+    let isMatch = false;
+    let shouldRehash = false;
+
+    try {
+      if (user.mat_khau.startsWith('$2a$') || user.mat_khau.startsWith('$2b$')) {
+        isMatch = await bcrypt.compare(dto.password, user.mat_khau);
+      } else if (user.mat_khau.startsWith('pbkdf2-sha512$')) {
+        const [_algo, iterationsStr, saltB64, expectedHashB64] = user.mat_khau.split('$');
+        if (iterationsStr && saltB64 && expectedHashB64) {
+          const iterations = parseInt(iterationsStr, 10);
+          if (!isNaN(iterations) && iterations > 0) {
+            const actualHash = crypto.pbkdf2Sync(
+              dto.password,
+              Buffer.from(saltB64, 'base64'),
+              iterations,
+              64,
+              'sha512',
+            );
+            const actualHashB64 = actualHash.toString('base64');
+            const actualHashBuf = Buffer.from(actualHashB64);
+            const expectedHashBuf = Buffer.from(expectedHashB64);
+
+            if (
+              actualHashBuf.length === expectedHashBuf.length &&
+              crypto.timingSafeEqual(actualHashBuf, expectedHashBuf)
+            ) {
+              isMatch = true;
+              shouldRehash = true;
+            }
+          }
+        }
+      } else {
+        // Fallback kiểm tra bcrypt cho các định dạng khác
+        isMatch = await bcrypt.compare(dto.password, user.mat_khau);
+      }
+    } catch (verifyErr: any) {
+      this.logger.warn(
+        `Lỗi khi kiểm tra mật khẩu cho tài khoản ${user.ten_dang_nhap}: ${verifyErr?.message}`,
+      );
+      isMatch = false;
+    }
+
     if (!isMatch) {
       throw new UnauthorizedException({
         code: AUTH_ERROR_UNAUTHORIZED,
         message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
       });
+    }
+
+    // Lazy Rehash: Tự động nâng cấp mật khẩu từ PBKDF2 (Keycloak) sang Bcrypt
+    if (shouldRehash) {
+      try {
+        const newBcryptHash = await bcrypt.hash(dto.password, BCRYPT_SALT_ROUNDS);
+        await this.prisma.nguoi_dung.update({
+          where: { id: user.id },
+          data: { mat_khau: newBcryptHash },
+        });
+        this.logger.log(
+          `Tài khoản ${user.ten_dang_nhap} đã tự động nâng cấp mật khẩu từ Keycloak sang Bcrypt!`,
+        );
+      } catch (rehashErr: any) {
+        this.logger.error(
+          `Lỗi khi tự động nâng cấp mật khẩu (Lazy Rehash) cho ${user.ten_dang_nhap}: ${rehashErr?.message}`,
+        );
+      }
     }
 
     if (user.active === false) {

@@ -1,5 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsEnum, IsOptional, IsArray, ValidateNested, IsNumber } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsArray,
+  ValidateNested,
+  IsInt,
+  Min,
+  MaxLength,
+  ArrayMaxSize,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { MenuType, TargetType } from '../../../config/enums/domain.enum';
 import { MenuMealDto, MenuWeekDto } from './create-menu.dto';
@@ -7,7 +17,8 @@ import { MenuMealDto, MenuWeekDto } from './create-menu.dto';
 export class UpdateMenuDto {
   @ApiPropertyOptional({ description: 'Tên thực đơn' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'Tên thực đơn phải là chuỗi' })
+  @MaxLength(255, { message: 'Tên thực đơn không được vượt quá 255 ký tự' })
   menuName?: string;
 
   @ApiPropertyOptional({
@@ -32,7 +43,8 @@ export class UpdateMenuDto {
 
   @ApiPropertyOptional({ description: 'ID nhóm bệnh mở rộng' })
   @IsOptional()
-  @IsNumber()
+  @IsInt({ message: 'ID nhóm bệnh phải là số nguyên' })
+  @Min(1, { message: 'ID nhóm bệnh phải lớn hơn 0' })
   diseaseGroupId?: number;
 
   @ApiPropertyOptional({ description: 'ID bộ giới hạn dinh dưỡng áp dụng' })
@@ -45,6 +57,7 @@ export class UpdateMenuDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(20, { message: 'Danh sách bữa ăn tối đa 20 bữa' })
   @ValidateNested({ each: true })
   @Type(() => MenuMealDto)
   meals?: MenuMealDto[];
@@ -55,6 +68,7 @@ export class UpdateMenuDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(5, { message: 'Danh sách tuần tối đa 5 tuần' })
   @ValidateNested({ each: true })
   @Type(() => MenuWeekDto)
   weeks?: MenuWeekDto[];

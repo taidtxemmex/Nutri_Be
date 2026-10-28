@@ -32,4 +32,22 @@ export class EvidenceDetailDto {
 
   @ApiPropertyOptional({ description: 'ID người tải lên' })
   uploaderId?: string | null;
+
+  @ApiPropertyOptional({ description: 'Tiêu đề minh chứng', example: 'Chứng chỉ hành nghề' })
+  title?: string | null;
+
+  @ApiPropertyOptional({ description: 'Tiêu đề minh chứng (Tiếng Việt)' })
+  tieuDe?: string | null;
+
+  @ApiPropertyOptional({ description: 'Loại minh chứng', example: 'CHUNG_CHI' })
+  evidenceType?: string | null;
+
+  @ApiPropertyOptional({ description: 'Loại minh chứng (Tiếng Việt)' })
+  loaiMinhChung?: string | null;
+
+  @ApiPropertyOptional({ description: 'Ghi chú tài liệu minh chứng' })
+  note?: string | null;
+
+  @ApiPropertyOptional({ description: 'Ghi chú (Tiếng Việt)' })
+  ghiChu?: string | null;
 }

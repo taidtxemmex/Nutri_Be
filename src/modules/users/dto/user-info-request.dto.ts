@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from 'class-validator';
+import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UserInfoRequestDto {
@@ -8,5 +8,6 @@ export class UserInfoRequestDto {
   })
   @IsNotEmpty({ message: 'userId không được để trống' })
   @IsString({ message: 'userId phải là chuỗi' })
+  @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
   userId: string;
 }

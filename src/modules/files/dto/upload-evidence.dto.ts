@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString } from 'class-validator';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class UploadEvidenceDto {
   @ApiPropertyOptional({
@@ -8,6 +8,7 @@ export class UploadEvidenceDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50, { message: 'proposalId tối đa 50 ký tự' })
   proposalId?: string;
 
   @ApiPropertyOptional({
@@ -16,6 +17,7 @@ export class UploadEvidenceDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50, { message: 'paymentRequestId tối đa 50 ký tự' })
   paymentRequestId?: string;
 
   @ApiPropertyOptional({
@@ -24,5 +26,6 @@ export class UploadEvidenceDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(500, { message: 'Ghi chú tối đa 500 ký tự' })
   note?: string;
 }

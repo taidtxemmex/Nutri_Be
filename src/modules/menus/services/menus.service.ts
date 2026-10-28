@@ -1187,6 +1187,20 @@ export class MenusService {
       );
     }
 
+    const isOwner = currentUser && original.nguoi_dung_id === currentUser.id;
+    const isPublic =
+      original.loai_thuc_don === 'CONG_KHAI' || original.loai_thuc_don === 'MAU_HE_THONG';
+
+    if (!isOwner && !isPublic && !this.isAdmin(currentUser)) {
+      throw new HttpException(
+        { code: 'MENU_001', message: 'Không tìm thấy thực đơn gốc' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Nếu clone thực đơn của người khác (ví dụ mẫu công khai), không kế thừa bệnh nhân riêng tư
+    const targetPatientId = isOwner ? original.benh_nhan_id : null;
+
     const clonedMenu = await this.prisma.$transaction(
       async (tx) => {
         const newMenu = await tx.thuc_don.create({
@@ -1195,7 +1209,7 @@ export class MenusService {
             ten_thuc_don: `[Bản sao] ${original.ten_thuc_don}`,
             loai_thuc_don: original.loai_thuc_don,
             loai_doi_tuong: original.loai_doi_tuong,
-            benh_nhan_id: original.benh_nhan_id,
+            benh_nhan_id: targetPatientId,
             nhom_benh_id: original.nhom_benh_id,
             gioi_han_dinh_duong_id: original.gioi_han_dinh_duong_id,
             ngay_tao: new Date(),

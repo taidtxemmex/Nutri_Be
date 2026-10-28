@@ -23,11 +23,11 @@ function parseDatabaseUrl(url: string) {
  * Chỉ nạp khi CSDL hoàn toàn trống để tránh xung đột khóa chính.
  */
 export async function seedRawSqlData(prisma: PrismaClient, databaseUrl: string): Promise<void> {
-  const existingDanhMuc = await prisma.danh_muc.count();
+  const existingNguyenLieu = await prisma.nguyen_lieu.count();
   const seedFilePath = path.join(__dirname, 'seed_data.sql');
 
-  if (existingDanhMuc === 0 && fs.existsSync(seedFilePath)) {
-    console.log(`📖 CSDL chưa có dữ liệu, đang nạp dữ liệu chuẩn từ: ${seedFilePath}...`);
+  if (existingNguyenLieu === 0 && fs.existsSync(seedFilePath)) {
+    console.log(`📖 CSDL thiếu dữ liệu nguyên liệu, đang nạp dữ liệu chuẩn từ: ${seedFilePath}...`);
     const dbConfig = parseDatabaseUrl(databaseUrl);
 
     const connection = await mysql.createConnection({
@@ -45,7 +45,8 @@ export async function seedRawSqlData(prisma: PrismaClient, databaseUrl: string):
     await connection.query('SET UNIQUE_CHECKS = 0;');
     await connection.query('SET NAMES utf8mb4;');
 
-    await connection.query(sqlContent);
+    const safeSql = sqlContent.replace(/INSERT INTO/g, 'INSERT IGNORE INTO');
+    await connection.query(safeSql);
 
     await connection.query('SET FOREIGN_KEY_CHECKS = 1;');
     await connection.query('SET UNIQUE_CHECKS = 1;');
@@ -53,7 +54,9 @@ export async function seedRawSqlData(prisma: PrismaClient, databaseUrl: string):
 
     console.log('   ✅ Đã nạp thành công dữ liệu lâm sàng từ file seed SQL!');
   } else {
-    console.log(`   ℹ️  CSDL đã có sẵn ${existingDanhMuc} danh mục thực phẩm, bỏ qua nạp SQL thô.`);
+    console.log(
+      `   ℹ️  CSDL đã có sẵn ${existingNguyenLieu} nguyên liệu thực phẩm, bỏ qua nạp SQL thô.`,
+    );
   }
 }
 

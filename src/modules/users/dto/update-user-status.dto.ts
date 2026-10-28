@@ -1,16 +1,18 @@
-import { IsOptional, IsString, IsBoolean } from 'class-validator';
+import { IsOptional, IsString, IsBoolean, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 
 export class UpdateUserStatusDto {
   @ApiPropertyOptional({ description: 'Keycloak User ID hoặc UUID tương ứng' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'keycloakUserId phải là chuỗi' })
+  @MaxLength(255, { message: 'keycloakUserId tối đa 255 ký tự' })
   keycloakUserId?: string;
 
   @ApiPropertyOptional({ description: 'User ID (UUID)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'userId phải là chuỗi' })
+  @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
   userId?: string;
 
   @ApiPropertyOptional({ example: true, description: 'Trạng thái hoạt động' })

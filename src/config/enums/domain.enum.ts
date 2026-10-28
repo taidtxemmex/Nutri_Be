@@ -109,3 +109,10 @@ export enum PaymentRequestStatus {
   REJECTED = 'REJECTED',
   TU_CHOI = 'TU_CHOI',
 }
+
+export enum DailyIntakeExportTemplateType {
+  TOTAL_FOOD_GROUP_MULTI_PATIENTS = 1,
+  AVG_GROUP_WEIGHT_PER_PATIENT = 2,
+  DAILY_NUTRIENT_INTAKE_PATIENT = 3,
+  TOTAL_WEIGHT_FOOD_GROUP_MULTI_PATIENTS = 4,
+}

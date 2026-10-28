@@ -1,13 +1,18 @@
-import { IsInt, IsNotEmpty, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  Min,
+  MaxLength,
+} from 'class-validator';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { DailyIntakeExportTemplateType } from '../../../config/enums/domain.enum';
 
-export enum DailyIntakeExportTemplateType {
-  TOTAL_FOOD_GROUP_MULTI_PATIENTS = 1,
-  AVG_GROUP_WEIGHT_PER_PATIENT = 2,
-  DAILY_NUTRIENT_INTAKE_PATIENT = 3,
-  TOTAL_WEIGHT_FOOD_GROUP_MULTI_PATIENTS = 4,
-}
+export { DailyIntakeExportTemplateType };
 
 export class DailyIntakeExportRequestDto {
   @ApiProperty({
@@ -45,6 +50,7 @@ export class DailyIntakeExportRequestDto {
   })
   @IsOptional()
   @IsString({ message: 'Chế độ xuất phải là chuỗi ký tự' })
+  @MaxLength(50, { message: 'Chế độ xuất tối đa 50 ký tự' })
   mode?: string;
 
   /**

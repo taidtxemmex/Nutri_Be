@@ -232,6 +232,7 @@ describe('MenusService', () => {
     it('nhân bản sâu toàn bộ thực đơn và các bữa ăn con sang ID mới', async () => {
       mockPrisma.thuc_don.findFirst.mockResolvedValue({
         id: BigInt(10),
+        nguoi_dung_id: 'user-uuid-1',
         ten_thuc_don: 'Thực đơn chuẩn',
         loai_thuc_don: MenuType.NGAY,
         loai_doi_tuong: TargetType.NHOM_BENH,
@@ -256,6 +257,7 @@ describe('MenusService', () => {
 
       mockPrisma.thuc_don.create.mockResolvedValue({
         id: BigInt(20),
+        nguoi_dung_id: 'user-uuid-1',
         ten_thuc_don: '[Bản sao] Thực đơn chuẩn',
         loai_thuc_don: MenuType.NGAY,
       });
@@ -264,6 +266,7 @@ describe('MenusService', () => {
 
       mockPrisma.thuc_don.findUnique.mockResolvedValue({
         id: BigInt(20),
+        nguoi_dung_id: 'user-uuid-1',
         ten_thuc_don: '[Bản sao] Thực đơn chuẩn',
         loai_thuc_don: MenuType.NGAY,
         chi_tiet_thuc_don: [],

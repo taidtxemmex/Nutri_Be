@@ -1,5 +1,14 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsInt, Min, Max, IsEnum, IsBoolean } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsEnum,
+  IsBoolean,
+  MaxLength,
+} from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { MenuType, TargetType } from '../../../config/enums/domain.enum';
 
@@ -22,11 +31,13 @@ export class MenuQueryDto {
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo tên thực đơn' })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm phụ (tương thích FE)' })
   @IsOptional()
   @IsString()
+  @MaxLength(255)
   search?: string;
 
   @ApiPropertyOptional({
@@ -48,12 +59,14 @@ export class MenuQueryDto {
   @ApiPropertyOptional({ description: 'Lọc theo ID bệnh nhân' })
   @IsOptional()
   @IsString()
+  @MaxLength(50)
   patientId?: string;
 
   @ApiPropertyOptional({ description: 'Lọc theo ID nhóm bệnh mở rộng' })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(1)
   diseaseGroupId?: number;
 
   @ApiPropertyOptional({ description: 'Lọc thực đơn công khai' })

@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, IsDateString, IsBoolean } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsDateString, IsBoolean, MaxLength } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { DailyIntakeClinicalReportType } from '../../../config/enums/domain.enum';
 
@@ -20,6 +20,7 @@ export class ImportDailyIntakeQueryDto {
   })
   @IsOptional()
   @IsString()
+  @MaxLength(50, { message: 'ID bệnh nhân tối đa 50 ký tự' })
   patientId?: string;
 
   @ApiPropertyOptional({

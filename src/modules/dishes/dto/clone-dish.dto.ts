@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsOptional,
+  IsString,
+  MaxLength,
+  ArrayMaxSize,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { DishIngredientInputDto } from './create-dish.dto';
 
@@ -10,6 +17,7 @@ export class DishCloneRequestDto {
   })
   @IsString()
   @IsOptional()
+  @MaxLength(255, { message: 'Tên món ăn không được vượt quá 255 ký tự' })
   newName?: string;
 
   @ApiPropertyOptional({
@@ -17,6 +25,7 @@ export class DishCloneRequestDto {
     type: [DishIngredientInputDto],
   })
   @IsArray()
+  @ArrayMaxSize(100, { message: 'Danh sách nguyên liệu không được vượt quá 100 mục' })
   @ValidateNested({ each: true })
   @Type(() => DishIngredientInputDto)
   @IsOptional()

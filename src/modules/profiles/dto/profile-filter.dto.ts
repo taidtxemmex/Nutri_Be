@@ -1,4 +1,4 @@
-import { IsOptional, IsInt, Min, Max, IsString } from 'class-validator';
+import { IsOptional, IsInt, Min, Max, IsString, MaxLength } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MAX_LIMIT, DEFAULT_LIMIT } from '../../../config/constants/pagination.constants';
@@ -36,5 +36,6 @@ export class ProfileFilterDto {
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm (tên, email, username)' })
   @IsOptional()
   @IsString()
+  @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
   keyword?: string;
 }

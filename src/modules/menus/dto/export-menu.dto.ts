@@ -1,4 +1,14 @@
-import { IsEnum, IsInt, IsOptional, IsArray, IsString, Min, Max } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsArray,
+  IsString,
+  Min,
+  Max,
+  MaxLength,
+  ArrayMaxSize,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MenuExportType } from '../../../config/enums/domain.enum';
@@ -20,7 +30,9 @@ export class ExportMenuDto {
   })
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(100, { message: 'Danh sách mã chỉ tiêu dinh dưỡng tối đa 100 mục' })
   @IsString({ each: true })
+  @MaxLength(100, { each: true, message: 'Mã chỉ tiêu dinh dưỡng tối đa 100 ký tự' })
   columns?: string[];
 
   @ApiPropertyOptional({

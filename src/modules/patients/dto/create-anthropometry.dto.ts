@@ -8,6 +8,7 @@ import {
   Max,
   IsDateString,
   MaxLength,
+  IsInt,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -56,7 +57,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Huyết áp tâm thu phải là số' })
+  @IsInt({ message: 'Huyết áp tâm thu phải là số nguyên' })
+  @Min(30, { message: 'Huyết áp tâm thu phải lớn hơn hoặc bằng 30 mmHg' })
+  @Max(300, { message: 'Huyết áp tâm thu không được vượt quá 300 mmHg' })
   systolicBloodPressure?: number;
 
   @ApiPropertyOptional({
@@ -65,7 +68,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Huyết áp tâm trương phải là số' })
+  @IsInt({ message: 'Huyết áp tâm trương phải là số nguyên' })
+  @Min(20, { message: 'Huyết áp tâm trương phải lớn hơn hoặc bằng 20 mmHg' })
+  @Max(200, { message: 'Huyết áp tâm trương không được vượt quá 200 mmHg' })
   diastolicBloodPressure?: number;
 
   @ApiPropertyOptional({
@@ -75,6 +80,8 @@ export class CreateAnthropometryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'Vòng eo phải là số' })
+  @Min(10, { message: 'Vòng eo phải lớn hơn hoặc bằng 10 cm' })
+  @Max(300, { message: 'Vòng eo không được vượt quá 300 cm' })
   waistCircumference?: number;
 
   @ApiPropertyOptional({
@@ -84,6 +91,8 @@ export class CreateAnthropometryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'Vòng mông phải là số' })
+  @Min(10, { message: 'Vòng mông phải lớn hơn hoặc bằng 10 cm' })
+  @Max(300, { message: 'Vòng mông không được vượt quá 300 cm' })
   hipCircumference?: number;
 
   @ApiPropertyOptional({
@@ -93,6 +102,8 @@ export class CreateAnthropometryDto {
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'Hệ số hoạt động phải là số' })
+  @Min(1.0, { message: 'Hệ số hoạt động phải lớn hơn hoặc bằng 1.0' })
+  @Max(2.5, { message: 'Hệ số hoạt động không được vượt quá 2.5' })
   activityFactor?: number;
 
   @ApiPropertyOptional({
