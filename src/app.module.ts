@@ -28,6 +28,7 @@ import { NutritionGuidesModule } from './modules/nutrition-guides/nutrition-guid
 import { HealthModule } from './modules/health/health.module';
 import { CronModule } from './core/cron/cron.module';
 import { QueueModule } from './core/queue/queue.module';
+import { LoggerModule } from './core/logger/logger.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { QueueModule } from './core/queue/queue.module';
     SecurityModule,
     CronModule,
     QueueModule,
+    LoggerModule,
     NutritionEngineModule,
     AuthModule,
     UsersModule,

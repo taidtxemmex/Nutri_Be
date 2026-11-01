@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { TransformResponseInterceptor } from './common/interceptors/transform-response.interceptor';
+import { RequestLoggingInterceptor } from './common/interceptors/request-logging.interceptor';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { CustomValidationPipe } from './common/pipes/custom-validation.pipe';
 import { Request, Response, NextFunction } from 'express';
@@ -17,8 +18,10 @@ import { applySecurityHeaders } from './security/headers/helmet.config';
 import { createCorsOptions } from './security/cors/cors.config';
 import { createSwaggerAuthMiddleware } from './security/swagger/swagger-auth.middleware';
 import { validateProductionSecrets } from './security/validation/security-secrets.validator';
+import { WinstonLoggerService } from './core/logger/winston-logger.service';
 
 async function bootstrap() {
+  const winstonLogger = new WinstonLoggerService();
   const logger = new Logger('Bootstrap');
 
   // 0. Fail-fast validation of critical security variables & secrets
@@ -27,7 +30,9 @@ async function bootstrap() {
   // Đảm bảo cây thư mục phân cấp bảo mật uploads tồn tại
   ensureUploadDirsExist();
 
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: winstonLogger,
+  });
 
   // 0.1. Cấu hình giới hạn kích thước request body 20MB (đồng bộ với Java Spring Boot, hỗ trợ thực đơn 30 ngày & ảnh Base64)
   app.useBodyParser('json', { limit: '20mb' });
@@ -60,7 +65,10 @@ async function bootstrap() {
   // 6. Global Validation, Interceptors, Filters (Inject I18nService vào Pipe & Filter)
   const i18nService = app.get(I18nService);
   app.useGlobalPipes(new CustomValidationPipe(i18nService));
-  app.useGlobalInterceptors(new TransformResponseInterceptor());
+  app.useGlobalInterceptors(
+    new RequestLoggingInterceptor(),
+    new TransformResponseInterceptor(),
+  );
   app.useGlobalFilters(new GlobalExceptionFilter(i18nService));
 
   // 7. Swagger OpenAPI UI Hardening (Basic Auth Protection & Production Disable Gate)

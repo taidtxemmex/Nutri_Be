@@ -5,3 +5,4 @@ export * from './permission.constants';
 export * from './regex.constants';
 export * from './excel.constants';
 export * from './file.constants';
+export * from './logger.constants';
