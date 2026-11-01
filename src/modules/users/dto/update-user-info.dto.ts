@@ -7,6 +7,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PHONE_REGEX } from '../../../config/constants/regex.constants';
 
@@ -24,6 +25,11 @@ export class UpdateUserInfoReqDto {
   userId?: string;
 
   @ApiPropertyOptional({ example: 'Nguyễn Minh Trí', description: 'Họ và tên' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Họ và tên phải là chuỗi' })
   @MinLength(2, { message: 'Họ và tên tối thiểu 2 ký tự' })
@@ -31,6 +37,11 @@ export class UpdateUserInfoReqDto {
   fullName?: string;
 
   @ApiPropertyOptional({ example: 'bsminhtri@gmail.com', description: 'Email' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Email phải là chuỗi' })
   @IsEmail({}, { message: 'Định dạng email không hợp lệ' })
@@ -38,6 +49,15 @@ export class UpdateUserInfoReqDto {
   email?: string;
 
   @ApiPropertyOptional({ example: '0987654321', description: 'Số điện thoại' })
+  @Transform(({ value }) =>
+    typeof value === 'string' &&
+    (value.trim() === '' ||
+      value.trim() === 'Chưa có' ||
+      value.trim() === 'Chưa cập nhật' ||
+      value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Số điện thoại phải là chuỗi' })
   @MaxLength(20, { message: 'Số điện thoại tối đa 20 ký tự' })
@@ -45,57 +65,142 @@ export class UpdateUserInfoReqDto {
   phone?: string;
 
   @ApiPropertyOptional({ example: '123 Giải Phóng, Hà Nội', description: 'Địa chỉ' })
+  @Transform(({ value }) =>
+    typeof value === 'string' &&
+    (value.trim() === '' ||
+      value.trim() === 'Chưa có' ||
+      value.trim() === 'Chưa cập nhật' ||
+      value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Địa chỉ phải là chuỗi' })
   @MaxLength(500, { message: 'Địa chỉ tối đa 500 ký tự' })
   address?: string;
 
   @ApiPropertyOptional({ example: 'NAM', enum: ['NAM', 'NU'], description: 'Giới tính' })
+  @Transform(({ value }) =>
+    typeof value === 'string' &&
+    (value.trim() === '' ||
+      value.trim() === 'Chưa có' ||
+      value.trim() === 'Chưa cập nhật' ||
+      value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsEnum(['NAM', 'NU'], { message: 'Giới tính phải là NAM hoặc NU' })
   gender?: 'NAM' | 'NU';
 
   @ApiPropertyOptional({ example: '1990-05-15', description: 'Ngày sinh (YYYY-MM-DD)' })
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    if (
+      trimmed === '' ||
+      trimmed === 'Chưa có' ||
+      trimmed === 'Chưa cập nhật' ||
+      trimmed === 'Chưa có email'
+    ) {
+      return undefined;
+    }
+    return /^\d{4}-\d{2}-\d{2}T/.test(trimmed) ? trimmed.slice(0, 10) : trimmed;
+  })
   @IsOptional()
   @IsString({ message: 'Ngày sinh phải là chuỗi' })
   @MaxLength(10, { message: 'Ngày sinh tối đa 10 ký tự (YYYY-MM-DD)' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ngày sinh phải có định dạng YYYY-MM-DD' })
   dob?: string;
 
   @ApiPropertyOptional({
     example: '1990-05-15',
     description: 'Alias ngày sinh cho Frontend cũ (YYYY-MM-DD)',
   })
+  @Transform(({ value }) => {
+    if (typeof value !== 'string') return value;
+    const trimmed = value.trim();
+    if (
+      trimmed === '' ||
+      trimmed === 'Chưa có' ||
+      trimmed === 'Chưa cập nhật' ||
+      trimmed === 'Chưa có email'
+    ) {
+      return undefined;
+    }
+    return /^\d{4}-\d{2}-\d{2}T/.test(trimmed) ? trimmed.slice(0, 10) : trimmed;
+  })
   @IsOptional()
   @IsString({ message: 'Ngày sinh phải là chuỗi' })
   @MaxLength(10, { message: 'Ngày sinh tối đa 10 ký tự (YYYY-MM-DD)' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ngày sinh phải có định dạng YYYY-MM-DD' })
   birthDate?: string;
 
   // Career / Job fields mapping to nguoi_de_xuat
   @ApiPropertyOptional({ example: 'Bác sĩ Chuyên khoa I', description: 'Trình độ học vấn' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Trình độ học vấn phải là chuỗi' })
   @MaxLength(100, { message: 'Trình độ học vấn tối đa 100 ký tự' })
   education?: string;
 
   @ApiPropertyOptional({ example: 'Dinh dưỡng Lâm sàng', description: 'Chuyên ngành' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Chuyên ngành phải là chuỗi' })
   @MaxLength(100, { message: 'Chuyên ngành tối đa 100 ký tự' })
   major?: string;
 
   @ApiPropertyOptional({ example: 'Bệnh viện Bạch Mai', description: 'Đơn vị công tác' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Đơn vị công tác phải là chuỗi' })
   @MaxLength(255, { message: 'Đơn vị công tác tối đa 255 ký tự' })
   unit?: string;
 
+  @ApiPropertyOptional({
+    example: 'Bệnh viện Bạch Mai',
+    description: 'Đơn vị công tác (alias workUnit)',
+  })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
+  @IsOptional()
+  @IsString({ message: 'Đơn vị công tác phải là chuỗi' })
+  @MaxLength(255, { message: 'Đơn vị công tác tối đa 255 ký tự' })
+  workUnit?: string;
+
   @ApiPropertyOptional({ example: 'Bác sĩ điều trị', description: 'Vị trí công tác' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Vị trí công tác phải là chuỗi' })
   @MaxLength(100, { message: 'Vị trí công tác/chức vụ tối đa 100 ký tự' })
   position?: string;
 
   @ApiPropertyOptional({ example: 'Hồi sức tích cực', description: 'Lĩnh vực công tác' })
+  @Transform(({ value }) =>
+    typeof value === 'string' && (value.trim() === '' || value.trim() === 'Chưa có email')
+      ? undefined
+      : value,
+  )
   @IsOptional()
   @IsString({ message: 'Lĩnh vực công tác phải là chuỗi' })
   @MaxLength(100, { message: 'Lĩnh vực công tác tối đa 100 ký tự' })

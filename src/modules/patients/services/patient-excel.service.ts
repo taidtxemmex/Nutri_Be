@@ -1,10 +1,18 @@
-import { Injectable, BadRequestException, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { CACHE_TAG_PATIENTS } from '../../../config/constants/cache.constants';
+import { AUTH_ERROR_FORBIDDEN } from '../../../config/constants/auth.constants';
+import { UserRole } from '../../../config/enums/role.enum';
 import { PatientCodeAllocator } from './patient-code-allocator.service';
 import { AnthropometryEngine } from './anthropometry.service';
 import { ExcelStreamReader, ErrorRowItem } from '../../../core/excel-engine';
@@ -117,6 +125,15 @@ export class PatientExcelService {
     errorFileBuffer?: Buffer;
     errorFileName?: string;
   }> {
+    const role = currentUser?.role ? String(currentUser.role).toUpperCase() : '';
+    const allowedRoles: string[] = [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.USERPRO];
+    if (!role || !allowedRoles.includes(role)) {
+      throw new ForbiddenException({
+        code: AUTH_ERROR_FORBIDDEN,
+        message: 'Bạn không có quyền thực hiện thao tác này.',
+      });
+    }
+
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new BadRequestException('File không có dữ liệu để import');
     }
@@ -147,6 +164,20 @@ export class PatientExcelService {
     let hasAnyError = false;
     const validPatientsData: any[] = [];
     const errorRowItems: ErrorRowItem[] = [];
+
+    const collectedRows: Array<{
+      rowNumber: number;
+      rawRowValues: any[];
+      code: string | null;
+      fullName: string | null;
+      genderRaw: string | null;
+      dobRaw: any;
+      weightRaw: any;
+      heightRaw: any;
+      activityRaw: any;
+      phoneRaw: string | null;
+      note: string | null;
+    }> = [];
 
     try {
       for await (const worksheetReader of reader) {
@@ -191,122 +222,149 @@ export class PatientExcelService {
             throw new BadRequestException('Chỉ cho phép import tối đa 1000 bệnh nhân / file');
           }
 
-          const errors: string[] = [];
-          const code = this.getCleanString(row.getCell(1).value);
-          const fullName = this.getCleanString(row.getCell(2).value);
-          const genderRaw = this.getCleanString(row.getCell(3).value);
-          const dobRaw = row.getCell(4).value;
-          const weightRaw = row.getCell(5).value;
-          const heightRaw = row.getCell(6).value;
-          const activityRaw = row.getCell(7).value;
-          const phoneRaw = this.getCleanString(row.getCell(8).value);
-          const note = this.getCleanString(row.getCell(9).value);
-
-          // 1. Mã BN
-          if (code) {
-            if (code.length > 50) errors.push('Mã bệnh nhân tối đa 50 ký tự');
-            else if (codesInFile.has(code)) errors.push('Trùng mã bệnh nhân trong file');
-            else if (existingCodes.includes(code))
-              errors.push('Mã bệnh nhân đã tồn tại trong hệ thống');
-            codesInFile.add(code);
-            allocator.reserve(code);
-          }
-
-          // 2. Họ tên
-          if (!fullName) errors.push('Họ tên không được để trống');
-          else if (fullName.length > 255) errors.push('Họ tên quá dài (tối đa 255 ký tự)');
-
-          // 3. Giới tính
-          let gender = 'NAM';
-          if (!genderRaw) {
-            errors.push('Giới tính không được để trống');
-          } else {
-            const g = genderRaw.toLowerCase();
-            if (g === 'nam') gender = 'NAM';
-            else if (g === 'nữ' || g === 'nu') gender = 'NU';
-            else errors.push('Giới tính phải là Nam hoặc Nữ');
-          }
-
-          // 4. Ngày sinh
-          let dobDate: Date | null = null;
-          let birthYearOnly = false;
-          if (!dobRaw) {
-            errors.push('Ngày sinh không được để trống');
-          } else {
-            const parsed = this.parseDobValue(dobRaw);
-            if (parsed.error) errors.push(parsed.error);
-            else {
-              dobDate = parsed.date;
-              birthYearOnly = parsed.birthYearOnly;
-            }
-          }
-
-          // 5. Cân nặng & Chiều cao
-          const weight = Number(weightRaw);
-          if (!weightRaw || isNaN(weight) || weight <= 0 || weight > 500) {
-            errors.push('Cân nặng phải lớn hơn 0 và không quá 500 kg');
-          }
-
-          const height = Number(heightRaw);
-          if (!heightRaw || isNaN(height) || height <= 0 || height > 300) {
-            errors.push('Chiều cao phải lớn hơn 0 và không quá 300 cm');
-          }
-
-          // 6. Hệ số hoạt động
-          const activity = this.parseActivityFactor(activityRaw);
-          if (activity === null) {
-            errors.push('Hệ số hoạt động không hợp lệ (chọn 1.2, 1.375, 1.55, 1.725, 1.9)');
-          }
-
-          // 7. Số điện thoại
-          let phone = '';
-          if (!phoneRaw) {
-            errors.push('Số điện thoại không được để trống');
-          } else {
-            phone = phoneRaw.replace(/[\s.-]/g, '');
-            if (/^[1-9]\d{8}$/.test(phone)) phone = '0' + phone;
-            if (!/^\d{10}$/.test(phone)) {
-              errors.push('Số điện thoại phải đủ 10 chữ số');
-            }
-          }
-
-          // Sinh mã tự động nếu code trống
-          let finalCode = code;
-          if (!code && phone) {
-            finalCode = allocator.next(phone);
-          }
-
-          if (errors.length > 0) {
-            hasAnyError = true;
-          } else {
-            validPatientsData.push({
-              nguoi_dung_id: currentUser.id,
-              ma_benh_nhan_bv: finalCode,
-              ho_ten: fullName,
-              so_dien_thoai: phone,
-              ngay_sinh: dobDate,
-              chi_nam_sinh: birthYearOnly,
-              gioi_tinh: gender,
-              can_nang: weight,
-              chieu_cao: height,
-              he_so_hoat_dong: activity,
-              ghi_chu: note,
-              deleted_at: null,
-              tao_luc: new Date(),
-            });
-          }
-
-          errorRowItems.push({
+          collectedRows.push({
             rowNumber,
-            rawValues: rawRowValues,
-            errors,
-            successNote: !code ? `Hợp lệ (Mã tự sinh: ${finalCode})` : 'Hợp lệ',
+            rawRowValues,
+            code: this.getCleanString(row.getCell(1).value),
+            fullName: this.getCleanString(row.getCell(2).value),
+            genderRaw: this.getCleanString(row.getCell(3).value),
+            dobRaw: row.getCell(4).value,
+            weightRaw: row.getCell(5).value,
+            heightRaw: row.getCell(6).value,
+            activityRaw: row.getCell(7).value,
+            phoneRaw: this.getCleanString(row.getCell(8).value),
+            note: this.getCleanString(row.getCell(9).value),
           });
         }
       }
     } catch (err: any) {
       if (err instanceof BadRequestException) throw err;
       throw new BadRequestException('File không đúng định dạng Excel (.xlsx)');
+    }
+
+    // Thu thập trước toàn bộ các mã bệnh nhân nhập tay (manualCode) trên tất cả các dòng vào usedCodes
+    // trước khi cấp mã tự động cho các dòng để trống mã, tránh trùng mã giữa dòng tự sinh và dòng nhập tay phía dưới
+    for (const r of collectedRows) {
+      if (r.code) {
+        allocator.reserve(r.code);
+      }
+    }
+
+    for (const r of collectedRows) {
+      const {
+        rowNumber,
+        rawRowValues,
+        code,
+        fullName,
+        genderRaw,
+        dobRaw,
+        weightRaw,
+        heightRaw,
+        activityRaw,
+        phoneRaw,
+        note,
+      } = r;
+      const errors: string[] = [];
+
+      // 1. Mã BN
+      if (code) {
+        if (code.length > 255) errors.push('Mã bệnh nhân quá dài (tối đa 255 ký tự)');
+        else if (codesInFile.has(code)) errors.push('Trùng mã bệnh nhân trong file');
+        else if (existingCodes.includes(code))
+          errors.push('Mã bệnh nhân đã tồn tại trong hệ thống');
+        codesInFile.add(code);
+      }
+
+      // 2. Họ tên
+      if (!fullName) errors.push('Họ tên không được để trống');
+      else if (fullName.length > 255) errors.push('Họ tên quá dài (tối đa 255 ký tự)');
+
+      // 3. Giới tính
+      let gender = 'NAM';
+      if (!genderRaw) {
+        errors.push('Giới tính không được để trống');
+      } else {
+        const g = genderRaw.toLowerCase();
+        if (g === 'nam') gender = 'NAM';
+        else if (g === 'nữ' || g === 'nu') gender = 'NU';
+        else errors.push('Giới tính phải là Nam hoặc Nữ');
+      }
+
+      // 4. Ngày sinh
+      let dobDate: Date | null = null;
+      let birthYearOnly = false;
+      if (!dobRaw) {
+        errors.push('Ngày sinh không được để trống');
+      } else {
+        const parsed = this.parseDobValue(dobRaw);
+        if (parsed.error) errors.push(parsed.error);
+        else {
+          dobDate = parsed.date;
+          birthYearOnly = parsed.birthYearOnly;
+        }
+      }
+
+      // 5. Cân nặng & Chiều cao
+      const weight = Number(weightRaw);
+      if (!weightRaw || isNaN(weight) || weight <= 0 || weight > 500) {
+        errors.push('Cân nặng phải lớn hơn 0 và không quá 500 kg');
+      }
+
+      const height = Number(heightRaw);
+      if (!heightRaw || isNaN(height) || height <= 0 || height > 300) {
+        errors.push('Chiều cao phải lớn hơn 0 và không quá 300 cm');
+      }
+
+      // 6. Hệ số hoạt động
+      const activity = this.parseActivityFactor(activityRaw);
+      if (activity === null) {
+        errors.push('Hệ số hoạt động không hợp lệ (chọn 1.2, 1.375, 1.55, 1.725, 1.9)');
+      }
+
+      // 7. Số điện thoại
+      let phone = '';
+      if (!phoneRaw) {
+        errors.push('Số điện thoại không được để trống');
+      } else {
+        phone = phoneRaw.replace(/[\s.-]/g, '');
+        if (/^[1-9]\d{8}$/.test(phone)) phone = '0' + phone;
+        if (!/^\d{10}$/.test(phone)) {
+          errors.push('Số điện thoại phải đủ 10 chữ số');
+        }
+      }
+
+      // Sinh mã tự động nếu code trống
+      let finalCode = code;
+      if (!code && phone) {
+        finalCode = allocator.next(phone);
+      }
+
+      if (errors.length > 0) {
+        hasAnyError = true;
+      } else {
+        validPatientsData.push({
+          nguoi_dung_id: currentUser.id,
+          ma_benh_nhan_bv: finalCode,
+          ho_ten: fullName,
+          so_dien_thoai: phone,
+          ngay_sinh: dobDate,
+          chi_nam_sinh: birthYearOnly,
+          gioi_tinh: gender,
+          can_nang: weight,
+          chieu_cao: height,
+          he_so_hoat_dong: activity,
+          ghi_chu: note,
+          deleted_at: null,
+          tao_luc: new Date(),
+        });
+      }
+
+      errorRowItems.push({
+        rowNumber,
+        rawValues: rawRowValues,
+        errors,
+        successNote: !code ? `Hợp lệ (Mã tự sinh: ${finalCode})` : 'Hợp lệ',
+      });
     }
 
     if (!targetWorksheetFound) {
@@ -368,7 +426,9 @@ export class PatientExcelService {
                 can_nang: p.can_nang,
                 chieu_cao: p.chieu_cao,
                 bmi: bmiResult.bmi ?? 0,
-                phan_loai_bmi: bmiResult.bmiStatus || 'Bình thường',
+                phan_loai_bmi: bmiResult.bmiLevel
+                  ? bmiResult.bmiLevel.toLowerCase().replace('_', '')
+                  : 'normal',
                 bmr: bmr > 0 ? bmr : null,
                 tdee: tdee > 0 ? tdee : null,
                 he_so_hoat_dong: p.he_so_hoat_dong,

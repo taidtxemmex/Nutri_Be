@@ -76,20 +76,25 @@ export class BasePaginationQueryDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ default: 20, maximum: 100, description: 'Limit items per page (max 100)' })
+  @ApiPropertyOptional({
+    default: 20,
+    maximum: 5000,
+    description: 'Limit items per page (max 5000)',
+  })
   @IsOptional()
   @Expose()
   @Type(() => Number)
   @Transform(({ value, obj }) => {
-    const raw = value !== undefined ? value : obj?.size;
+    const raw = value !== undefined && value !== '' && !Number.isNaN(value) ? value : obj?.size;
+    if (raw === undefined || raw === null || raw === '') return undefined;
     const num = Number(raw);
-    if (isNaN(num) || num < 1) return 20;
-    return Math.min(100, num);
+    if (isNaN(num) || num < 1) return undefined;
+    return Math.min(5000, num);
   })
   @IsInt()
   @Min(1)
-  @Max(100)
-  limit?: number = 20;
+  @Max(5000)
+  limit?: number;
 
   // Property alias for backward compatibility with NutriFE / Spring Boot
   @ApiPropertyOptional({ description: 'Alias for limit' })
@@ -107,10 +112,10 @@ export class BasePaginationQueryDto {
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  sortBy?: string = 'id';
+  sortBy?: string;
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc', description: 'Sort order' })
   @IsOptional()
   @IsIn(['asc', 'desc', 'ASC', 'DESC'])
-  sortOrder?: 'asc' | 'desc' = 'desc';
+  sortOrder?: 'asc' | 'desc';
 }

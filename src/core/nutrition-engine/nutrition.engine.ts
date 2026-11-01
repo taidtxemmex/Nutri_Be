@@ -59,7 +59,7 @@ export class CalculateCarbohydrateParamDto {
   protein: unknown;
   fat: unknown;
   ash: unknown;
-  fiber: unknown;
+  fiber?: unknown;
 }
 
 export class CalculateEnergyParamDto {
@@ -195,22 +195,21 @@ export class NutritionEngine {
   }
 
   /**
-   * Tính Available Carbohydrate chuẩn FAO (Carbohydrate khả dụng):
-   * Carb = max(0, 100 - (Water + Protein + Fat + Ash + Fiber))
-   * BẮT BUỘC TRỪ FIBER (Chất xơ) theo đúng chuẩn FAO/WHO và Viện Dinh Dưỡng Quốc Gia (NIN).
+   * Tính Carbohydrate theo hiệu số khớp 100% với Java & React FE:
+   * Carb = (water == 0 && protein == 0 && fat == 0 && ash == 0) ? 0 : max(0, 100 - (Water + Protein + Fat + Ash))
+   * TUYỆT ĐỐI KHÔNG trừ Fiber (Chất xơ).
    */
   public static calculateCarbohydrate(
     paramOrWater: CalculateCarbohydrateParamDto | unknown,
     legacyProtein?: unknown,
     legacyFat?: unknown,
     legacyAsh?: unknown,
-    legacyFiber?: unknown,
+    _legacyFiber?: unknown,
   ): Decimal {
     let water: unknown;
     let protein: unknown;
     let fat: unknown;
     let ash: unknown;
-    let fiber: unknown;
 
     if (
       paramOrWater &&
@@ -224,22 +223,23 @@ export class NutritionEngine {
       protein = dto.protein;
       fat = dto.fat;
       ash = dto.ash;
-      fiber = dto.fiber;
     } else {
       water = paramOrWater;
       protein = legacyProtein;
       fat = legacyFat;
       ash = legacyAsh;
-      fiber = legacyFiber;
     }
 
     const w = Decimal.max(this.ZERO, this.toDecimal(water, 0));
     const p = Decimal.max(this.ZERO, this.toDecimal(protein, 0));
     const f = Decimal.max(this.ZERO, this.toDecimal(fat, 0));
     const a = Decimal.max(this.ZERO, this.toDecimal(ash, 0));
-    const fib = Decimal.max(this.ZERO, this.toDecimal(fiber, 0));
 
-    const proximateSum = w.plus(p).plus(f).plus(a).plus(fib);
+    if (w.isZero() && p.isZero() && f.isZero() && a.isZero()) {
+      return this.ZERO;
+    }
+
+    const proximateSum = w.plus(p).plus(f).plus(a);
     return Decimal.max(this.ZERO, this.ONE_HUNDRED.minus(proximateSum));
   }
 

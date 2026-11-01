@@ -10,6 +10,7 @@ export const SOFT_DELETE_MODELS = [
   'nguyen_lieu',
   'thuc_don',
   'goi',
+  'de_xuat_thuc_don',
 ];
 
 @Injectable()
@@ -193,9 +194,29 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             args: any;
             query: (args: any) => Promise<any>;
           }) {
-            const result = await query(args);
-            if (result && SOFT_DELETE_MODELS.includes(model) && (result as any).deleted_at) {
-              return null;
+            const isSoftDeleteModel = SOFT_DELETE_MODELS.includes(model);
+            let addedDeletedAt = false;
+            let queryArgs = args;
+
+            if (isSoftDeleteModel && args?.select && !args.select.deleted_at) {
+              queryArgs = {
+                ...args,
+                select: {
+                  ...args.select,
+                  deleted_at: true,
+                },
+              };
+              addedDeletedAt = true;
+            }
+
+            const result = await query(queryArgs);
+            if (isSoftDeleteModel && result) {
+              if (result.deleted_at !== null && result.deleted_at !== undefined) {
+                return null;
+              }
+              if (addedDeletedAt) {
+                delete result.deleted_at;
+              }
             }
             return result;
           },

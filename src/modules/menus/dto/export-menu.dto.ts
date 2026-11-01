@@ -9,7 +9,7 @@ import {
   MaxLength,
   ArrayMaxSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { MenuExportType } from '../../../config/enums/domain.enum';
 
@@ -41,9 +41,11 @@ export class ExportMenuDto {
     description: 'Số suất ăn cần tính toán định lượng (bắt buộc > 0 với chế độ RAW và COOKED)',
   })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt()
   @Min(1)
-  @Max(10000)
+  @Max(1000000)
   servings?: number = 1;
 }

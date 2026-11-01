@@ -3,6 +3,10 @@ import { IsString, IsOptional, IsEnum, IsBoolean, IsObject, MaxLength } from 'cl
 import { NutritionLimitWarning } from '../../../config/enums/domain.enum';
 
 export class CreateNutritionLimitSetDto {
+  @ApiPropertyOptional({ description: 'ID bộ giới hạn (nếu có)' })
+  @IsOptional()
+  id?: number | string;
+
   @ApiPropertyOptional({
     description: 'Tên bộ giới hạn dinh dưỡng',
     example: 'Giới hạn tiểu đường Type 2',
@@ -35,6 +39,10 @@ export class CreateNutritionLimitSetDto {
 }
 
 export class UpdateNutritionLimitSetDto {
+  @ApiPropertyOptional({ description: 'ID bộ giới hạn (nếu có)' })
+  @IsOptional()
+  id?: number | string;
+
   @ApiPropertyOptional({
     description: 'Tên bộ giới hạn dinh dưỡng',
     example: 'Giới hạn tiểu đường Type 2 (Cập nhật)',

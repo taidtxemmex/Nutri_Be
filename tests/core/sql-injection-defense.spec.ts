@@ -39,6 +39,7 @@ describe('SQL Injection Defense in Search & Queries', () => {
         { ten_dang_nhap: { contains: payload.trim() } },
         { ho_so_ca_nhan: { ho_ten: { contains: payload.trim() } } },
         { ho_so_ca_nhan: { email: { contains: payload.trim() } } },
+        { ho_so_ca_nhan: { phone: { contains: payload.trim() } } },
       ]);
 
       // Returns empty/safe list without executing raw SQL

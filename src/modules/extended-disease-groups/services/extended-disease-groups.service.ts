@@ -40,7 +40,11 @@ export class ExtendedDiseaseGroupsService {
     userId,
     query,
   }: FindExtendedDiseaseGroupsParamsDto): Promise<PaginatedExtendedDiseaseGroupsResult> {
-    const { page, limit, skip } = normalizePagination(query);
+    const { page, limit, skip } = normalizePagination({
+      query,
+      defaultLimit: 1000,
+      maxLimit: 1000,
+    });
 
     const cacheKey = this.cacheService?.generateKey({
       prefix: `extended-disease-groups:${userId}`,
@@ -110,18 +114,15 @@ export class ExtendedDiseaseGroupsService {
       }),
     ]);
 
-    const items: ExtendedDiseaseGroupResponseDto[] = records.map((r) => {
-      const parentCode = r.nhom_benh?.ma_nhom ? `${r.nhom_benh.ma_nhom} - ` : '';
-      return {
-        id: r.id,
-        extendedCode: r.ma_nhom_mo_rong || '',
-        displayName: r.ten_hien_thi || '',
-        userId: r.nguoi_dung_id || '',
-        parentId: r.ma_nhom_cha || undefined,
-        parentName: r.nhom_benh?.ten_nhom || '',
-        fullCode: parentCode + (r.ma_nhom_mo_rong || ''),
-      };
-    });
+    const items: ExtendedDiseaseGroupResponseDto[] = records.map((r) => ({
+      id: r.id,
+      extendedCode: r.ma_nhom_mo_rong || '',
+      displayName: r.ten_hien_thi || '',
+      userId: r.nguoi_dung_id || '',
+      parentId: r.ma_nhom_cha || undefined,
+      parentName: r.nhom_benh?.ten_nhom || '',
+      fullCode: this.buildFullCode(r.ma_nhom_mo_rong, r.nhom_benh?.ma_nhom),
+    }));
 
     const result: PaginatedExtendedDiseaseGroupsResult = {
       items,
@@ -143,25 +144,30 @@ export class ExtendedDiseaseGroupsService {
   }
 
   /**
-   * Lấy chi tiết nhóm bệnh mở rộng theo ID (chỉ của chính user)
+   * Lấy chi tiết nhóm bệnh mở rộng theo ID
    */
   async findById({
     id,
     userId,
   }: FindExtendedDiseaseGroupByIdParamsDto): Promise<ExtendedDiseaseGroupResponseDto> {
-    const cacheKey = buildExtendedDiseaseGroupDetailCacheKey(id);
+    const cacheKey = userId
+      ? `${buildExtendedDiseaseGroupDetailCacheKey(id)}:user:${userId}`
+      : buildExtendedDiseaseGroupDetailCacheKey(id);
+
     if (this.cacheService) {
       const cached = await this.cacheService.get<ExtendedDiseaseGroupResponseDto>(cacheKey);
-      if (cached && cached.userId === userId) {
+      if (cached) {
         return cached;
       }
     }
 
+    const where: any = { id };
+    if (userId) {
+      where.OR = [{ nguoi_dung_id: userId }, { nguoi_dung_id: null }];
+    }
+
     const record = await this.prisma.nhom_benh_mo_rong.findFirst({
-      where: {
-        id,
-        nguoi_dung_id: userId,
-      },
+      where,
       select: {
         id: true,
         ma_nhom_mo_rong: true,
@@ -185,7 +191,6 @@ export class ExtendedDiseaseGroupsService {
       });
     }
 
-    const parentCode = record.nhom_benh?.ma_nhom ? `${record.nhom_benh.ma_nhom} - ` : '';
     const response: ExtendedDiseaseGroupResponseDto = {
       id: record.id,
       extendedCode: record.ma_nhom_mo_rong || '',
@@ -193,7 +198,7 @@ export class ExtendedDiseaseGroupsService {
       userId: record.nguoi_dung_id || '',
       parentId: record.ma_nhom_cha || undefined,
       parentName: record.nhom_benh?.ten_nhom || '',
-      fullCode: parentCode + (record.ma_nhom_mo_rong || ''),
+      fullCode: this.buildFullCode(record.ma_nhom_mo_rong, record.nhom_benh?.ma_nhom),
     };
 
     if (this.cacheService) {
@@ -204,6 +209,33 @@ export class ExtendedDiseaseGroupsService {
     }
 
     return response;
+  }
+
+  private buildFullCode(extendedCode?: string | null, parentCode?: string | null): string {
+    const ext = (extendedCode || '').trim();
+    const parent = (parentCode || '').trim();
+    if (!parent) {
+      return ext;
+    }
+    if (!ext) {
+      return parent;
+    }
+    if (ext.toLowerCase().startsWith(`${parent.toLowerCase()}-`)) {
+      return ext;
+    }
+    return `${parent}-${ext}`;
+  }
+
+  private stripParentCodePrefix(extendedCode: string, parentCode?: string | null): string {
+    const trimmed = extendedCode.trim();
+    const cleanParent = parentCode?.trim();
+    if (!trimmed || !cleanParent) {
+      return trimmed;
+    }
+    if (trimmed.toLowerCase().startsWith(`${cleanParent.toLowerCase()}-`)) {
+      return trimmed.slice(`${cleanParent}-`.length).trim();
+    }
+    return trimmed;
   }
 
   /**
@@ -225,8 +257,32 @@ export class ExtendedDiseaseGroupsService {
       });
     }
 
-    const extendedCode = dto.extendedCode.trim();
-    const displayName = dto.displayName.trim();
+    const rawExtendedCode = (
+      typeof dto.getExtendedCode === 'function'
+        ? dto.getExtendedCode()
+        : dto.extendedCode || dto.maNhomBenh || dto.maNhomMoRong || ''
+    ).trim();
+    const extendedCode = this.stripParentCodePrefix(rawExtendedCode, parent.ma_nhom);
+    const displayName = (
+      typeof dto.getDisplayName === 'function'
+        ? dto.getDisplayName()
+        : dto.displayName || dto.tenNhomBenh || dto.tenHienThi || ''
+    ).trim();
+
+    const duplicate = await this.prisma.nhom_benh_mo_rong.findFirst({
+      where: {
+        nguoi_dung_id: userId,
+        ma_nhom_mo_rong: extendedCode,
+      },
+      select: { id: true },
+    });
+
+    if (duplicate) {
+      throw new ConflictException({
+        code: 'EDG_002',
+        message: 'Mã nhóm mở rộng đã tồn tại',
+      });
+    }
 
     const created = await this.prisma.nhom_benh_mo_rong.create({
       data: {
@@ -246,7 +302,6 @@ export class ExtendedDiseaseGroupsService {
 
     await this.invalidateCache({ id: created.id });
 
-    const parentCode = parent.ma_nhom ? `${parent.ma_nhom} - ` : '';
     return {
       id: created.id,
       extendedCode: created.ma_nhom_mo_rong || '',
@@ -254,7 +309,7 @@ export class ExtendedDiseaseGroupsService {
       userId: created.nguoi_dung_id || '',
       parentId: created.ma_nhom_cha || undefined,
       parentName: parent.ten_nhom || '',
-      fullCode: parentCode + (created.ma_nhom_mo_rong || ''),
+      fullCode: this.buildFullCode(created.ma_nhom_mo_rong, parent.ma_nhom),
     };
   }
 
@@ -271,7 +326,15 @@ export class ExtendedDiseaseGroupsService {
         id,
         nguoi_dung_id: userId,
       },
-      select: { id: true, ma_nhom_cha: true },
+      select: {
+        id: true,
+        ma_nhom_cha: true,
+        nhom_benh: {
+          select: {
+            ma_nhom: true,
+          },
+        },
+      },
     });
 
     if (!existing) {
@@ -282,10 +345,11 @@ export class ExtendedDiseaseGroupsService {
     }
 
     let parentId = existing.ma_nhom_cha;
+    let parentMaNhom: string | null | undefined = existing.nhom_benh?.ma_nhom;
     if (dto.parentId !== undefined) {
       const parent = await this.prisma.nhom_benh.findUnique({
         where: { id: dto.parentId },
-        select: { id: true },
+        select: { id: true, ma_nhom: true },
       });
       if (!parent) {
         throw new NotFoundException({
@@ -294,13 +358,50 @@ export class ExtendedDiseaseGroupsService {
         });
       }
       parentId = parent.id;
+      parentMaNhom = parent.ma_nhom;
+    } else if (!parentMaNhom && parentId) {
+      const parent = await this.prisma.nhom_benh.findUnique({
+        where: { id: parentId },
+        select: { ma_nhom: true },
+      });
+      parentMaNhom = parent?.ma_nhom;
+    }
+
+    const rawExtendedCode = (
+      typeof dto.getExtendedCode === 'function'
+        ? dto.getExtendedCode()
+        : dto.extendedCode || dto.maNhomBenh || dto.maNhomMoRong || ''
+    ).trim();
+    const extendedCode = this.stripParentCodePrefix(rawExtendedCode, parentMaNhom);
+    const displayName = (
+      typeof dto.getDisplayName === 'function'
+        ? dto.getDisplayName()
+        : dto.displayName || dto.tenNhomBenh || dto.tenHienThi || ''
+    ).trim();
+
+    if (extendedCode) {
+      const duplicate = await this.prisma.nhom_benh_mo_rong.findFirst({
+        where: {
+          nguoi_dung_id: userId,
+          ma_nhom_mo_rong: extendedCode,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+
+      if (duplicate) {
+        throw new ConflictException({
+          code: 'EDG_002',
+          message: 'Mã nhóm mở rộng đã tồn tại',
+        });
+      }
     }
 
     const updated = await this.prisma.nhom_benh_mo_rong.update({
       where: { id },
       data: {
-        ...(dto.extendedCode && { ma_nhom_mo_rong: dto.extendedCode.trim() }),
-        ...(dto.displayName && { ten_hien_thi: dto.displayName.trim() }),
+        ...(extendedCode && { ma_nhom_mo_rong: extendedCode }),
+        ...(displayName && { ten_hien_thi: displayName }),
         ...(dto.parentId !== undefined && { ma_nhom_cha: parentId }),
       },
       select: {
@@ -321,7 +422,6 @@ export class ExtendedDiseaseGroupsService {
 
     await this.invalidateCache({ id: updated.id });
 
-    const parentCode = updated.nhom_benh?.ma_nhom ? `${updated.nhom_benh.ma_nhom} - ` : '';
     return {
       id: updated.id,
       extendedCode: updated.ma_nhom_mo_rong || '',
@@ -329,13 +429,13 @@ export class ExtendedDiseaseGroupsService {
       userId: updated.nguoi_dung_id || '',
       parentId: updated.ma_nhom_cha || undefined,
       parentName: updated.nhom_benh?.ten_nhom || '',
-      fullCode: parentCode + (updated.ma_nhom_mo_rong || ''),
+      fullCode: this.buildFullCode(updated.ma_nhom_mo_rong, updated.nhom_benh?.ma_nhom),
     };
   }
 
   /**
    * Xóa nhóm bệnh mở rộng của user
-   * - Proactive check _count trên thuc_don & de_xuat_thuc_don (EDG_001, 409)
+   * - Proactive check _count trên thuc_don, de_xuat_thuc_don, benh_nhan & benh_nhan_benh_an (EDG_001, 409)
    */
   async delete({
     id,
@@ -352,6 +452,8 @@ export class ExtendedDiseaseGroupsService {
           select: {
             thuc_don: true,
             de_xuat_thuc_don: true,
+            benh_nhan: true,
+            benh_nhan_benh_an: true,
           },
         },
       },
@@ -366,8 +468,10 @@ export class ExtendedDiseaseGroupsService {
 
     const menuCount = existing._count?.thuc_don ?? 0;
     const menuProposalCount = existing._count?.de_xuat_thuc_don ?? 0;
+    const patientCount = existing._count?.benh_nhan ?? 0;
+    const medicalRecordCount = existing._count?.benh_nhan_benh_an ?? 0;
 
-    if (menuCount > 0 || menuProposalCount > 0) {
+    if (menuCount + menuProposalCount + patientCount + medicalRecordCount > 0) {
       throw new ConflictException({
         code: 'EDG_001',
         message: 'error.extended_disease_group.in_use',

@@ -207,11 +207,11 @@ describe('Sprint 4: Module 07 - IntakeCalculationEngine & RdaComparisonEngine', 
       const result = IntakeCalculationEngine.calculateIngredient(carrot);
       expect(result.netWeightGrams).toBe(100);
 
-      // 1. Available Carb = 100 - (88.5 + 1.5 + 0.2 + 0.8 + 1.2) = 100 - 92.2 = 7.8g
-      expect(result.nutrients.carbohydrate).toBe(7.8);
+      // 1. Carbohydrate (Java legacy sync) = 100 - (88.5 + 1.5 + 0.2 + 0.8) = 100 - 91.0 = 9.0g
+      expect(result.nutrients.carbohydrate).toBe(9);
 
-      // 2. Atwater Energy = 4 * 1.5 (6) + 9 * 0.2 (1.8) + 4 * 7.8 (31.2) = 39.0 kcal
-      expect(result.nutrients.energy).toBe(39.0);
+      // 2. Atwater Energy = 4 * 1.5 (6) + 9 * 0.2 (1.8) + 4 * 9.0 (36.0) = 43.8 kcal
+      expect(result.nutrients.energy).toBe(43.8);
 
       // 3. Vitamin A RAE = 0 + (6500 / 12) + (2400 / 24) + (240 / 24)
       // = 0 + 541.6666... + 100 + 10 = 651.6666... -> 651.67 µg RAE

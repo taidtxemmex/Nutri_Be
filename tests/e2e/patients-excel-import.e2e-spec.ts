@@ -57,7 +57,7 @@ describe('Sprint 5 Suite 3: Patients Excel Import & Formula Injection (Task 5.4)
     const unique = `${Date.now()}_${Math.floor(Math.random() * 10000)}`;
     const doc = await helper.createTestUser({
       username: `doc_excel_${unique}`,
-      role: UserRole.USER,
+      role: UserRole.USERPRO,
       password: 'P@ssw0rd123!',
       fullName: 'BS Nguyễn Hải Đăng - Excel QA',
     });
@@ -149,6 +149,23 @@ describe('Sprint 5 Suite 3: Patients Excel Import & Formula Injection (Task 5.4)
 
       const errMsg = res.body?.error?.message || res.body?.message || '';
       expect(errMsg).toContain('Template không đúng');
+    });
+
+    it('1.5 Người dùng vai trò thông thường (USER) bị chặn Import Excel -> Trả về 403 Forbidden', async () => {
+      const normalUser = await helper.createTestUser({
+        username: `normal_user_${Date.now()}`,
+        role: UserRole.USER,
+        password: 'P@ssw0rd123!',
+        fullName: 'Người Dùng Thường',
+      });
+
+      const res = await request(helper.getHttpServer())
+        .post('/api/patients/import')
+        .set('Authorization', `Bearer ${normalUser.token}`)
+        .attach('file', Buffer.from('dummy'), 'test.xlsx')
+        .expect(403);
+
+      expect(res.body?.error?.code || res.body?.code).toBeDefined();
     });
   });
 

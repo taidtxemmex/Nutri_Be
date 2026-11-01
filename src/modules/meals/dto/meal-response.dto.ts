@@ -30,6 +30,12 @@ export class MealResponseDto {
   @ApiProperty({ description: 'Khung giờ ăn', example: '07:00' })
   time!: string;
 
+  @ApiPropertyOptional({ description: 'Giờ bắt đầu', example: '07:00' })
+  startTime?: string;
+
+  @ApiPropertyOptional({ description: 'Giờ kết thúc', example: '08:00' })
+  endTime?: string;
+
   @ApiPropertyOptional({ description: 'Trạng thái bữa ăn', example: 'RIENG_TU' })
   status?: string | null;
 

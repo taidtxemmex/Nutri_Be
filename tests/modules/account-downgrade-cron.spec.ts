@@ -177,9 +177,11 @@ describe('AccountDowngradeCronService Tests (Task 7.4)', () => {
       // Layer 3 Database State Assertions:
       const u1 = usersTable.find((u) => u.id === 'user-pro-expired-1');
       expect(u1.vai_tro).toBe(UserRole.USER);
+      expect(u1.pro_expired_at).toBeNull();
 
       const u2 = usersTable.find((u) => u.id === 'user-pro-expired-2');
       expect(u2.vai_tro).toBe(UserRole.USER);
+      expect(u2.pro_expired_at).toBeNull();
 
       const u3 = usersTable.find((u) => u.id === 'user-pro-active-3');
       expect(u3.vai_tro).toBe(UserRole.USERPRO); // Still active!

@@ -175,7 +175,7 @@ describe('Disease Groups & Extended Disease Groups Master E2E (IDOR & 3-Layer Pe
         userId: doctorAUser.id,
         parentId: parentGroup.id,
         parentName: 'Bệnh lý Thận & Tiết niệu',
-        fullCode: 'THAN - TH-01',
+        fullCode: 'THAN-TH-01',
       });
 
       const createdExtId = res.body.data.id;

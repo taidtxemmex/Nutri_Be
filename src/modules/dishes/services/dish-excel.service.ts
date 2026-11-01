@@ -59,17 +59,308 @@ export function normalizeDishKey(str: string): string {
 
 export const DEFAULT_DISH_EXPORT_KEYS: string[] = [
   'energy',
+  'water',
   'protein',
   'fat',
   'carbohydrate',
   'fiber',
+  'ash',
   'calci',
+  'phosphorous',
   'iron',
+  'zinc',
   'sodium',
   'potassium',
+  'magnesium',
+  'manganese',
+  'copper',
+  'selenium',
   'vitaminC',
+  'thiamine',
+  'riboflavin',
+  'niacin',
+  'pantothenicAcid',
+  'vitaminB6',
+  'folate',
+  'folicAcid',
+  'biotin',
+  'vitaminB12',
+  'retinol',
   'vitaminARae',
+  'vitaminD',
+  'vitaminE',
+  'vitaminK',
+  'betaCarotene',
+  'alphaCarotene',
+  'betaCryptoxanthin',
+  'lycopene',
+  'luteinZeaxanthin',
+  'isoflavoneTongSo',
+  'daidzein',
+  'genistein',
+  'glycetin',
+  'purine',
+  'tsAxitBeoNo',
+  'palmitic',
+  'margaric',
+  'stearic',
+  'arachidic',
+  'behenic',
+  'lignoceric',
+  'tsAxitBeoKhongNo1NoiDoi',
+  'myristoleic',
+  'palmitoleic',
+  'oleic',
+  'tsAxitBeoKhongNoNhieuNoiDoi',
+  'linoleic',
+  'linolenic',
+  'arachidonic',
+  'epa',
+  'dha',
+  'tsAxitBeoTrans',
+  'cholesterol',
+  'phytosterol',
+  'lysin',
+  'methionin',
+  'tryptophan',
+  'phenylalanin',
+  'threonin',
+  'valine',
+  'leucine',
+  'isoleucine',
+  'arginine',
+  'histidine',
+  'cystine',
+  'tyrosine',
+  'alanine',
+  'asparticAcid',
+  'glutamicAcid',
+  'glycine',
+  'proline',
+  'serine',
 ];
+
+const EXPORT_COLUMN_ALIAS_MAP: Record<string, string> = {
+  energy: 'energy',
+  'energy (kcal)': 'energy',
+  water: 'water',
+  'water (g)': 'water',
+  protein: 'protein',
+  'protein (g)': 'protein',
+  fat: 'fat',
+  'fat (g)': 'fat',
+  carbohydrate: 'carbohydrate',
+  'carbohydrate (g)': 'carbohydrate',
+  fiber: 'fiber',
+  'fiber (g)': 'fiber',
+  ash: 'ash',
+  'ash (g)': 'ash',
+  calci: 'calci',
+  'calci (mg)': 'calci',
+  phosphorous: 'phosphorous',
+  'phosphorous (mg)': 'phosphorous',
+  iron: 'iron',
+  'iron (mg)': 'iron',
+  zinc: 'zinc',
+  'zinc (mg)': 'zinc',
+  sodium: 'sodium',
+  'sodium (mg)': 'sodium',
+  potassium: 'potassium',
+  'potassium (mg)': 'potassium',
+  magnesium: 'magnesium',
+  'magnesium (mg)': 'magnesium',
+  manganese: 'manganese',
+  'manganese (mg)': 'manganese',
+  copper: 'copper',
+  'copper (µg)': 'copper',
+  'copper (ug)': 'copper',
+  selenium: 'selenium',
+  'selenium (µg)': 'selenium',
+  'selenium (ug)': 'selenium',
+  vitaminc: 'vitaminC',
+  'vitamin c': 'vitaminC',
+  'vitamin c (mg)': 'vitaminC',
+  thiamine: 'thiamine',
+  'thiamine (mg)': 'thiamine',
+  riboflavin: 'riboflavin',
+  'riboflavin (mg)': 'riboflavin',
+  niacin: 'niacin',
+  'niacin (mg)': 'niacin',
+  pantothenicacid: 'pantothenicAcid',
+  'pantothenic acid': 'pantothenicAcid',
+  'pantothenic acid (mg)': 'pantothenicAcid',
+  vitaminb6: 'vitaminB6',
+  'vitamin b6': 'vitaminB6',
+  'vitamin b6 (mg)': 'vitaminB6',
+  folate: 'folate',
+  'folate (µg)': 'folate',
+  'folate (ug)': 'folate',
+  folicacid: 'folicAcid',
+  'folic acid': 'folicAcid',
+  'folic acid (µg)': 'folicAcid',
+  'folic acid (ug)': 'folicAcid',
+  biotin: 'biotin',
+  'biotin (µg)': 'biotin',
+  'biotin (ug)': 'biotin',
+  vitaminb12: 'vitaminB12',
+  'vitamin b12': 'vitaminB12',
+  'vitamin b12 (µg)': 'vitaminB12',
+  'vitamin b12 (ug)': 'vitaminB12',
+  retinol: 'retinol',
+  'retinol (µg)': 'retinol',
+  'retinol (ug)': 'retinol',
+  vitaminarae: 'vitaminARae',
+  'vitamin a -rae': 'vitaminARae',
+  'vitamin a - rae': 'vitaminARae',
+  'vitamin a - rae (µg)': 'vitaminARae',
+  'vitamin a - rae (ug)': 'vitaminARae',
+  'vitamin a rae': 'vitaminARae',
+  vitamind: 'vitaminD',
+  'vitamin d': 'vitaminD',
+  'vitamin d (µg)': 'vitaminD',
+  'vitamin d (ug)': 'vitaminD',
+  vitamine: 'vitaminE',
+  'vitamin e': 'vitaminE',
+  'vitamin e (mg)': 'vitaminE',
+  vitamink: 'vitaminK',
+  'vitamin k': 'vitaminK',
+  'vitamin k (µg)': 'vitaminK',
+  'vitamin k (ug)': 'vitaminK',
+  betacarotene: 'betaCarotene',
+  'b-carotene': 'betaCarotene',
+  'β-carotene': 'betaCarotene',
+  'β-carotene (µg)': 'betaCarotene',
+  'b-carotene (µg)': 'betaCarotene',
+  alphacarotene: 'alphaCarotene',
+  'a-carotene': 'alphaCarotene',
+  'α-carotene': 'alphaCarotene',
+  'α-carotene (µg)': 'alphaCarotene',
+  'a-carotene (µg)': 'alphaCarotene',
+  betacryptoxanthin: 'betaCryptoxanthin',
+  'b-cryptoxanthin': 'betaCryptoxanthin',
+  'β-cryptoxanthin': 'betaCryptoxanthin',
+  'β-cryptoxanthin (µg)': 'betaCryptoxanthin',
+  'b-cryptoxanthin (µg)': 'betaCryptoxanthin',
+  lycopene: 'lycopene',
+  'lycopene (µg)': 'lycopene',
+  luteinzeaxanthin: 'luteinZeaxanthin',
+  'lutein + zeaxanthin': 'luteinZeaxanthin',
+  'lutein + zeaxanthin (µg)': 'luteinZeaxanthin',
+  isoflavonetongso: 'isoflavoneTongSo',
+  'isoflavone tổng số': 'isoflavoneTongSo',
+  'isoflavone tổng số (mg)': 'isoflavoneTongSo',
+  daidzein: 'daidzein',
+  'daidzein (mg)': 'daidzein',
+  genistein: 'genistein',
+  'genistein (mg)': 'genistein',
+  glycetin: 'glycetin',
+  'glycetin (mg)': 'glycetin',
+  purine: 'purine',
+  'purine (mg)': 'purine',
+  tsaxitbeono: 'tsAxitBeoNo',
+  'ts acid béo no': 'tsAxitBeoNo',
+  'ts axit béo no': 'tsAxitBeoNo',
+  'ts axit béo no (g)': 'tsAxitBeoNo',
+  'ts acid béo no (g)': 'tsAxitBeoNo',
+  palmitic: 'palmitic',
+  'palmitic (c16:0)': 'palmitic',
+  'palmitic (c16:0) (g)': 'palmitic',
+  margaric: 'margaric',
+  'margaric (c17:0)': 'margaric',
+  'margaric (c17:0) (g)': 'margaric',
+  stearic: 'stearic',
+  'stearic (c18:0)': 'stearic',
+  'stearic (c18:0) (g)': 'stearic',
+  arachidic: 'arachidic',
+  'arachidic (c20:0)': 'arachidic',
+  'arachidic (c20:0) (g)': 'arachidic',
+  behenic: 'behenic',
+  'behenic (c22:0)': 'behenic',
+  'behenic (c22:0) (g)': 'behenic',
+  lignoceric: 'lignoceric',
+  'lignoceric (c24:0)': 'lignoceric',
+  'lignoceric (c24:0) (g)': 'lignoceric',
+  tsaxitbeokhongno1noidoi: 'tsAxitBeoKhongNo1NoiDoi',
+  'ts acid béo không no 1 nối đôi': 'tsAxitBeoKhongNo1NoiDoi',
+  'ts axit béo không no 1 nối đôi': 'tsAxitBeoKhongNo1NoiDoi',
+  'ts acid béo không no 1 nối đôi (g)': 'tsAxitBeoKhongNo1NoiDoi',
+  myristoleic: 'myristoleic',
+  'myristoleic (c14:1)': 'myristoleic',
+  'myristoleic (c14:1) (g)': 'myristoleic',
+  palmitoleic: 'palmitoleic',
+  'palmitoleic (c16:1)': 'palmitoleic',
+  'palmitoleic (c16:1) (g)': 'palmitoleic',
+  oleic: 'oleic',
+  'oleic (c18:1)': 'oleic',
+  'oleic (c18:1) (g)': 'oleic',
+  tsaxitbeokhongnonhieunoidoi: 'tsAxitBeoKhongNoNhieuNoiDoi',
+  'ts acid béo không no nhiều nối đôi': 'tsAxitBeoKhongNoNhieuNoiDoi',
+  'ts axit béo không no nhiều nối đôi': 'tsAxitBeoKhongNoNhieuNoiDoi',
+  'ts acid béo không no nhiều nối đôi (g)': 'tsAxitBeoKhongNoNhieuNoiDoi',
+  linoleic: 'linoleic',
+  'linoleic (g)': 'linoleic',
+  linolenic: 'linolenic',
+  'linolenic (g)': 'linolenic',
+  arachidonic: 'arachidonic',
+  'arachidonic (c20:4)': 'arachidonic',
+  'arachidonic (c20:4) (g)': 'arachidonic',
+  epa: 'epa',
+  'epa (c20:5 n3)': 'epa',
+  'epa (c20:5 n3) (g)': 'epa',
+  dha: 'dha',
+  'dha (c22:6 n3)': 'dha',
+  'dha (c22:6 n3) (g)': 'dha',
+  tsaxitbeotrans: 'tsAxitBeoTrans',
+  'ts acid béo trans': 'tsAxitBeoTrans',
+  'ts axit béo trans': 'tsAxitBeoTrans',
+  'ts acid béo trans (g)': 'tsAxitBeoTrans',
+  cholesterol: 'cholesterol',
+  'cholesterol (mg)': 'cholesterol',
+  phytosterol: 'phytosterol',
+  'phytosterol (mg)': 'phytosterol',
+  lysin: 'lysin',
+  lysine: 'lysin',
+  'lysine (mg)': 'lysin',
+  methionin: 'methionin',
+  methionine: 'methionin',
+  'methionine (mg)': 'methionin',
+  tryptophan: 'tryptophan',
+  'tryptophan (mg)': 'tryptophan',
+  phenylalanin: 'phenylalanin',
+  phenylalanine: 'phenylalanin',
+  'phenylalanine (mg)': 'phenylalanin',
+  threonin: 'threonin',
+  threonine: 'threonin',
+  'threonine (mg)': 'threonin',
+  valine: 'valine',
+  'valine (mg)': 'valine',
+  leucine: 'leucine',
+  'leucine (mg)': 'leucine',
+  isoleucine: 'isoleucine',
+  'isoleucine (mg)': 'isoleucine',
+  arginine: 'arginine',
+  'arginine (mg)': 'arginine',
+  histidine: 'histidine',
+  'histidine (mg)': 'histidine',
+  cystine: 'cystine',
+  'cystine (mg)': 'cystine',
+  tyrosine: 'tyrosine',
+  'tyrosine (mg)': 'tyrosine',
+  alanine: 'alanine',
+  'alanine (mg)': 'alanine',
+  asparticacid: 'asparticAcid',
+  'aspartic acid': 'asparticAcid',
+  'aspartic acid (mg)': 'asparticAcid',
+  glutamicacid: 'glutamicAcid',
+  'glutamic acid': 'glutamicAcid',
+  'glutamic acid (mg)': 'glutamicAcid',
+  glycine: 'glycine',
+  'glycine (mg)': 'glycine',
+  proline: 'proline',
+  'proline (mg)': 'proline',
+  serine: 'serine',
+  'serine (mg)': 'serine',
+};
 
 const VALID_INGREDIENT_DB_FIELDS = new Set<string>([
   'id',
@@ -215,7 +506,7 @@ export class DishExcelService {
 
     // 3. Lưu vào CacheService với tag 'ingredients' (tự động invalidate khi nguyên liệu thay đổi)
     if (this.cacheService) {
-      this.cacheService.set(
+      await this.cacheService.set(
         DishExcelService.TEMPLATE_CACHE_KEY,
         buffer,
         DishExcelService.TEMPLATE_CACHE_TTL_MS,
@@ -506,13 +797,20 @@ export class DishExcelService {
               ExcelStreamReader.readCellString({ cell: row.getCell(2), sanitize: false }) || '';
             const h3 =
               ExcelStreamReader.readCellString({ cell: row.getCell(3), sanitize: false }) || '';
+            const h4 =
+              ExcelStreamReader.readCellString({ cell: row.getCell(4), sanitize: false }) || '';
+            const isValidFourthCol =
+              !h4 ||
+              h4.toLowerCase() === DishExcelService.RESULT_HEADER.toLowerCase() ||
+              h4.toLowerCase() === 'ket_qua_import';
 
             if (
               h1.toLowerCase().includes('món') &&
               h2.toLowerCase().includes('nguyên liệu') &&
               (h3.toLowerCase().includes('kl') ||
                 h3.toLowerCase().includes('khối lượng') ||
-                h3.toLowerCase().includes('g'))
+                h3.toLowerCase().includes('g')) &&
+              isValidFourthCol
             ) {
               isTargetSheet = true;
               targetWorksheetFound = true;
@@ -688,7 +986,7 @@ export class DishExcelService {
     if (hasAnyError) {
       const errorBuffer = await ExcelStreamReader.generateErrorWorkbook({
         headers: ['Tên món ăn', 'Tên nguyên liệu', 'KL sống sạch (g)'],
-        rows: errorRowItems.slice(0, 500),
+        rows: errorRowItems,
         sheetName: DishExcelService.DATA_SHEET,
         resultHeaderTitle: 'Kết quả import',
         resultColumnWidth: 45,
@@ -911,17 +1209,18 @@ export class DishExcelService {
         const ingNutrients: Record<string, number> = {};
         if (ing) {
           const ratio = net / 100.0;
-          const carb = Math.max(
-            0,
-            100 -
-              (Number(ing.water || 0) +
-                Number(ing.protein || 0) +
-                Number(ing.fat || 0) +
-                Number(ing.fiber || 0) +
-                Number(ing.ash || 0)),
-          );
-          const energy = Number(ing.protein || 0) * 4 + Number(ing.fat || 0) * 9 + carb * 4;
-          const vitaminARae = Number(ing.retinol || 0) + Number(ing.betaCarotene || 0) / 12;
+          const w = Number(ing.water || 0);
+          const p = Number(ing.protein || 0);
+          const f = Number(ing.fat || 0);
+          const a = Number(ing.ash || 0);
+          const carb =
+            w === 0 && p === 0 && f === 0 && a === 0 ? 0 : Math.max(0, 100 - (w + p + f + a));
+          const energy = p * 4 + f * 9 + carb * 4;
+          const vitaminARae =
+            Number(ing.retinol || 0) +
+            Number(ing.betaCarotene || 0) / 12 +
+            Number(ing.alphaCarotene || 0) / 24 +
+            Number(ing.betaCryptoxanthin || 0) / 24;
 
           for (const col of columnsToExport) {
             let rawVal = 0;
@@ -989,6 +1288,8 @@ export class DishExcelService {
         ash: true,
         retinol: true,
         betaCarotene: true,
+        alphaCarotene: true,
+        betaCryptoxanthin: true,
       };
       for (const col of columnsToExport) {
         if (VALID_INGREDIENT_DB_FIELDS.has(col.key)) {
@@ -1066,7 +1367,12 @@ export class DishExcelService {
         return false;
       }
     }
-    return true;
+    const extraCol = this.readCellString(row.getCell(DishExcelService.EXPECTED_HEADERS.length + 1));
+    return (
+      !extraCol ||
+      extraCol.toLowerCase() === DishExcelService.RESULT_HEADER.toLowerCase() ||
+      extraCol.toLowerCase() === 'ket_qua_import'
+    );
   }
 
   private hasRowValues(row: ExcelJS.Row): boolean {
@@ -1119,31 +1425,66 @@ export class DishExcelService {
   }
 
   private resolveExportColumns(selectedColumns?: string[]): DishExportColumn[] {
+    const columnMap = new Map<string, DishExportColumn>();
     const allAvailableColumns: DishExportColumn[] = ALL_INDICATOR_CODES.map((code) => {
       const meta = NUTRIENT_METADATA_MAP[code];
-      return {
+      const col: DishExportColumn = {
         key: code,
         header: meta ? `${meta.nameVi} (${meta.unit})` : `${code}`,
         unit: meta ? meta.unit : '',
       };
+      columnMap.set(code, col);
+      return col;
     });
+
+    const defaultColumns = DEFAULT_DISH_EXPORT_KEYS.map((key) => columnMap.get(key)!).filter(
+      Boolean,
+    );
 
     if (!selectedColumns || !Array.isArray(selectedColumns) || selectedColumns.length === 0) {
-      return allAvailableColumns.filter((col) => DEFAULT_DISH_EXPORT_KEYS.includes(col.key));
+      return defaultColumns;
     }
 
-    const lowerRequested = selectedColumns.map((c) => c.trim().toLowerCase());
+    const matched: DishExportColumn[] = [];
+    const seenKeys = new Set<string>();
 
-    const matched = allAvailableColumns.filter((col) => {
-      const keyLower = col.key.toLowerCase();
-      const headerLower = col.header.toLowerCase();
-      return lowerRequested.some(
-        (req) => req === keyLower || headerLower.includes(req) || req.includes(keyLower),
-      );
-    });
+    for (const rawCol of selectedColumns) {
+      if (!rawCol || typeof rawCol !== 'string') continue;
+      const norm = rawCol.normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (!norm) continue;
+
+      let resolvedKey = EXPORT_COLUMN_ALIAS_MAP[norm];
+      if (!resolvedKey) {
+        const strippedUnit = norm.replace(/\s*\([^)]*\)\s*$/, '').trim();
+        resolvedKey = EXPORT_COLUMN_ALIAS_MAP[strippedUnit];
+      }
+
+      let foundCol = resolvedKey ? columnMap.get(resolvedKey) : undefined;
+      if (!foundCol) {
+        foundCol = allAvailableColumns.find((col) => {
+          const keyLower = col.key.toLowerCase();
+          const headerLower = col.header.toLowerCase();
+          const meta = NUTRIENT_METADATA_MAP[col.key as keyof typeof NUTRIENT_METADATA_MAP];
+          const nameViLower = meta?.nameVi?.toLowerCase() || '';
+          const nameEnLower = meta?.nameEn?.toLowerCase() || '';
+          return (
+            norm === keyLower ||
+            norm === headerLower ||
+            norm === nameViLower ||
+            norm === nameEnLower ||
+            headerLower.includes(norm)
+          );
+        });
+      }
+
+      if (foundCol && !seenKeys.has(foundCol.key)) {
+        seenKeys.add(foundCol.key);
+        matched.push(foundCol);
+      }
+    }
 
     if (matched.length === 0) {
-      return allAvailableColumns.filter((col) => DEFAULT_DISH_EXPORT_KEYS.includes(col.key));
+      return defaultColumns;
     }
 
     return matched;

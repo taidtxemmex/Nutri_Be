@@ -36,6 +36,7 @@ export class PaymentDocRequestDto {
     example: 'https://example.com/receipt.jpg',
     description: 'Link ngoài nếu có (chỉ chấp nhận http:// hoặc https://, tối đa 1000 ký tự)',
   })
+  @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @IsOptional()
   @IsString({ message: 'externalLink phải là chuỗi' })
   @MaxLength(1000, { message: 'externalLink không được vượt quá 1000 ký tự' })
@@ -80,6 +81,6 @@ export class SubscriptionRequestDto {
 
   getPackageCode(): string {
     const raw = this.ma_goi || this.maGoi || this.packageCode || '';
-    return raw.trim();
+    return typeof raw === 'string' ? raw.trim() : String(raw).trim();
   }
 }

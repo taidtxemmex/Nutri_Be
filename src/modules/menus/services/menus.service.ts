@@ -23,8 +23,10 @@ import {
 import { MenuType, DishStatus } from '../../../config/enums/domain.enum';
 import { isAdminRole } from '../../../config/enums/role.enum';
 import {
+  CACHE_TAG_MENUS,
   CACHE_TAG_PATIENTS,
   CACHE_TTL_PERPETUAL,
+  buildMenuCacheTag,
   buildPatientCacheTag,
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
@@ -57,7 +59,7 @@ export interface ResolveMealWithCopyOnWriteParamDto {
 @Injectable()
 export class MenusService {
   private readonly logger = new Logger(MenusService.name);
-  private readonly CACHE_TAG = 'menus';
+  private readonly CACHE_TAG = CACHE_TAG_MENUS;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -179,6 +181,23 @@ export class MenusService {
     return energyDisplay;
   }
 
+  private formatDateDdMmYyyy(date?: Date | string | null): any {
+    if (!date) return null;
+    if (typeof date === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(date.trim())) {
+      return date.trim();
+    }
+    const d = date instanceof Date ? date : new Date(date);
+    if (isNaN(d.getTime())) return String(date);
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  }
+
+  async findAll(params: GetAllMenusParamsDto) {
+    return this.getAll(params);
+  }
+
   /**
    * 1. GET /api/menus & /api/menu: Lấy danh sách thực đơn phân trang (Anti-Overfetching)
    */
@@ -188,41 +207,37 @@ export class MenusService {
     page: number;
     limit: number;
   }> {
-    const page = Math.max(1, Number(query.page) || 1);
-    const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
+    const page = Math.max(1, Number(query?.page) || 1);
+    const limit = Math.min(1000, Math.max(1, Number(query?.limit) || 1000));
     const skip = (page - 1) * limit;
 
-    const searchTerm = query.keyword?.trim() || query.search?.trim();
+    const searchTerm = query?.keyword?.trim() || query?.search?.trim();
 
     const where: any = {
       deleted_at: null,
     };
 
-    if (query.isPublic) {
-      where.loai_thuc_don = { in: ['CONG_KHAI', 'MAU_HE_THONG'] };
-    } else {
-      if (!this.isAdmin(currentUser)) {
-        where.nguoi_dung_id = currentUser.id;
-      }
+    if (!query?.isPublic && !this.isAdmin(currentUser)) {
+      where.nguoi_dung_id = currentUser.id;
     }
 
     if (searchTerm) {
       where.ten_thuc_don = { contains: searchTerm };
     }
 
-    if (query.menuType) {
+    if (query?.menuType) {
       where.loai_thuc_don = query.menuType;
     }
 
-    if (query.targetType) {
+    if (query?.targetType) {
       where.loai_doi_tuong = query.targetType;
     }
 
-    if (query.patientId) {
+    if (query?.patientId) {
       where.benh_nhan_id = BigInt(query.patientId);
     }
 
-    if (query.diseaseGroupId) {
+    if (query?.diseaseGroupId) {
       where.nhom_benh_id = Number(query.diseaseGroupId);
     }
 
@@ -269,7 +284,7 @@ export class MenusService {
       menuName: r.ten_thuc_don,
       menuType: r.loai_thuc_don,
       targetType: r.loai_doi_tuong,
-      createdDate: r.ngay_tao,
+      createdDate: this.formatDateDdMmYyyy(r.ngay_tao),
       totalEnergy: r.tong_nang_luong || null,
       createdBy: r.nguoi_dung?.ho_so_ca_nhan?.ho_ten || r.nguoi_dung?.ten_dang_nhap || null,
       patientId: r.benh_nhan_id ? r.benh_nhan_id.toString() : null,
@@ -280,6 +295,14 @@ export class MenusService {
     }));
 
     return { items, total, page, limit };
+  }
+
+  async getMenuDetail(params: GetMenuByIdParamsDto): Promise<MenuDetailResponseDto> {
+    return this.getById(params);
+  }
+
+  async getDayDetail(params: GetMenuByIdParamsDto): Promise<MenuDetailResponseDto> {
+    return this.getById(params);
   }
 
   /**
@@ -314,7 +337,7 @@ export class MenusService {
                     mon_an: {
                       include: {
                         chi_tiet_mon_an: {
-                          include: { nguyen_lieu: true },
+                          include: { nguyen_lieu: { include: { he_so_song_chin: true } } },
                         },
                       },
                     },
@@ -335,24 +358,34 @@ export class MenusService {
     }
 
     const isOwner = currentUser && menu.nguoi_dung_id === currentUser.id;
-    const isPublic = menu.loai_thuc_don === 'CONG_KHAI' || menu.loai_thuc_don === 'MAU_HE_THONG';
 
-    if (!isOwner && !isPublic && !this.isAdmin(currentUser)) {
+    if (!isOwner && !this.isAdmin(currentUser)) {
       throw new HttpException(
         { code: 'MENU_001', message: 'Không tìm thấy thực đơn' },
         HttpStatus.NOT_FOUND,
       );
     }
 
-    // Lọc chi tiết theo loại thực đơn và tham số lọc tuần/ngày
+    // Lọc chi tiết theo loại thực đơn và tham số lọc tuần/ngày (khớp MenuServiceImpl.java:264-273)
     let filteredDetails = menu.chi_tiet_thuc_don || [];
+    let resolvedWeek: number | null = null;
+    let resolvedDay: number | null = null;
 
-    if (menu.loai_thuc_don === MenuType.TUAN || menu.loai_thuc_don === MenuType.THANG) {
-      filteredDetails = filteredDetails.filter((md) => {
-        const matchWeek = weekNo == null || md.so_tuan === Number(weekNo);
-        const matchDay = dayOfWeek == null || md.thu_trong_tuan === Number(dayOfWeek);
-        return matchWeek && matchDay;
-      });
+    if (menu.loai_thuc_don === MenuType.NGAY) {
+      resolvedWeek = null;
+      resolvedDay = null;
+    } else if (menu.loai_thuc_don === MenuType.TUAN) {
+      resolvedWeek = 1;
+      resolvedDay = dayOfWeek != null ? Number(dayOfWeek) : 2;
+      filteredDetails = filteredDetails.filter(
+        (md) => md.so_tuan === resolvedWeek && md.thu_trong_tuan === resolvedDay,
+      );
+    } else if (menu.loai_thuc_don === MenuType.THANG) {
+      resolvedWeek = weekNo != null ? Number(weekNo) : 1;
+      resolvedDay = dayOfWeek != null ? Number(dayOfWeek) : 2;
+      filteredDetails = filteredDetails.filter(
+        (md) => md.so_tuan === resolvedWeek && md.thu_trong_tuan === resolvedDay,
+      );
     }
 
     // Chuyển đổi và tính toán dinh dưỡng từng bữa ăn
@@ -388,6 +421,16 @@ export class MenusService {
       const dishSummaries = (meal.chi_tiet_bua_an || []).map((mb: any, idx: number) => {
         const dishCalc = mealCalc.dishes[idx];
         const coef = mb.he_so_song_chin != null ? Number(mb.he_so_song_chin) : 1.0;
+        const details = (mb.mon_an?.chi_tiet_mon_an || []).map((nl: any, cidx: number) => {
+          const breakdown = dishCalc?.ingredientBreakdown?.[cidx];
+          return {
+            ingredientId: Number(nl.nguyen_lieu?.id ?? nl.nguyen_lieu_id),
+            ingredientName: nl.nguyen_lieu?.ten_nguyen_lieu || '',
+            netWeight: nl.khoi_luong_song_sach != null ? Number(nl.khoi_luong_song_sach) : 0,
+            edible: nl.nguyen_lieu?.edible != null ? Number(nl.nguyen_lieu.edible) : null,
+            nutrients: breakdown ? breakdown.nutrients : {},
+          };
+        });
 
         return {
           id: mb.mon_an?.id ? mb.mon_an.id.toString() : mb.mon_an_id.toString(),
@@ -395,11 +438,21 @@ export class MenusService {
           dishWeight: dishCalc ? dishCalc.cookedWeightGrams : 0,
           coefficient: coef,
           nutrients: dishCalc ? dishCalc.nutrients : {},
+          details,
         };
       });
 
-      // Cộng dồn vi chất vào ngày
+      // Cộng dồn vi chất vào ngày (không cộng dồn các chỉ số tỷ lệ %)
+      const ratioKeys = new Set([
+        'proteinRatio',
+        'lipidRatio',
+        'carbohydrateRatio',
+        'animalProteinRatio',
+        'animalFatRatio',
+        'energyRatio',
+      ]);
       for (const [k, v] of Object.entries(mealCalc.nutrients)) {
+        if (ratioKeys.has(k)) continue;
         totalDayNutrients[k] = Number(((totalDayNutrients[k] || 0) + v).toFixed(2));
       }
 
@@ -412,12 +465,31 @@ export class MenusService {
       });
     }
 
+    if (Object.keys(totalDayNutrients).length > 0) {
+      const round2 = (n: number) => Math.round(n * 100) / 100;
+      const dayEnergy = Number(totalDayNutrients.energy || 0);
+      const dayProtein = Number(totalDayNutrients.protein || 0);
+      const dayFat = Number(totalDayNutrients.fat || 0);
+      const dayCarb = Number(totalDayNutrients.carbohydrate || 0);
+      const dayProteinAnimal = Number(totalDayNutrients.proteinAnimal || 0);
+      const dayFatAnimal = Number(totalDayNutrients.fatAnimal || 0);
+
+      totalDayNutrients.proteinRatio =
+        dayEnergy > 0 ? round2(((dayProtein * 4) / dayEnergy) * 100) : 0;
+      totalDayNutrients.lipidRatio = dayEnergy > 0 ? round2(((dayFat * 9) / dayEnergy) * 100) : 0;
+      totalDayNutrients.carbohydrateRatio =
+        dayEnergy > 0 ? round2(((dayCarb * 4) / dayEnergy) * 100) : 0;
+      totalDayNutrients.animalProteinRatio =
+        dayProtein > 0 ? round2((dayProteinAnimal / dayProtein) * 100) : 0;
+      totalDayNutrients.animalFatRatio = dayFat > 0 ? round2((dayFatAnimal / dayFat) * 100) : 0;
+    }
+
     return {
       id: menu.id.toString(),
       menuName: menu.ten_thuc_don,
       menuType: menu.loai_thuc_don,
       targetType: menu.loai_doi_tuong,
-      createdDate: menu.ngay_tao,
+      createdDate: this.formatDateDdMmYyyy(menu.ngay_tao),
       createdBy: menu.nguoi_dung?.ho_so_ca_nhan?.ho_ten || menu.nguoi_dung?.ten_dang_nhap || null,
       patientId: menu.benh_nhan_id ? menu.benh_nhan_id.toString() : null,
       patientName: menu.benh_nhan?.ho_ten || null,
@@ -426,8 +498,8 @@ export class MenusService {
       nutritionLimitSetId: menu.gioi_han_dinh_duong_id
         ? menu.gioi_han_dinh_duong_id.toString()
         : null,
-      weekNo: weekNo || null,
-      dayOfWeek: dayOfWeek || null,
+      weekNo: resolvedWeek,
+      dayOfWeek: resolvedDay,
       meals: mealResponses,
       totalDayNutrients,
     };
@@ -450,7 +522,9 @@ export class MenusService {
                     mon_an: {
                       include: {
                         chi_tiet_mon_an: {
-                          include: { nguyen_lieu: true },
+                          include: {
+                            nguyen_lieu: true,
+                          },
                         },
                       },
                     },
@@ -471,9 +545,8 @@ export class MenusService {
     }
 
     const isOwner = currentUser && menu.nguoi_dung_id === currentUser.id;
-    const isPublic = menu.loai_thuc_don === 'CONG_KHAI' || menu.loai_thuc_don === 'MAU_HE_THONG';
 
-    if (!isOwner && !isPublic && !this.isAdmin(currentUser)) {
+    if (!isOwner && !this.isAdmin(currentUser)) {
       throw new HttpException(
         { code: 'MENU_001', message: 'Không tìm thấy thực đơn' },
         HttpStatus.NOT_FOUND,
@@ -484,8 +557,8 @@ export class MenusService {
     const weekMap = new Map<number, Map<number, any>>();
 
     for (const md of menu.chi_tiet_thuc_don || []) {
-      const weekNo = md.so_tuan != null ? md.so_tuan : 0;
-      const dayOfWeek = md.thu_trong_tuan != null ? md.thu_trong_tuan : 0;
+      const weekNo = md.so_tuan ?? 1;
+      const dayOfWeek = md.thu_trong_tuan ?? 1;
 
       if (!weekMap.has(weekNo)) {
         weekMap.set(weekNo, new Map<number, any>());
@@ -505,17 +578,19 @@ export class MenusService {
 
       const dishDTOs = (meal.chi_tiet_bua_an || []).map((mb: any) => {
         const dish = mb.mon_an;
-        const details = (dish?.chi_tiet_mon_an || []).map((cd: any) => ({
-          ingredientId: cd.nguyen_lieu_id.toString(),
-          ingredientName: cd.nguyen_lieu?.ten_nguyen_lieu || '',
-          netWeight: cd.khoi_luong_song_sach != null ? Number(cd.khoi_luong_song_sach) : 0,
-        }));
+        const details = Array.isArray(dish?.chi_tiet_mon_an)
+          ? dish.chi_tiet_mon_an.map((nl: any) => ({
+              ingredientId: Number(nl.nguyen_lieu?.id ?? nl.nguyen_lieu_id),
+              ingredientName: nl.nguyen_lieu?.ten_nguyen_lieu || '',
+              netWeight: nl.khoi_luong_song_sach != null ? Number(nl.khoi_luong_song_sach) : 0,
+            }))
+          : undefined;
 
         return {
-          id: dish ? dish.id.toString() : mb.mon_an_id.toString(),
+          id: Number(dish ? dish.id : mb.mon_an_id) as any,
           name: dish?.ten_mon || '',
           coefficient: mb.he_so_song_chin != null ? Number(mb.he_so_song_chin) : 1.0,
-          details,
+          ...(details ? { details } : {}),
         };
       });
 
@@ -545,7 +620,7 @@ export class MenusService {
         ? menu.gioi_han_dinh_duong_id.toString()
         : null,
       weeks,
-    };
+    } as any;
   }
 
   /**
@@ -589,7 +664,7 @@ export class MenusService {
         data: {
           nguoi_dung_id: currentUser.id,
           ten_bua_an: mealDto.mealName || null,
-          gio_an: mealDto.time,
+          gio_an: mealDto.time || '07:00',
           trang_thai: mealDto.status || 'RIENG_TU',
           la_cong_khai: Boolean(mealDto.isPublic),
         },
@@ -625,7 +700,7 @@ export class MenusService {
   }
 
   /**
-   * Helper: Xử lý gắn món có sẵn hoặc tạo món inline theo recipe
+   * Helper: Xử lý gắn món có sẵn hoặc tạo món inline theo recipe (Khớp 100% MenuServiceImpl.java:589-646)
    */
   private async resolveDishInTransaction(
     paramOrDto: ResolveDishInTransactionParamDto | MenuDishDto | ResolveDishDto,
@@ -645,22 +720,90 @@ export class MenusService {
       currentUser = legacyCurrentUser!;
       tx = legacyTx;
     }
-    // 1. Nếu có dishId và không có chi tiết nguyên liệu -> dùng lại món có sẵn
-    if (dishDto.dishId && (!dishDto.details || dishDto.details.length === 0)) {
-      const dish = await tx.mon_an.findFirst({
+
+    // 1. Tải currentDish từ DB theo dishDto.dishId (kèm chi_tiet_mon_an)
+    if (dishDto.dishId) {
+      const currentDish = await tx.mon_an.findFirst({
         where: { id: BigInt(dishDto.dishId), deleted_at: null },
-        select: { id: true },
+        include: { chi_tiet_mon_an: true },
       });
-      if (!dish) {
+
+      if (!currentDish) {
         throw new HttpException(
           { code: 'DISH_NOT_FOUND', message: 'Không tìm thấy món ăn' },
           HttpStatus.NOT_FOUND,
         );
       }
-      return dish.id;
+
+      // 2. Nếu không có details -> trả về currentDish.id
+      if (!dishDto.details || dishDto.details.length === 0) {
+        return currentDish.id;
+      }
+
+      // 3. Tính newHash (độ chính xác 3 chữ số thập phân .toFixed(3))
+      const recipeComponents = dishDto.details.map((d) => ({
+        ingredientId: d.ingredientId,
+        weightGrams: d.netWeight,
+      }));
+      const newHash = computeRecipeHash(recipeComponents);
+
+      let currentHash = currentDish.recipe_hash;
+      if (!currentHash && currentDish.chi_tiet_mon_an && currentDish.chi_tiet_mon_an.length > 0) {
+        currentHash = computeRecipeHash(
+          currentDish.chi_tiet_mon_an.map((cd: any) => ({
+            ingredientId: Number(cd.nguyen_lieu_id),
+            weightGrams: Number(cd.khoi_luong_song_sach ?? 0),
+          })),
+        );
+      }
+
+      if (currentHash === newHash) {
+        return currentDish.id;
+      }
+
+      // 4. Xác định baseDishId và tên món dishName (giữ nguyên currentDish.ten_mon nếu không truyền name)
+      const baseDishId = currentDish.mon_goc_id ?? currentDish.id;
+      const dishName = dishDto.name?.trim() || currentDish.ten_mon;
+
+      // 5. Tìm món HE_THONG có recipe_hash = newHash
+      const existingMatch = await tx.mon_an.findFirst({
+        where: {
+          recipe_hash: newHash,
+          trang_thai: DishStatus.HE_THONG,
+          deleted_at: null,
+        },
+        select: { id: true },
+      });
+
+      if (existingMatch) {
+        return existingMatch.id;
+      }
+
+      const createdDish = await tx.mon_an.create({
+        data: {
+          ten_mon: dishName,
+          nguoi_dung_id: null,
+          trang_thai: DishStatus.HE_THONG,
+          recipe_hash: newHash,
+          mon_goc_id: baseDishId,
+          ngay_tao: new Date(),
+        },
+      });
+
+      for (const d of dishDto.details) {
+        await tx.chi_tiet_mon_an.create({
+          data: {
+            mon_an_id: createdDish.id,
+            nguyen_lieu_id: BigInt(d.ingredientId),
+            khoi_luong_song_sach: d.netWeight,
+          },
+        });
+      }
+
+      return createdDish.id;
     }
 
-    // 2. Nếu có chi tiết nguyên liệu, tính toán recipe_hash
+    // Trường hợp tạo món inline không truyền dishId nhưng có details
     if (dishDto.details && dishDto.details.length > 0) {
       const recipeComponents = dishDto.details.map((d) => ({
         ingredientId: d.ingredientId,
@@ -668,7 +811,6 @@ export class MenusService {
       }));
       const hash = computeRecipeHash(recipeComponents);
 
-      // Kiểm tra món hệ thống hoặc món của user có cùng recipe_hash
       const existingMatch = await tx.mon_an.findFirst({
         where: {
           recipe_hash: hash,
@@ -686,20 +828,18 @@ export class MenusService {
         return existingMatch.id;
       }
 
-      // Tạo món mới inline
       const dishName = dishDto.name?.trim() || 'Món ăn tùy chỉnh';
       const createdDish = await tx.mon_an.create({
         data: {
           ten_mon: dishName,
-          nguoi_dung_id: currentUser.id,
-          trang_thai: DishStatus.RIENG_TU,
+          nguoi_dung_id: null,
+          trang_thai: DishStatus.HE_THONG,
           recipe_hash: hash,
-          mon_goc_id: dishDto.dishId ? BigInt(dishDto.dishId) : null,
+          mon_goc_id: null,
           ngay_tao: new Date(),
         },
       });
 
-      // Tạo các chi tiết nguyên liệu
       for (const d of dishDto.details) {
         await tx.chi_tiet_mon_an.create({
           data: {
@@ -711,10 +851,6 @@ export class MenusService {
       }
 
       return createdDish.id;
-    }
-
-    if (dishDto.dishId) {
-      return BigInt(dishDto.dishId);
     }
 
     throw new HttpException(
@@ -976,6 +1112,8 @@ export class MenusService {
 
     const totalEnergy = await this.updateMenuEnergyDisplay({ menuId });
     await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.invalidateTag(`menu_${id}`);
+    await this.cacheService.invalidateTag(buildMenuCacheTag(id));
 
     return {
       id: updatedMenu.id.toString(),
@@ -1156,6 +1294,8 @@ export class MenusService {
     });
 
     await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.invalidateTag(`menu_${id}`);
+    await this.cacheService.invalidateTag(buildMenuCacheTag(id));
     return { success: true, message: 'Xóa thực đơn thành công' };
   }
 
@@ -1188,10 +1328,8 @@ export class MenusService {
     }
 
     const isOwner = currentUser && original.nguoi_dung_id === currentUser.id;
-    const isPublic =
-      original.loai_thuc_don === 'CONG_KHAI' || original.loai_thuc_don === 'MAU_HE_THONG';
 
-    if (!isOwner && !isPublic && !this.isAdmin(currentUser)) {
+    if (!isOwner && !this.isAdmin(currentUser)) {
       throw new HttpException(
         { code: 'MENU_001', message: 'Không tìm thấy thực đơn gốc' },
         HttpStatus.NOT_FOUND,

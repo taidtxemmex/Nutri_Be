@@ -11,7 +11,7 @@ import {
   Max,
   ArrayMaxSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateIngredientProposalDto {
@@ -46,7 +46,9 @@ export class CreateIngredientProposalDto {
 
   @ApiPropertyOptional({ example: 100 })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber({}, { message: 'Tỷ lệ ăn được phải là số' })
   @Min(0, { message: 'Tỷ lệ ăn được phải lớn hơn hoặc bằng 0' })
   @Max(100, { message: 'Tỷ lệ ăn được không được vượt quá 100%' })

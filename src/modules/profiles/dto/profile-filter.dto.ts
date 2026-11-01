@@ -1,7 +1,7 @@
 import { IsOptional, IsInt, Min, Max, IsString, MaxLength } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { MAX_LIMIT, DEFAULT_LIMIT } from '../../../config/constants/pagination.constants';
+import { DEFAULT_LIMIT } from '../../../config/constants/pagination.constants';
 
 export class ProfileFilterDto {
   @ApiPropertyOptional({
@@ -18,19 +18,19 @@ export class ProfileFilterDto {
   @ApiPropertyOptional({
     example: 20,
     default: DEFAULT_LIMIT,
-    maximum: MAX_LIMIT,
-    description: 'Số lượng phần tử mỗi trang (tự động ép về tối đa 100)',
+    maximum: 5000,
+    description: 'Số lượng phần tử mỗi trang (tối đa 5000)',
   })
   @IsOptional()
   @Type(() => Number)
   @Transform(({ value }) => {
     const num = Number(value);
     if (isNaN(num) || num < 1) return DEFAULT_LIMIT;
-    return Math.min(MAX_LIMIT, num);
+    return Math.min(5000, num);
   })
   @IsInt()
   @Min(1)
-  @Max(MAX_LIMIT)
+  @Max(5000)
   size?: number = DEFAULT_LIMIT;
 
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm (tên, email, username)' })
@@ -38,4 +38,24 @@ export class ProfileFilterDto {
   @IsString()
   @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
   keyword?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo vai trò (role)' })
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo giới tính (gender)' })
+  @IsOptional()
+  @IsString()
+  gender?: string;
+
+  @ApiPropertyOptional({ description: 'Trường sắp xếp (sortBy)' })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiPropertyOptional({ description: 'Chiều sắp xếp (sortDir)' })
+  @IsOptional()
+  @IsString()
+  sortDir?: string;
 }

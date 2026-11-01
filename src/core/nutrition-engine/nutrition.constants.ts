@@ -212,7 +212,8 @@ export const NUTRIENT_METADATA_MAP: Record<AllIndicatorCode, NutrientMeta> = {
     category: 'PROXIMATE',
     isBase: false,
     isCalculated: true,
-    description: 'Tính theo chuẩn FAO: max(0, 100 - (nước + đạm + béo + tro + xơ))',
+    description:
+      'Tính theo chuẩn Viện Dinh Dưỡng Quốc Gia (NIN): max(0, 100 - (nước + đạm + béo + tro))',
   },
   fiber: {
     code: 'fiber',

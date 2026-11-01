@@ -106,60 +106,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     if (this.i18nService) {
-      const nestDefaultMessages = [
-        'Not Found',
-        'Bad Request',
-        'Unauthorized',
-        'Forbidden',
-        'Conflict',
-        'Internal Server Error',
-        'Too Many Requests',
-      ];
-
-      if (nestDefaultMessages.includes(message) && this.i18nService.hasKey(errorCode)) {
-        message = this.i18nService.translate(errorCode, locale);
-      } else {
-        const hasCatalogKey = this.i18nService.hasKey(message);
-        const translated = this.i18nService.translateTextOrKey(message, locale);
-        if (hasCatalogKey) {
-          message = translated || this.i18nService.translate(message, locale);
-        } else if (translated && translated !== message) {
-          message = translated;
-        } else if (this.i18nService.hasKey(errorCode)) {
-          message = this.i18nService.translate(errorCode, locale);
-        }
-      }
+      message = this.translateErrorMessage(message, errorCode, locale);
 
       // Dịch chi tiết mảng details
       if (Array.isArray(details)) {
-        details = details.map((item) => ({ ...item }));
-        for (const item of details) {
-          if (item.message) {
-            const hasKey = this.i18nService.hasKey(item.message);
-            const translated = this.i18nService.translateTextOrKey(item.message, locale);
-            if (hasKey || (translated && translated !== item.message)) {
-              item.message = translated;
-            } else if (item.code && item.field) {
-              item.message = this.i18nService.translateValidationConstraint({
-                code: item.code,
-                field: item.field,
-                locale,
-              });
-            } else {
-              item.message = translated;
-            }
-          } else if (item.code && item.field) {
-            item.message = this.i18nService.translateValidationConstraint({
-              code: item.code,
-              field: item.field,
-              locale,
-            });
-          }
-        }
+        details = this.translateErrorDetails(details, locale);
       }
     }
 
+    if (response.headersSent) {
+      return;
+    }
+
     response.status(status).json({
+      status,
       message, // Root-level alias for NutriFE frontend compatibility (P0 parity)
       error: {
         code: errorCode,
@@ -171,6 +131,75 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         traceId,
       },
     });
+  }
+
+  private translateErrorMessage(message: string, errorCode: string, locale: string): string {
+    if (!this.i18nService) {
+      return message;
+    }
+
+    const nestDefaultMessages = [
+      'Not Found',
+      'Bad Request',
+      'Unauthorized',
+      'Forbidden',
+      'Conflict',
+      'Internal Server Error',
+      'Too Many Requests',
+    ];
+
+    if (
+      (!message || message === errorCode || nestDefaultMessages.includes(message)) &&
+      this.i18nService.hasKey(errorCode)
+    ) {
+      return this.i18nService.translate(errorCode, locale);
+    }
+
+    const hasCatalogKey = this.i18nService.hasKey(message);
+    const translated = this.i18nService.translateTextOrKey(message, locale);
+    if (hasCatalogKey) {
+      return translated || this.i18nService.translate(message, locale);
+    }
+    if (translated && translated !== message) {
+      return translated;
+    }
+    if (locale !== 'vi' && this.i18nService.hasKey(errorCode)) {
+      return this.i18nService.translate(errorCode, locale);
+    }
+
+    return message;
+  }
+
+  private translateErrorDetails(details: any[], locale: string): any[] {
+    if (!this.i18nService) {
+      return details;
+    }
+
+    const cloned = details.map((item) => ({ ...item }));
+    for (const item of cloned) {
+      if (item.message) {
+        const hasKey = this.i18nService.hasKey(item.message);
+        const translated = this.i18nService.translateTextOrKey(item.message, locale);
+        if (hasKey || (translated && translated !== item.message)) {
+          item.message = translated;
+        } else if (item.code && item.field) {
+          item.message = this.i18nService.translateValidationConstraint({
+            code: item.code,
+            field: item.field,
+            locale,
+          });
+        } else {
+          item.message = translated;
+        }
+      } else if (item.code && item.field) {
+        item.message = this.i18nService.translateValidationConstraint({
+          code: item.code,
+          field: item.field,
+          locale,
+        });
+      }
+    }
+    return cloned;
   }
 
   private mapStatusToErrorCode(status: number): string {

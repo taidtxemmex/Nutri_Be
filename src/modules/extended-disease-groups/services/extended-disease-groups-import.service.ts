@@ -2,7 +2,10 @@ import { Injectable, BadRequestException, Logger, Optional } from '@nestjs/commo
 import * as ExcelJS from 'exceljs';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
-import { CACHE_TAG_EXTENDED_DISEASE_GROUPS } from '../../../config/constants/cache.constants';
+import {
+  CACHE_TAG_EXTENDED_DISEASE_GROUPS,
+  CACHE_TAG_DISEASE_GROUPS,
+} from '../../../config/constants/cache.constants';
 import { ImportResultDto, ImportExtendedDiseaseGroupsParamsDto } from '../dto';
 import { ExcelStreamReader, ErrorRowItem } from '../../../core/excel-engine';
 
@@ -14,6 +17,7 @@ export class ExtendedDiseaseGroupsImportService {
   private static readonly PARENT_SHEET = 'Nhom_benh_cha';
   private static readonly RESULT_HEADER = 'Kết quả import';
   private static readonly MAX_ROWS = 1000;
+  private readonly MAX_ROWS = ExtendedDiseaseGroupsImportService.MAX_ROWS;
   private static readonly MAX_CODE_LENGTH = 20;
   private static readonly MAX_NAME_LENGTH = 255;
   private static readonly EXPECTED_HEADERS = ['Nhóm bệnh cha', 'Mã nhóm mở rộng', 'Tên hiển thị'];
@@ -25,7 +29,7 @@ export class ExtendedDiseaseGroupsImportService {
 
   /**
    * Sinh file mẫu Excel (.xlsx) với danh sách dropdown nhóm bệnh cha động
-   * Tích hợp bộ đệm CacheService 30 phút (0ms) & file tĩnh trên đĩa
+   * Tích hợp bộ đệm CacheService 30 phút (0ms)
    */
   async getTemplate(): Promise<Buffer> {
     const cacheKey = 'extended-disease-groups:template';
@@ -82,7 +86,7 @@ export class ExtendedDiseaseGroupsImportService {
     // 3. Dropdown Validation for Sheet 1
     if (parents.length > 0) {
       const formula = `'${ExtendedDiseaseGroupsImportService.PARENT_SHEET}'!$A$2:$A$${parents.length + 1}`;
-      for (let rowIdx = 2; rowIdx <= 100; rowIdx++) {
+      for (let rowIdx = 2; rowIdx <= this.MAX_ROWS + 1; rowIdx++) {
         dataSheet.getCell(`A${rowIdx}`).dataValidation = {
           type: 'list',
           allowBlank: true,
@@ -103,14 +107,12 @@ export class ExtendedDiseaseGroupsImportService {
       buffer &&
       buffer.length <= 5 * 1024 * 1024
     ) {
-      await this.cacheService.set(
-        cacheKey,
-        buffer.toString('base64'),
-        1800,
+      await this.cacheService.set(cacheKey, buffer.toString('base64'), 1800, [
         CACHE_TAG_EXTENDED_DISEASE_GROUPS,
-      );
+        CACHE_TAG_DISEASE_GROUPS,
+      ]);
       this.logger.debug(
-        '💾 Đã lưu template nhóm bệnh mở rộng vào CacheService (tag=extended_disease_groups)',
+        '💾 Đã lưu template nhóm bệnh mở rộng vào CacheService (tags=extended_disease_groups,disease_groups)',
       );
     }
 
@@ -208,8 +210,12 @@ export class ExtendedDiseaseGroupsImportService {
 
           if (!isTargetSheet) continue;
 
-          const rawParent = (row.getCell(1).value?.toString() || '').trim();
-          const rawCode = (row.getCell(2).value?.toString() || '').trim();
+          const rawParent = (
+            ExcelStreamReader.readCellString({ cell: row.getCell(1), sanitize: true }) || ''
+          ).trim();
+          const rawCode = (
+            ExcelStreamReader.readCellString({ cell: row.getCell(2), sanitize: true }) || ''
+          ).trim();
           const rawName =
             ExcelStreamReader.readCellString({ cell: row.getCell(3), sanitize: true }) || '';
 
@@ -234,9 +240,10 @@ export class ExtendedDiseaseGroupsImportService {
             const lowerParent = rawParent.toLowerCase();
             matchedParent = parentsByLabel.get(lowerParent) || parentsByCode.get(lowerParent);
             if (!matchedParent) {
-              // Thử tìm theo prefix "A -"
+              // Thử tìm theo prefix "A - "
+              const codePart = lowerParent.split('-')[0].trim();
               for (const [, val] of parentsByLabel.entries()) {
-                if (lowerParent.startsWith(val.code.toLowerCase())) {
+                if (codePart === val.code.toLowerCase()) {
                   matchedParent = val;
                   break;
                 }

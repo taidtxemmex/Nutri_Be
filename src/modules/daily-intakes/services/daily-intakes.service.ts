@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { NutritionCalculatorService } from '../../../core/nutrition-engine';
@@ -17,16 +17,17 @@ import {
   GetRdaReportParamDto,
 } from '../dto';
 import { RdaComparisonEngine, RdaComparisonResult } from '../engines/rda-comparison.engine';
+import { IntakeCalculationEngine } from '../engines/intake-calculation.engine';
 import { DemographicProfile } from '../engines/rda-reference-data';
 import { isAdminRole } from '../../../config/enums/role.enum';
 import {
   CACHE_TAG_PATIENTS,
+  CACHE_TAG_DAILY_INTAKES,
   CACHE_TTL_PERPETUAL,
   buildPatientCacheTag,
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import { PatientsService } from '../../patients/services/patients.service';
-import { Optional } from '@nestjs/common';
 
 export interface CalculateAgeParamDto {
   dateOfBirth?: Date | null;
@@ -36,7 +37,7 @@ export interface CalculateAgeParamDto {
 @Injectable()
 export class DailyIntakesService {
   private readonly logger = new Logger(DailyIntakesService.name);
-  private readonly CACHE_TAG = 'daily-intakes';
+  private readonly CACHE_TAG = CACHE_TAG_DAILY_INTAKES;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -104,21 +105,21 @@ export class DailyIntakesService {
 
         let itemNutrients: Record<string, number> = {};
         if (rawIngredient) {
-          const ingCalc = NutritionEngine.calculateIngredientNutrients({
+          const ingCalc = IntakeCalculationEngine.calculateIngredient({
             ingredient: rawIngredient,
-            weightGrams: weightVal,
+            rawWeightInput: weightVal,
             options: {
-              isNetWeight: false, // Áp dụng tỷ lệ ăn được (edible) chính xác cho cân thô
+              isNetWeight: true, // khoi_luong_song_sach trong DB đã là khối lượng sống sạch (Net Weight / rawClean)
               preserveDecimals: true,
             },
           });
 
           NutritionEngine.accumulateNutrients({
             target: mealAccumulated,
-            source: ingCalc.nutrients,
+            source: ingCalc.decimalNutrients,
           });
           itemNutrients = NutritionEngine.roundDecimalMap({
-            map: ingCalc.nutrients,
+            map: ingCalc.decimalNutrients,
             decimalPlaces: 2,
           });
         }
@@ -271,6 +272,7 @@ export class DailyIntakesService {
     );
 
     await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.invalidateTag('daily-intakes');
     return this.getById({ id: created.id, currentUser });
   }
 
@@ -346,23 +348,21 @@ export class DailyIntakesService {
     ]);
 
     const items: DailyIntakeListDto[] = rows.map((r) => {
-      // Ước lượng nhanh tổng năng lượng cho list endpoint (tính đúng edible)
+      // Ước lượng nhanh tổng năng lượng cho list endpoint (khoi_luong_song_sach đã là Net Weight)
       let totalEnergy = 0;
       for (const meal of r.khau_phan_24h_bua_an || []) {
         for (const item of meal.khau_phan_24h_nguyen_lieu || []) {
-          const w = item.khoi_luong_song_sach || 0;
+          const weight = Number(item.khoi_luong_song_sach) || 0;
           if (item.nguyen_lieu) {
-            const edibleRatio =
-              item.nguyen_lieu.edible != null ? Number(item.nguyen_lieu.edible) / 100 : 1;
-            const netWeight = w * Math.max(0, Math.min(1, edibleRatio));
-            const p = item.nguyen_lieu.protein || 0;
-            const f = item.nguyen_lieu.fat || 0;
-            const water = item.nguyen_lieu.water || 0;
-            const fiber = item.nguyen_lieu.fiber || 0;
-            const ash = item.nguyen_lieu.ash || 0;
-            const carb = Math.max(0, 100 - water - p - f - fiber - ash);
-            const energyPer100g = 4 * p + 9 * f + 4 * carb;
-            totalEnergy += (netWeight * energyPer100g) / 100;
+            const factor = weight / 100;
+            const p = Number(item.nguyen_lieu.protein) || 0;
+            const f = Number(item.nguyen_lieu.fat) || 0;
+            const water = Number(item.nguyen_lieu.water) || 0;
+            const ash = Number(item.nguyen_lieu.ash) || 0;
+            const allFourZero = water === 0 && p === 0 && f === 0 && ash === 0;
+            const carb = allFourZero ? 0 : Math.max(0, 100 - (water + p + f + ash));
+            const energyPer100g = allFourZero ? 0 : 4 * p + 9 * f + 4 * carb;
+            totalEnergy += factor * energyPer100g;
           }
         }
       }
@@ -450,6 +450,32 @@ export class DailyIntakesService {
       );
     }
 
+    const targetPatientId =
+      dto.patientId !== undefined ? BigInt(dto.patientId) : intake.benh_nhan_id;
+    const targetDate = dto.intakeDate
+      ? new Date(`${dto.intakeDate}T00:00:00.000Z`)
+      : intake.ngay_an;
+
+    if (dto.intakeDate || dto.patientId !== undefined) {
+      const duplicate = await this.prisma.khau_phan_24h.findFirst({
+        where: {
+          benh_nhan_id: targetPatientId,
+          ngay_an: targetDate,
+          id: { not: intakeId },
+        },
+        select: { id: true },
+      });
+      if (duplicate) {
+        throw new HttpException(
+          {
+            code: 'DAILY_INTAKE_DUPLICATE',
+            message: 'Bệnh nhân đã có khẩu phần 24h trong ngày này',
+          },
+          HttpStatus.CONFLICT,
+        );
+      }
+    }
+
     await this.prisma.$transaction(
       async (tx) => {
         await tx.khau_phan_24h.update({
@@ -457,6 +483,8 @@ export class DailyIntakesService {
           data: {
             ghi_chu: dto.note !== undefined ? dto.note : intake.ghi_chu,
             kieu_nhap: dto.inputType !== undefined ? dto.inputType : intake.kieu_nhap,
+            ...(dto.intakeDate ? { ngay_an: new Date(`${dto.intakeDate}T00:00:00.000Z`) } : {}),
+            ...(dto.patientId !== undefined ? { benh_nhan_id: BigInt(dto.patientId) } : {}),
           },
         });
 
@@ -504,6 +532,7 @@ export class DailyIntakesService {
     );
 
     await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.invalidateTag('daily-intakes');
     return this.getById({ id: intakeId, currentUser });
   }
 
@@ -556,6 +585,7 @@ export class DailyIntakesService {
     });
 
     await this.cacheService.invalidateTag(this.CACHE_TAG);
+    await this.cacheService.invalidateTag('daily-intakes');
     return { success: true, message: 'Xóa khẩu phần 24h thành công' };
   }
 

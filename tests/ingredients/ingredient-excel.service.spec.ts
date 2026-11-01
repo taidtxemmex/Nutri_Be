@@ -78,8 +78,17 @@ describe('IngredientExcelService', () => {
       expect(sheet).toBeDefined();
       expect(sheet!.rowCount).toBeGreaterThanOrEqual(2);
 
+      const headerRow = sheet!.getRow(1);
+      expect(headerRow.getCell(1).value).toBe('Tên nguyên liệu');
+      expect(headerRow.getCell(2).value).toBe('Nhóm');
+      expect(headerRow.getCell(3).value).toBe('Loại protein');
+      expect(headerRow.getCell(4).value).toBe('Water (g)');
+
       const dataRow = sheet!.getRow(2);
-      expect(dataRow.getCell(2).value).toBe('Gạo tẻ');
+      expect(dataRow.getCell(1).value).toBe('Gạo tẻ');
+      expect(dataRow.getCell(2).value).toBe('Ngũ cốc và sản phẩm chế biến');
+      expect(dataRow.getCell(3).value).toBe('Thực vật');
+      expect(dataRow.getCell(4).value).toBe(13.8);
     });
   });
 

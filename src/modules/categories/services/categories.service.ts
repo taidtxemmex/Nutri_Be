@@ -44,7 +44,11 @@ export class CategoriesService {
    * Danh sách danh mục phân trang kèm tìm kiếm (Anti-OOM: max 100 items, Lean Projection)
    */
   async findAll({ query }: FindCategoriesParamsDto = {}): Promise<PaginatedCategoriesResult> {
-    const { page, limit, skip } = normalizePagination(query);
+    const { page, limit, skip } = normalizePagination({
+      query,
+      defaultLimit: 1000,
+      maxLimit: 1000,
+    });
 
     const cacheKey = this.cacheService?.generateKey({
       prefix: 'categories:list',
@@ -73,7 +77,7 @@ export class CategoriesService {
     const orderBy: any = {};
     const sortField =
       query?.sortBy === 'categoryName' || query?.sortBy === 'name' ? 'ten_danh_muc' : 'id';
-    orderBy[sortField] = query?.sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+    orderBy[sortField] = query?.sortOrder?.toLowerCase() === 'desc' ? 'desc' : 'asc';
 
     const [total, records] = await Promise.all([
       this.prisma.danh_muc.count({ where }),
@@ -328,7 +332,9 @@ export class CategoriesService {
         id: true,
         _count: {
           select: {
-            nguyen_lieu_nguyen_lieu_danh_mucTodanh_muc: true,
+            nguyen_lieu_nguyen_lieu_danh_mucTodanh_muc: {
+              where: { deleted_at: null },
+            },
             de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_danh_mucTodanh_muc: true,
           },
         },
@@ -342,7 +348,11 @@ export class CategoriesService {
       });
     }
 
-    const ingredientCount = existing._count?.nguyen_lieu_nguyen_lieu_danh_mucTodanh_muc ?? 0;
+    const ingredientCount = this.prisma.nguyen_lieu?.count
+      ? await this.prisma.nguyen_lieu.count({
+          where: { danh_muc: Number(id), deleted_at: null },
+        })
+      : (existing._count?.nguyen_lieu_nguyen_lieu_danh_mucTodanh_muc ?? 0);
     const proposalCount =
       existing._count?.de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_danh_mucTodanh_muc ?? 0;
 
@@ -350,6 +360,13 @@ export class CategoriesService {
       throw new ConflictException({
         code: 'CAT_002',
         message: 'error.category.in_use',
+      });
+    }
+
+    if (this.prisma.nguyen_lieu?.updateMany) {
+      await this.prisma.nguyen_lieu.updateMany({
+        where: { danh_muc: Number(id), deleted_at: { not: null } },
+        data: { danh_muc: null },
       });
     }
 

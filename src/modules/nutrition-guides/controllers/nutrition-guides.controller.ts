@@ -54,11 +54,12 @@ export class NutritionGuidesController {
   }
 
   @Post()
+  @HttpCode(HttpStatus.OK)
   @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
   @ApiOperation({ summary: 'Tạo bài viết hướng dẫn dinh dưỡng lâm sàng mới' })
   @ApiStandardResponse({
     type: NutritionGuideResponseDto,
-    status: HttpStatus.CREATED,
+    status: HttpStatus.OK,
     description: 'Tạo hướng dẫn dinh dưỡng thành công',
   })
   async create(

@@ -123,14 +123,16 @@ export class LocalStorageService {
     const detectedMime =
       (file as any).detectedMimeType || file.mimetype || 'application/octet-stream';
     const fileSize = file.buffer.length;
+    const resolvedFileName = file.originalname || generatedFileName;
 
     return {
       objectKey,
-      originalFileName: file.originalname || generatedFileName,
+      fileName: resolvedFileName,
+      originalFileName: resolvedFileName,
       mimeType: detectedMime,
       fileSize,
       url: `/uploads/${objectKey}`,
-    };
+    } as FileUploadResponseDto;
   }
 
   /**
@@ -164,11 +166,26 @@ export class LocalStorageService {
     }
 
     const buffer = fs.readFileSync(fullPath);
+    const ext = path.extname(fullPath).toLowerCase();
+    const mimeMap: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.webp': 'image/webp',
+      '.gif': 'image/gif',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    };
+    const mimeType = mimeMap[ext] || 'application/octet-stream';
 
     return {
       buffer,
       filePath: fullPath,
       size: stat.size,
+      mimeType,
     };
   }
 

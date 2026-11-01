@@ -18,9 +18,32 @@ export class UpdateMealDto {
   @IsOptional()
   mealName?: string;
 
+  @ApiPropertyOptional({ description: 'Alias tên bữa ăn (từ MealTable.jsx)' })
+  @IsString({ message: 'Tên bữa ăn phải là chuỗi' })
+  @MaxLength(100, { message: 'Tên bữa ăn không được vượt quá 100 ký tự' })
+  @IsOptional()
+  name?: string;
+
+  @ApiPropertyOptional({ description: 'Giờ bắt đầu (từ MealTable.jsx)', example: '07:00' })
+  @IsString()
+  @MaxLength(20)
+  @IsOptional()
+  startTime?: string;
+
+  @ApiPropertyOptional({ description: 'Giờ kết thúc (từ MealTable.jsx)', example: '08:00' })
+  @IsString()
+  @MaxLength(20)
+  @IsOptional()
+  endTime?: string;
+
+  @ApiPropertyOptional({ description: 'Mô tả bữa ăn (từ MealTable.jsx)' })
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @ApiPropertyOptional({ description: 'Khung giờ ăn (vd: 12:00 hoặc Trưa)', example: '12:00' })
   @IsString({ message: 'Khung giờ ăn phải là chuỗi' })
-  @MaxLength(20, { message: 'Khung giờ ăn không được vượt quá 20 ký tự' })
+  @MaxLength(50, { message: 'Khung giờ ăn không được vượt quá 50 ký tự' })
   @IsOptional()
   time?: string;
 

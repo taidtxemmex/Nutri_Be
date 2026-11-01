@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { JwtPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
+import { TokenBlacklistService } from '../../../security/token/token-blacklist.service';
 import {
   AUTH_ERROR_UNAUTHORIZED,
   AUTH_ERROR_INACTIVE_ACCOUNT,
@@ -23,6 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly configService: ConfigService,
     @Optional() private readonly prisma?: PrismaService,
     @Optional() private readonly cacheService?: CacheService,
+    @Optional() private readonly tokenBlacklistService?: TokenBlacklistService,
   ) {
     const jwtSecret = configService.get<string>('JWT_SECRET') || process.env.JWT_SECRET;
 
@@ -36,11 +38,51 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
       secretOrKey: jwtSecret || 'dev_temporary_jwt_secret_key_minimum_32_chars_12345',
+      passReqToCallback: true,
     });
   }
 
-  async validate(payload: JwtPayload): Promise<AuthenticatedUser> {
-    const userId = payload.sub || payload.id;
+  async validate(reqOrPayload: any, maybePayload?: any): Promise<AuthenticatedUser> {
+    let req: any;
+    let payload: JwtPayload;
+
+    if (maybePayload !== undefined) {
+      req = reqOrPayload;
+      payload = maybePayload;
+    } else if (reqOrPayload && (reqOrPayload.headers || reqOrPayload.get)) {
+      req = reqOrPayload;
+      payload = reqOrPayload.user;
+    } else {
+      payload = reqOrPayload;
+      req = undefined;
+    }
+
+    // 1. Kiểm tra Token Blacklist khi đăng xuất (P1-3)
+    let token: string | undefined;
+    if (req) {
+      try {
+        token = ExtractJwt.fromAuthHeaderAsBearerToken()(req);
+      } catch {
+        const authHeader = req.headers?.authorization;
+        if (authHeader && typeof authHeader === 'string') {
+          token = authHeader.replace(/^Bearer\s+/i, '').trim();
+        }
+      }
+    } else if (payload && (payload as any).__rawToken) {
+      token = (payload as any).__rawToken;
+    }
+
+    if (token && this.tokenBlacklistService) {
+      const isBlacklisted = await this.tokenBlacklistService.isTokenBlacklisted(token);
+      if (isBlacklisted) {
+        throw new UnauthorizedException({
+          code: AUTH_ERROR_UNAUTHORIZED,
+          message: 'Token đã bị thu hồi / đăng xuất',
+        });
+      }
+    }
+
+    const userId = payload?.sub || (payload as any)?.id;
 
     if (!payload || !userId) {
       throw new UnauthorizedException({
@@ -57,6 +99,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         ten_dang_nhap: string;
         vai_tro: string;
         active: boolean | null;
+        deleted_at?: Date | null;
       } | null = null;
 
       if (this.cacheService) {
@@ -68,6 +111,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             ten_dang_nhap: cachedDetail.ten_dang_nhap || cachedDetail.username || '',
             vai_tro: cachedDetail.vai_tro || cachedDetail.role || 'USER',
             active: cachedDetail.active !== undefined ? cachedDetail.active : true,
+            deleted_at: cachedDetail.deleted_at || null,
           };
         } else {
           // Chưa có trong detail cache -> nạp và lưu auth cache vĩnh viễn đến khi có mutation
@@ -77,7 +121,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             async () => {
               return this.prisma!.nguoi_dung.findUnique({
                 where: { id: userId },
-                select: { id: true, ten_dang_nhap: true, vai_tro: true, active: true },
+                select: {
+                  id: true,
+                  ten_dang_nhap: true,
+                  vai_tro: true,
+                  active: true,
+                  deleted_at: true,
+                },
               });
             },
             [CACHE_TAG_USERS, buildUserCacheTag(userId)],
@@ -86,7 +136,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       } else {
         user = await this.prisma.nguoi_dung.findUnique({
           where: { id: userId },
-          select: { id: true, ten_dang_nhap: true, vai_tro: true, active: true },
+          select: {
+            id: true,
+            ten_dang_nhap: true,
+            vai_tro: true,
+            active: true,
+            deleted_at: true,
+          },
         });
       }
 
@@ -97,7 +153,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         });
       }
 
-      if (user.active === false) {
+      if (user.active === false || user.deleted_at) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_INACTIVE_ACCOUNT,
           message: 'Tài khoản của bạn đã bị khóa hoặc chưa kích hoạt.',

@@ -17,14 +17,28 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     ]);
 
     if (isPublic) {
+      const request = context.switchToHttp().getRequest();
+      const authHeader = request?.headers?.authorization;
+      if (authHeader && typeof authHeader === 'string' && /^Bearer\s+/i.test(authHeader)) {
+        return super.canActivate(context);
+      }
       return true;
     }
 
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, _info: any) {
+  handleRequest(err: any, user: any, _info: any, context?: ExecutionContext) {
     if (err || !user) {
+      if (context) {
+        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+          context.getHandler(),
+          context.getClass(),
+        ]);
+        if (isPublic) {
+          return undefined;
+        }
+      }
       throw (
         err ||
         new UnauthorizedException({

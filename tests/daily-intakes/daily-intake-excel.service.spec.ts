@@ -2,6 +2,7 @@ import * as ExcelJS from 'exceljs';
 import { PassThrough } from 'stream';
 import { DailyIntakeExcelService } from '../../src/modules/daily-intakes/services/daily-intake-excel.service';
 import { DailyIntakeClinicalReportType, Gender } from '../../src/config/enums/domain.enum';
+import { UserRole } from '../../src/config/enums/role.enum';
 
 describe('DailyIntakeExcelService', () => {
   let service: DailyIntakeExcelService;
@@ -189,6 +190,7 @@ describe('DailyIntakeExcelService', () => {
         options: {
           patientId: 10,
           userId: 'doctor-001',
+          userRole: UserRole.USERPRO,
           date: '2026-10-26',
         },
       });
@@ -197,6 +199,25 @@ describe('DailyIntakeExcelService', () => {
       expect(result.importedCount).toBe(3);
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       expect(mockCacheService.invalidateTag).toHaveBeenCalledWith('daily_intake:10');
+    });
+
+    it('ném ForbiddenException nếu người dùng không có vai trò SUPERADMIN, ADMIN, USERPRO', async () => {
+      const wb = new ExcelJS.Workbook();
+      const sheet = wb.addWorksheet('Khau_phan_24h');
+      sheet.addRow(['Bữa ăn', 'Giờ ăn', 'Tên nguyên liệu', 'Khối lượng sống sạch (g)', 'Ghi chú']);
+      sheet.addRow(['Bữa sáng', '07:00', 'Bánh phở', 150, 'Phở sáng']);
+      const fileBuffer = Buffer.from(await wb.xlsx.writeBuffer());
+
+      await expect(
+        service.importDailyIntakeExcel({
+          fileBuffer,
+          options: {
+            patientId: 10,
+            userId: 'user-001',
+            userRole: UserRole.USER,
+          },
+        }),
+      ).rejects.toThrow();
     });
 
     it('phát hiện lỗi Zod & nghiệp vụ, trả về danh sách lỗi chi tiết kèm file Excel đánh dấu dòng lỗi', async () => {
@@ -215,6 +236,7 @@ describe('DailyIntakeExcelService', () => {
         options: {
           patientId: 10,
           userId: 'doctor-001',
+          userRole: UserRole.USERPRO,
         },
       });
 

@@ -22,12 +22,20 @@ export const FILE_SECURITY_CONFIG = {
     WEBP_RIFF: [0x52, 0x49, 0x46, 0x46], // RIFF
     WEBP_TYPE: [0x57, 0x45, 0x42, 0x50], // WEBP at offset 8
     GIF: [0x47, 0x49, 0x46, 0x38], // GIF8
+    ZIP_OOXML: [0x50, 0x4b, 0x03, 0x04], // PK.. (.docx, .xlsx)
+    OLE2: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1], // OLE2 (.doc, .xls)
   },
 
   // Danh mục định dạng cho phép
   ALLOWED_IMAGE_MIME_TYPES: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const,
 
-  ALLOWED_DOCUMENT_MIME_TYPES: ['application/pdf'] as const,
+  ALLOWED_DOCUMENT_MIME_TYPES: [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ] as const,
 
   ALLOWED_EXTENSIONS: {
     'image/jpeg': ['.jpg', '.jpeg'],
@@ -35,6 +43,10 @@ export const FILE_SECURITY_CONFIG = {
     'image/webp': ['.webp'],
     'image/gif': ['.gif'],
     'application/pdf': ['.pdf'],
+    'application/msword': ['.doc'],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+    'application/vnd.ms-excel': ['.xls'],
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
   } as Record<string, string[]>,
 
   // Token HMAC hết hạn mặc định (giây)

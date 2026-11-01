@@ -136,10 +136,12 @@ export class UsersService {
 
     if (query.search) {
       const keyword = query.search.trim();
+      // Hỗ trợ tìm kiếm theo cả số điện thoại (so_dien_thoai: { contains: keyword } / phone)
       where.OR = [
         { ten_dang_nhap: { contains: keyword } },
         { ho_so_ca_nhan: { ho_ten: { contains: keyword } } },
         { ho_so_ca_nhan: { email: { contains: keyword } } },
+        { ho_so_ca_nhan: { phone: { contains: keyword } } },
       ];
     }
 
@@ -202,38 +204,89 @@ export class UsersService {
     return result;
   }
 
+  private isNonEmptyString(val: unknown): boolean {
+    return typeof val === 'string' && val.trim().length > 0;
+  }
+
+  /**
+   * Kiểm tra hồ sơ đã hoàn thiện đủ 7 trường bắt buộc theo chuẩn Java UserServiceImpl.isProfileComplete
+   */
+  private isProfileComplete(profile?: any, proposer?: any): boolean {
+    if (!profile || !proposer) return false;
+    const hasHoTen = this.isNonEmptyString(profile.ho_ten ?? profile.fullName);
+    const hasNgaySinh = profile.ngay_sinh != null && profile.ngay_sinh !== '';
+    const hasGioiTinh = this.isNonEmptyString(profile.gioi_tinh ?? profile.gender);
+    const hasPhone = this.isNonEmptyString(
+      profile.phone ?? profile.so_dien_thoai ?? profile.phoneNumber,
+    );
+    const hasEmail = this.isNonEmptyString(profile.email);
+    const hasUnit = this.isNonEmptyString(
+      proposer.don_vi_cong_tac ?? proposer.unit ?? proposer.workUnit,
+    );
+    const hasPosition = this.isNonEmptyString(
+      proposer.vi_tri_cong_tac ?? proposer.chuc_vu ?? proposer.position,
+    );
+
+    return hasHoTen && hasNgaySinh && hasGioiTinh && hasPhone && hasEmail && hasUnit && hasPosition;
+  }
+
+  /**
+   * Tra cứu người dùng theo id hoặc keycloak_user_id (hỗ trợ tài khoản từ Java cũ có id != keycloak_user_id)
+   */
+  private async findUserByIdOrKeycloakId<T = any>(
+    targetId: string,
+    select: Record<string, any>,
+    client: any = this.prisma,
+  ): Promise<T | null> {
+    if (typeof client.nguoi_dung?.findFirst === 'function') {
+      const found = await client.nguoi_dung.findFirst({
+        where: {
+          OR: [{ id: targetId }, { keycloak_user_id: targetId }],
+        },
+        select,
+      });
+      if (found) {
+        return found as T;
+      }
+    }
+    if (typeof client.nguoi_dung?.findUnique === 'function') {
+      return (await client.nguoi_dung.findUnique({
+        where: { id: targetId },
+        select,
+      })) as T | null;
+    }
+    return null;
+  }
+
   /**
    * Lấy chi tiết tài khoản theo ID - Tích hợp Shared Entity Cache (Identity Map) vĩnh viễn
    */
   async findById({ id }: FindUserByIdParamsDto): Promise<UserDetailResult> {
     const fetchUser = async () => {
-      const user = await this.prisma.nguoi_dung.findUnique({
-        where: { id },
-        select: {
-          id: true,
-          ten_dang_nhap: true,
-          vai_tro: true,
-          active: true,
-          keycloak_user_id: true,
-          created_at: true,
-          ho_so_ca_nhan: {
-            select: {
-              ho_ten: true,
-              email: true,
-              phone: true,
-              dia_chi: true,
-              gioi_tinh: true,
-              ngay_sinh: true,
-            },
+      const user = await this.findUserByIdOrKeycloakId<UserDetailResult>(id, {
+        id: true,
+        ten_dang_nhap: true,
+        vai_tro: true,
+        active: true,
+        keycloak_user_id: true,
+        created_at: true,
+        ho_so_ca_nhan: {
+          select: {
+            ho_ten: true,
+            email: true,
+            phone: true,
+            dia_chi: true,
+            gioi_tinh: true,
+            ngay_sinh: true,
           },
-          nguoi_de_xuat: {
-            select: {
-              trinh_do_hoc_van: true,
-              nghe_nghiep: true,
-              don_vi_cong_tac: true,
-              vi_tri_cong_tac: true,
-              linh_vuc_cong_tac: true,
-            },
+        },
+        nguoi_de_xuat: {
+          select: {
+            trinh_do_hoc_van: true,
+            nghe_nghiep: true,
+            don_vi_cong_tac: true,
+            vi_tri_cong_tac: true,
+            linh_vuc_cong_tac: true,
           },
         },
       });
@@ -299,16 +352,25 @@ export class UsersService {
     targetUserId,
     currentUser,
   }: GetUserInfoParamsDto): Promise<UserInfoViewResponse> {
+    const normalizedTargetForIdor =
+      targetUserId &&
+      (currentUser as any)?.keycloakUserId &&
+      targetUserId === (currentUser as any).keycloakUserId
+        ? currentUser.id
+        : targetUserId;
+
     // 1. Kiểm tra IDOR Defense
     this.idorDefenseService.assertUserOwnershipOrAdmin({
       currentUserId: currentUser.id,
       currentUserRole: currentUser.role,
-      targetUserId,
+      targetUserId: normalizedTargetForIdor,
     });
+
+    const lookupId = targetUserId || currentUser.id;
 
     const cacheKey = this.cacheService?.generateKey({
       prefix: 'users:info',
-      params: { targetUserId },
+      params: { targetUserId: lookupId },
     });
     if (this.cacheService && cacheKey) {
       const cached = await this.cacheService.get<UserInfoViewResponse>(cacheKey);
@@ -317,33 +379,30 @@ export class UsersService {
       }
     }
 
-    // 2. Explicit select dữ liệu từ database (Anti-Overfetching)
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id: targetUserId },
-      select: {
-        id: true,
-        ten_dang_nhap: true,
-        vai_tro: true,
-        active: true,
-        created_at: true,
-        ho_so_ca_nhan: {
-          select: {
-            ho_ten: true,
-            email: true,
-            phone: true,
-            dia_chi: true,
-            gioi_tinh: true,
-            ngay_sinh: true,
-          },
+    // 2. Explicit select dữ liệu từ database theo id hoặc keycloak_user_id (Anti-Overfetching)
+    const user = await this.findUserByIdOrKeycloakId(lookupId, {
+      id: true,
+      ten_dang_nhap: true,
+      vai_tro: true,
+      active: true,
+      created_at: true,
+      ho_so_ca_nhan: {
+        select: {
+          ho_ten: true,
+          email: true,
+          phone: true,
+          dia_chi: true,
+          gioi_tinh: true,
+          ngay_sinh: true,
         },
-        nguoi_de_xuat: {
-          select: {
-            trinh_do_hoc_van: true,
-            nghe_nghiep: true,
-            don_vi_cong_tac: true,
-            vi_tri_cong_tac: true,
-            linh_vuc_cong_tac: true,
-          },
+      },
+      nguoi_de_xuat: {
+        select: {
+          trinh_do_hoc_van: true,
+          nghe_nghiep: true,
+          don_vi_cong_tac: true,
+          vi_tri_cong_tac: true,
+          linh_vuc_cong_tac: true,
         },
       },
     });
@@ -385,7 +444,7 @@ export class UsersService {
         cacheKey,
         result,
         CACHE_TTL_DETAIL_SECONDS,
-        buildUserCacheTag(targetUserId),
+        buildUserCacheTag(user.id),
       );
     }
 
@@ -399,32 +458,58 @@ export class UsersService {
     dto,
     currentUser,
   }: UpdateUserInfoParamsDto): Promise<{ success: boolean; message: string }> {
-    const targetId = dto.userId || dto.keycloakUserId || currentUser.id;
+    const rawTargetId = dto.userId || dto.keycloakUserId || currentUser.id;
+    const normalizedTargetForIdor =
+      rawTargetId &&
+      (currentUser as any)?.keycloakUserId &&
+      rawTargetId === (currentUser as any).keycloakUserId
+        ? currentUser.id
+        : rawTargetId;
 
     // Kiểm tra IDOR Defense
     this.idorDefenseService.assertUserOwnershipOrAdmin({
       currentUserId: currentUser.id,
       currentUserRole: currentUser.role,
-      targetUserId: targetId,
+      targetUserId: normalizedTargetForIdor,
     });
 
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id: targetId },
-      select: { id: true },
+    const user = await this.findUserByIdOrKeycloakId(rawTargetId, {
+      id: true,
+      ho_so_ca_nhan: {
+        select: {
+          ho_ten: true,
+          email: true,
+          phone: true,
+          dia_chi: true,
+          gioi_tinh: true,
+          ngay_sinh: true,
+        },
+      },
+      nguoi_de_xuat: {
+        select: {
+          trinh_do_hoc_van: true,
+          nghe_nghiep: true,
+          don_vi_cong_tac: true,
+          vi_tri_cong_tac: true,
+          linh_vuc_cong_tac: true,
+        },
+      },
     });
     if (!user) {
       throw new NotFoundException('Người dùng không tồn tại.');
     }
 
+    const actualUserId = user.id;
     const dobValue = dto.dob || dto.birthDate;
     const dobDate = dobValue ? new Date(dobValue) : undefined;
+    const unitValue = dto.unit ?? (dto as any).workUnit;
 
     await this.prisma.$transaction(async (tx) => {
       // 1. Cập nhật hồ sơ cá nhân
-      await tx.ho_so_ca_nhan.upsert({
-        where: { nguoi_dung_id: targetId },
+      const upsertedProfile = await tx.ho_so_ca_nhan.upsert({
+        where: { nguoi_dung_id: actualUserId },
         create: {
-          nguoi_dung_id: targetId,
+          nguoi_dung_id: actualUserId,
           ho_ten: dto.fullName,
           email: dto.email,
           phone: dto.phone,
@@ -443,30 +528,61 @@ export class UsersService {
       });
 
       // 2. Cập nhật thông tin chuyên môn nếu có
+      let upsertedProposer: any = null;
       if (
         dto.education !== undefined ||
         dto.major !== undefined ||
-        dto.unit !== undefined ||
+        unitValue !== undefined ||
         dto.position !== undefined ||
         dto.field !== undefined
       ) {
-        await tx.nguoi_de_xuat.upsert({
-          where: { nguoi_dung_id: targetId },
+        upsertedProposer = await tx.nguoi_de_xuat.upsert({
+          where: { nguoi_dung_id: actualUserId },
           create: {
-            nguoi_dung_id: targetId,
+            nguoi_dung_id: actualUserId,
             trinh_do_hoc_van: dto.education,
             nghe_nghiep: dto.major,
-            don_vi_cong_tac: dto.unit,
+            don_vi_cong_tac: unitValue,
             vi_tri_cong_tac: dto.position,
             linh_vuc_cong_tac: dto.field,
           },
           update: {
             ...(dto.education !== undefined && { trinh_do_hoc_van: dto.education }),
             ...(dto.major !== undefined && { nghe_nghiep: dto.major }),
-            ...(dto.unit !== undefined && { don_vi_cong_tac: dto.unit }),
+            ...(unitValue !== undefined && { don_vi_cong_tac: unitValue }),
             ...(dto.position !== undefined && { vi_tri_cong_tac: dto.position }),
             ...(dto.field !== undefined && { linh_vuc_cong_tac: dto.field }),
           },
+        });
+      }
+
+      // 3. Kiểm tra 7 trường bắt buộc và cập nhật nguoi_dung.profile_completed ngay trong transaction
+      const mergedProfile = {
+        ...(user.ho_so_ca_nhan || {}),
+        ...(upsertedProfile || {}),
+        ...(dto.fullName !== undefined && { ho_ten: dto.fullName }),
+        ...(dto.email !== undefined && { email: dto.email }),
+        ...(dto.phone !== undefined && { phone: dto.phone }),
+        ...(dto.address !== undefined && { dia_chi: dto.address }),
+        ...(dto.gender !== undefined && { gioi_tinh: dto.gender }),
+        ...(dobDate !== undefined && { ngay_sinh: dobDate }),
+      };
+
+      const mergedProposer = {
+        ...(user.nguoi_de_xuat || {}),
+        ...(upsertedProposer || {}),
+        ...(dto.education !== undefined && { trinh_do_hoc_van: dto.education }),
+        ...(dto.major !== undefined && { nghe_nghiep: dto.major }),
+        ...(unitValue !== undefined && { don_vi_cong_tac: unitValue }),
+        ...(dto.position !== undefined && { vi_tri_cong_tac: dto.position }),
+        ...(dto.field !== undefined && { linh_vuc_cong_tac: dto.field }),
+      };
+
+      const isComplete = this.isProfileComplete(mergedProfile, mergedProposer);
+      if (tx.nguoi_dung?.update) {
+        await tx.nguoi_dung.update({
+          where: { id: actualUserId },
+          data: { profile_completed: isComplete },
         });
       }
     });
@@ -476,8 +592,8 @@ export class UsersService {
       await this.cacheService.debouncedInvalidateTags([
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
-        buildUserCacheTag(targetId),
-        buildUserAuthCacheKey(targetId),
+        buildUserCacheTag(actualUserId),
+        buildUserAuthCacheKey(actualUserId),
       ]);
     }
 
@@ -497,17 +613,32 @@ export class UsersService {
   }: UpdateUserRoleParamsDto): Promise<{ success: boolean; message: string; role: string }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, vai_tro: true },
+    if (newRole === UserRole.SUPERADMIN && currentUser?.role !== UserRole.SUPERADMIN) {
+      throw new ForbiddenException(
+        'Chỉ Quản trị viên cấp cao (SUPERADMIN) mới có quyền phân quyền SUPERADMIN.',
+      );
+    }
+
+    const user = await this.findUserByIdOrKeycloakId(targetUserId, {
+      id: true,
+      vai_tro: true,
     });
 
     if (!user) {
       throw new NotFoundException('Không tìm thấy người dùng cần phân quyền.');
     }
 
+    if (user.vai_tro === UserRole.SUPERADMIN && newRole !== UserRole.SUPERADMIN) {
+      throw new BadRequestException({
+        code: 'CANNOT_CHANGE_SUPERADMIN_ROLE',
+        message: 'Không thể thay đổi quyền của tài khoản SUPERADMIN.',
+      });
+    }
+
+    const actualUserId = user.id;
+
     await this.prisma.nguoi_dung.update({
-      where: { id: targetUserId },
+      where: { id: actualUserId },
       data: {
         vai_tro: newRole,
       },
@@ -518,8 +649,8 @@ export class UsersService {
       await this.cacheService.debouncedInvalidateTags([
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
-        buildUserCacheTag(targetUserId),
-        buildUserAuthCacheKey(targetUserId),
+        buildUserCacheTag(actualUserId),
+        buildUserAuthCacheKey(actualUserId),
       ]);
     }
 
@@ -540,29 +671,34 @@ export class UsersService {
   }: UpdateUserStatusParamsDto): Promise<{ success: boolean; message: string; active: boolean }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id: targetUserId },
-      select: { id: true },
+    const user = await this.findUserByIdOrKeycloakId(targetUserId, {
+      id: true,
     });
 
     if (!user) {
       throw new NotFoundException('Không tìm thấy người dùng cần cập nhật trạng thái.');
     }
 
+    const actualUserId = user.id;
+
     await this.prisma.nguoi_dung.update({
-      where: { id: targetUserId },
+      where: { id: actualUserId },
       data: {
         active: isActive,
       },
     });
+
+    if (isActive === false && this.refreshTokenRotationService) {
+      await this.refreshTokenRotationService.revokeAllUserTokens(actualUserId);
+    }
 
     // Invalidate Cache gom cụm 500ms (Rule 25)
     if (this.cacheService) {
       await this.cacheService.debouncedInvalidateTags([
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
-        buildUserCacheTag(targetUserId),
-        buildUserAuthCacheKey(targetUserId),
+        buildUserCacheTag(actualUserId),
+        buildUserAuthCacheKey(actualUserId),
       ]);
     }
 
@@ -573,22 +709,73 @@ export class UsersService {
     };
   }
 
+  async updateActiveStatus(
+    params: UpdateUserStatusParamsDto,
+  ): Promise<{ success: boolean; message: string; active: boolean }> {
+    return this.updateStatus(params);
+  }
+
   /**
    * Kiểm tra người dùng đã hoàn thiện hồ sơ chưa (Tương thích FE cũ: check-profile)
    */
-  async checkProfile({ userId }: CheckProfileParamsDto): Promise<{ profileComplete: boolean }> {
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id: userId },
-      select: { profile_completed: true, deleted_at: true },
+  async checkProfile(
+    paramOrUserId: CheckProfileParamsDto | string,
+  ): Promise<{ profileComplete: boolean }> {
+    const userId =
+      typeof paramOrUserId === 'object' && paramOrUserId !== null && 'userId' in paramOrUserId
+        ? paramOrUserId.userId
+        : (paramOrUserId as string);
+
+    const user = await this.findUserByIdOrKeycloakId(userId, {
+      id: true,
+      profile_completed: true,
+      deleted_at: true,
+      ho_so_ca_nhan: {
+        select: {
+          ho_ten: true,
+          ngay_sinh: true,
+          gioi_tinh: true,
+          phone: true,
+          email: true,
+        },
+      },
+      nguoi_de_xuat: {
+        select: {
+          don_vi_cong_tac: true,
+          vi_tri_cong_tac: true,
+        },
+      },
     });
 
     if (!user || user.deleted_at) {
       throw new NotFoundException('Không tìm thấy người dùng hoặc tài khoản đã bị vô hiệu hóa.');
     }
 
+    const hasRelationFields = 'ho_so_ca_nhan' in user || 'nguoi_de_xuat' in user;
+    const computedComplete = hasRelationFields
+      ? this.isProfileComplete(user.ho_so_ca_nhan, user.nguoi_de_xuat)
+      : Boolean(user.profile_completed);
+
+    if (
+      hasRelationFields &&
+      Boolean(user.profile_completed) !== computedComplete &&
+      this.prisma.nguoi_dung?.update
+    ) {
+      await this.prisma.nguoi_dung.update({
+        where: { id: user.id },
+        data: { profile_completed: computedComplete },
+      });
+    }
+
     return {
-      profileComplete: Boolean(user.profile_completed),
+      profileComplete: computedComplete,
     };
+  }
+
+  async checkProfileComplete(
+    paramOrUserId: CheckProfileParamsDto | string,
+  ): Promise<{ profileComplete: boolean }> {
+    return this.checkProfile(paramOrUserId);
   }
 
   /**
@@ -600,17 +787,20 @@ export class UsersService {
   }: SoftDeleteUserParamsDto): Promise<{ success: boolean; message: string }> {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
-    const user = await this.prisma.nguoi_dung.findUnique({
-      where: { id: targetUserId },
-      select: { id: true, active: true, deleted_at: true },
+    const user = await this.findUserByIdOrKeycloakId(targetUserId, {
+      id: true,
+      active: true,
+      deleted_at: true,
     });
 
     if (!user || user.deleted_at) {
       throw new NotFoundException('Không tìm thấy người dùng hoặc tài khoản đã bị xóa trước đó.');
     }
 
+    const actualUserId = user.id;
+
     await this.prisma.nguoi_dung.update({
-      where: { id: targetUserId },
+      where: { id: actualUserId },
       data: {
         active: false,
         deleted_at: new Date(),
@@ -619,7 +809,7 @@ export class UsersService {
 
     // Thu hồi toàn bộ Refresh Token của user bị xóa mềm
     if (this.refreshTokenRotationService) {
-      await this.refreshTokenRotationService.revokeAllUserTokens(targetUserId);
+      await this.refreshTokenRotationService.revokeAllUserTokens(actualUserId);
     }
 
     // Invalidate Cache gom cụm 500ms
@@ -627,8 +817,8 @@ export class UsersService {
       await this.cacheService.debouncedInvalidateTags([
         CACHE_TAG_USERS,
         CACHE_TAG_PROFILES,
-        buildUserCacheTag(targetUserId),
-        buildUserAuthCacheKey(targetUserId),
+        buildUserCacheTag(actualUserId),
+        buildUserAuthCacheKey(actualUserId),
       ]);
     }
 

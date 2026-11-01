@@ -9,11 +9,13 @@ import {
   IsBoolean,
   MaxLength,
 } from 'class-validator';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 
 export class UpdateCoefficientDto {
   @ApiPropertyOptional({ description: 'ID nguyên liệu liên kết', example: 1 })
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'ID nguyên liệu phải là số nguyên' })
   @Min(1, { message: 'ID nguyên liệu phải lớn hơn 0' })
   @IsOptional()
@@ -27,7 +29,9 @@ export class UpdateCoefficientDto {
   processingMethod?: string;
 
   @ApiPropertyOptional({ description: 'Hệ số sống/chín', example: 0.9 })
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber({}, { message: 'Hệ số phải là số' })
   @Min(0.01, { message: 'Hệ số sống chín phải lớn hơn hoặc bằng 0.01' })
   @Max(10.0, { message: 'Hệ số sống chín phải nhỏ hơn hoặc bằng 10.0' })
@@ -43,7 +47,9 @@ export class UpdateCoefficientDto {
 
   @ApiPropertyOptional({ description: 'ID nguyên liệu (alias)', example: 1 })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'ID nguyên liệu phải là số nguyên' })
   @Min(1, { message: 'ID nguyên liệu phải lớn hơn 0' })
   nguyenLieuId?: number;
@@ -57,7 +63,9 @@ export class UpdateCoefficientDto {
 
   @ApiPropertyOptional({ description: 'Hệ số sống chín (alias tiếng Việt)', example: 0.9 })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber({}, { message: 'Hệ số phải là số' })
   @Min(0.01, { message: 'Hệ số sống chín phải lớn hơn hoặc bằng 0.01' })
   @Max(10.0, { message: 'Hệ số sống chín phải nhỏ hơn hoặc bằng 10.0' })

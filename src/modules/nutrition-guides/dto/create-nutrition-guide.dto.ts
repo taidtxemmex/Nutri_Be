@@ -59,7 +59,7 @@ export class CreateNutritionGuideDto {
     example: 'Hạn chế đường đơn, kiểm soát carbohydrate',
   })
   @IsString({ message: 'Nguyên tắc dinh dưỡng phải là chuỗi' })
-  @MaxLength(10000, { message: 'Nguyên tắc dinh dưỡng tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Nguyên tắc dinh dưỡng tối đa 65000 ký tự' })
   @IsOptional()
   nutritionPrinciple?: string;
 
@@ -68,7 +68,7 @@ export class CreateNutritionGuideDto {
     example: 'Hạn chế đường đơn, kiểm soát carbohydrate',
   })
   @IsString({ message: 'Nguyên tắc dinh dưỡng phải là chuỗi' })
-  @MaxLength(10000, { message: 'Nguyên tắc dinh dưỡng tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Nguyên tắc dinh dưỡng tối đa 65000 ký tự' })
   @IsOptional()
   nguyenTacDinhDuong?: string;
 
@@ -76,7 +76,7 @@ export class CreateNutritionGuideDto {
     description: 'Nguyên tắc dinh dưỡng (nguyenTac alias)',
   })
   @IsString({ message: 'Nguyên tắc dinh dưỡng phải là chuỗi' })
-  @MaxLength(10000, { message: 'Nguyên tắc dinh dưỡng tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Nguyên tắc dinh dưỡng tối đa 65000 ký tự' })
   @IsOptional()
   nguyenTac?: string;
 
@@ -85,7 +85,7 @@ export class CreateNutritionGuideDto {
     example: 'Mô tả chi tiết phác đồ dinh dưỡng',
   })
   @IsString({ message: 'Mô tả phải là chuỗi' })
-  @MaxLength(10000, { message: 'Mô tả tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Mô tả tối đa 65000 ký tự' })
   @IsOptional()
   description?: string;
 
@@ -93,7 +93,7 @@ export class CreateNutritionGuideDto {
     description: 'Mô tả hướng dẫn dinh dưỡng (moTa alias)',
   })
   @IsString({ message: 'Mô tả phải là chuỗi' })
-  @MaxLength(10000, { message: 'Mô tả tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Mô tả tối đa 65000 ký tự' })
   @IsOptional()
   moTa?: string;
 
@@ -112,13 +112,13 @@ export class CreateNutritionGuideDto {
 
   @ApiPropertyOptional({ description: 'Ghi chú và cảnh báo lâm sàng' })
   @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(10000, { message: 'Ghi chú tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Ghi chú tối đa 65000 ký tự' })
   @IsOptional()
   note?: string;
 
   @ApiPropertyOptional({ description: 'Ghi chú lâm sàng (luuY alias)' })
   @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(10000, { message: 'Ghi chú tối đa 10000 ký tự' })
+  @MaxLength(65000, { message: 'Ghi chú tối đa 65000 ký tự' })
   @IsOptional()
   luuY?: string;
 }

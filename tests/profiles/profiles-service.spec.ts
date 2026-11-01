@@ -47,6 +47,8 @@ describe('ProfilesService', () => {
         email: 'bsminhtri@gmail.com',
         phone: '0987654321',
         dob: '1990-05-15',
+        gender: null,
+        address: null,
         role: 'USER',
         active: true,
       });

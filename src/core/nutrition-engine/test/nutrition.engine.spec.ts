@@ -44,13 +44,12 @@ describe('NutritionEngine (High-Precision Decimal.js Domain Engine)', () => {
   });
 
   describe('2. FAO Available Carbohydrate (By-Difference) Calculation', () => {
-    it('should correctly subtract dietary fiber from prox total according to FAO standard', () => {
+    it('should calculate carbohydrate by difference matching Java legacy standard (100 - (water + protein + fat + ash))', () => {
       // 100g thực phẩm có:
       // Nước: 70g, Protein: 5g, Fat: 2g, Ash: 1g, Fiber: 3g
-      // Thuật toán FAO chuẩn: 100 - (70 + 5 + 2 + 1 + 3) = 19g
-      // Thuật toán cũ của Java (quên trừ fiber): 100 - (70 + 5 + 2 + 1) = 22g (Sai lệch 3g!)
+      // Thuật toán đồng bộ Java: 100 - (70 + 5 + 2 + 1) = 22g (không trừ fiber)
       const carb = NutritionEngine.calculateCarbohydrate(70, 5, 2, 1, 3);
-      expect(carb.equals(new Decimal('19'))).toBe(true);
+      expect(carb.equals(new Decimal('22'))).toBe(true);
     });
 
     it('should return 0 and never return negative carbohydrate if proximate sum exceeds 100', () => {

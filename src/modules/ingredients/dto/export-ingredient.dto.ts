@@ -8,7 +8,7 @@ import {
   Min,
   ArrayMaxSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 
 export class ExportIngredientDto {
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo tên' })
@@ -19,7 +19,9 @@ export class ExportIngredientDto {
 
   @ApiPropertyOptional({ description: 'ID danh mục' })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === null || value === undefined || value === '' ? undefined : Number(value),
+  )
   @IsInt({ message: 'ID danh mục phải là số nguyên' })
   @Min(1, { message: 'ID danh mục phải lớn hơn 0' })
   categoryId?: number;

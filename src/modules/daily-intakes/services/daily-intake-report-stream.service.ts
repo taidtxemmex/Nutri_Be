@@ -913,6 +913,7 @@ export class DailyIntakeReportStreamService {
           gte: new Date(`${dto.fromDate}T00:00:00.000Z`),
           lte: new Date(`${dto.toDate}T23:59:59.999Z`),
         },
+        ...(dto.mode ? { kieu_nhap: dto.mode } : {}),
       },
       select: {
         id: true,

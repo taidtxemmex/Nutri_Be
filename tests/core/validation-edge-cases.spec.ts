@@ -104,42 +104,42 @@ describe('ValidationEdgeCases & Anti-OOM Bounding', () => {
   });
 
   describe('Anti-OOM Pagination Bounding', () => {
-    it('should clamp limit = 999999 to 100 in BasePaginationQueryDto', () => {
+    it('should clamp limit = 999999 to 5000 in BasePaginationQueryDto', () => {
       const dto = plainToInstance(BasePaginationQueryDto, {
         page: '1',
         limit: '999999',
       });
 
-      expect(dto.limit).toBe(100);
-      expect(dto.limit).toBeLessThanOrEqual(100);
+      expect(dto.limit).toBe(5000);
+      expect(dto.limit).toBeLessThanOrEqual(5000);
     });
 
-    it('should normalize negative page and limit in BasePaginationQueryDto', () => {
+    it('should normalize negative page and non-positive limit in BasePaginationQueryDto', () => {
       const dto = plainToInstance(BasePaginationQueryDto, {
         page: '-5',
         limit: '0',
       });
 
       expect(dto.page).toBe(1);
-      expect(dto.limit).toBe(20);
+      expect(dto.limit).toBeUndefined();
     });
 
-    it('should clamp size = 999999 to 100 in ProfileFilterDto', () => {
+    it('should clamp size = 999999 to 5000 in ProfileFilterDto', () => {
       const dto = plainToInstance(ProfileFilterDto, {
         page: 0,
         size: 999999,
       });
 
-      expect(dto.size).toBe(100);
-      expect(dto.size).toBeLessThanOrEqual(100);
+      expect(dto.size).toBe(5000);
+      expect(dto.size).toBeLessThanOrEqual(5000);
     });
 
     it('should handle size alias from legacy FE in BasePaginationQueryDto', () => {
       const dto = plainToInstance(BasePaginationQueryDto, {
-        size: '500',
+        size: '99999',
       });
 
-      expect(dto.limit).toBe(100);
+      expect(dto.limit).toBe(5000);
     });
   });
 });

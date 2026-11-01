@@ -55,7 +55,7 @@ describe('ExtendedDiseaseGroupsService', () => {
       );
       expect(result.items).toHaveLength(1);
       expect(result.items[0].extendedCode).toBe('A-01');
-      expect(result.items[0].fullCode).toBe('A - A-01');
+      expect(result.items[0].fullCode).toBe('A-01');
     });
   });
 

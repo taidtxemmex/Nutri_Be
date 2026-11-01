@@ -1,4 +1,14 @@
-import { Get, Post, Put, Delete, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  HttpCode,
+  HttpStatus,
+  BadRequestException,
+} from '@nestjs/common';
 import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { SubscriptionsService } from '../services/subscriptions.service';
 import { CreatePlanDto, UpdatePlanDto, PlanResponseDto } from '../dto';
@@ -30,21 +40,15 @@ export class PlansController {
   @Public()
   @Get(['all', ''])
   @ApiOperation({
-    summary: 'Lấy danh sách gói cước (Admin xem tất cả, Guest/User xem gói kích hoạt)',
+    summary: 'Lấy danh sách gói cước (Sắp xếp ACTIVE lên trước rồi theo số ngày sử dụng tăng dần)',
   })
   @ApiStandardResponse({
     type: PlanResponseDto,
     isArray: true,
     description: 'Danh sách gói cước',
   })
-  async getAllPlans(@CurrentUser() user?: any): Promise<PlanResponseDto[]> {
-    const isAdmin =
-      user &&
-      (user.role === UserRole.ADMIN ||
-        user.role === UserRole.SUPERADMIN ||
-        user.role === 'ADMIN' ||
-        user.role === 'SUPERADMIN');
-    return this.subscriptionsService.findAllPlans({ activeOnly: !isAdmin });
+  async getAllPlans(): Promise<PlanResponseDto[]> {
+    return this.subscriptionsService.findAllPlans(false);
   }
 
   @Public()
@@ -88,7 +92,7 @@ export class PlansController {
   ): Promise<PlanResponseDto> {
     const id = dto.id;
     if (!id) {
-      throw new Error('ID gói cước không được để trống khi gọi update-package');
+      throw new BadRequestException('ID gói cước không được để trống khi gọi update-package');
     }
     return this.subscriptionsService.updatePlan({ id, dto, adminUser: admin });
   }

@@ -256,6 +256,54 @@ export class I18nService {
           });
         },
       },
+      // 18b. Class-validator @Min: X must not be less than Y
+      {
+        regex: /^(\w+) must not be less than (-?\d+(?:\.\d+)?)$/i,
+        translate: (m, locale) => {
+          const field = this.translateField({ field: m[1], locale });
+          return this.translate({
+            key: 'validation.min',
+            locale,
+            args: { field, min: m[2] },
+          });
+        },
+      },
+      // 18c. Class-validator @Max: X must not be greater than Y
+      {
+        regex: /^(\w+) must not be greater than (-?\d+(?:\.\d+)?)$/i,
+        translate: (m, locale) => {
+          const field = this.translateField({ field: m[1], locale });
+          return this.translate({
+            key: 'validation.max',
+            locale,
+            args: { field, max: m[2] },
+          });
+        },
+      },
+      // 18d. Class-validator @ArrayMinSize: X must contain at least Y elements
+      {
+        regex: /^(\w+) must contain at least (\d+) elements$/i,
+        translate: (m, locale) => {
+          const field = this.translateField({ field: m[1], locale });
+          return this.translate({
+            key: 'validation.array_min_size',
+            locale,
+            args: { field, min: m[2] },
+          });
+        },
+      },
+      // 18e. Class-validator @ArrayMaxSize: X must contain not more than Y elements
+      {
+        regex: /^(\w+) must contain not more than (\d+) elements$/i,
+        translate: (m, locale) => {
+          const field = this.translateField({ field: m[1], locale });
+          return this.translate({
+            key: 'validation.array_max_size',
+            locale,
+            args: { field, max: m[2] },
+          });
+        },
+      },
       // 19. Password min length: Mật khẩu (phải có) tối thiểu X ký tự
       {
         regex: /^Mật khẩu (?:phải có )?tối thiểu (\d+) ký tự$/i,
@@ -583,7 +631,8 @@ export class I18nService {
     const viCatalog = this.catalogs[DEFAULT_LOCALE] || {};
     if (Boolean(viCatalog[cleanKey])) return true;
     const normalized = cleanKey.toLowerCase();
-    return this.viToKeyMap.has(normalized);
+    if (this.viToKeyMap.has(normalized)) return true;
+    return this.dynamicPatterns.some((p) => p.regex.test(cleanKey));
   }
 
   public getSupportedLocales(): SupportedLocale[] {

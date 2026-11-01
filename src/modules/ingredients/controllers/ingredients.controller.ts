@@ -14,7 +14,6 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { Response } from 'express';
-import * as fs from 'fs';
 import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
@@ -62,6 +61,7 @@ export class IngredientsController {
   }
 
   @Get('all')
+  @SkipTransform()
   @ApiOperation({ summary: 'Lấy toàn bộ danh sách nguyên liệu đã duyệt (In-memory Cache FE)' })
   @ApiStandardResponse({
     type: IngredientDetailDto,
@@ -91,25 +91,16 @@ export class IngredientsController {
     @Res() res: Response,
   ) {
     const colArray = typeof columns === 'string' ? [columns] : columns;
-    const isDefault = !colArray || colArray.length === 0;
-
     const safeFileName = path.basename('Template_import_nguyen_lieu.xlsx');
-    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
     setExcelResponseHeaders({ res, filename: safeFileName });
 
-    if (isDefault && fs.existsSync(filePath)) {
-      return fs.createReadStream(filePath).pipe(res);
-    }
-
     const buffer = await this.excelService.generateTemplate({ columns: colArray });
-    if (isDefault) {
-      fs.promises.writeFile(filePath, buffer).catch(() => {});
-    }
     return res.end(buffer);
   }
 
   @Post('import')
+  @SkipTransform()
   @Auth(UserRole.ADMIN, UserRole.SUPERADMIN)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')

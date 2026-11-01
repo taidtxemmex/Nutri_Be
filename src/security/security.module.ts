@@ -5,6 +5,7 @@ import { IdorDefenseService } from './idor/idor-defense.service';
 import { IdorUserOwnershipGuard } from './idor/idor-user-ownership.guard';
 import { AdminOnlyGuard } from './idor/admin-only.guard';
 import { RefreshTokenRotationService } from './token/refresh-token-rotation.service';
+import { TokenBlacklistService } from './token/token-blacklist.service';
 import { AuthRateLimitGuard } from './rate-limit/auth-rate-limit.guard';
 import { ThrottlerBehindProxyGuard } from './rate-limit/throttler-behind-proxy.guard';
 import { ExcelMagicByteValidationPipe } from './excel/excel-magic-byte.pipe';
@@ -47,6 +48,7 @@ import {
     IdorUserOwnershipGuard,
     AdminOnlyGuard,
     RefreshTokenRotationService,
+    TokenBlacklistService,
     AuthRateLimitGuard,
     ExcelMagicByteValidationPipe,
     ExcelThrottleGuard,
@@ -66,6 +68,7 @@ import {
     IdorUserOwnershipGuard,
     AdminOnlyGuard,
     RefreshTokenRotationService,
+    TokenBlacklistService,
     AuthRateLimitGuard,
     ExcelMagicByteValidationPipe,
     ExcelThrottleGuard,

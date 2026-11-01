@@ -207,6 +207,8 @@ async function main() {
 
     await printSummaryTable();
   }
+
+  await prisma.$executeRawUnsafe('DELETE FROM _system_cache').catch(() => {});
 }
 
 main()

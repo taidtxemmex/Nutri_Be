@@ -160,7 +160,7 @@ describe('MenuProposalsService', () => {
   });
 
   describe('2. approve', () => {
-    it('Admin duyệt đề xuất: cập nhật trạng thái DA_DUYET và đổi thực đơn gốc sang CONG_KHAI', async () => {
+    it('Admin duyệt đề xuất: cập nhật trạng thái DA_DUYET trên bảng de_xuat_thuc_don (giữ nguyên thực đơn gốc)', async () => {
       mockPrisma.de_xuat_thuc_don.findFirst.mockResolvedValue({
         id: BigInt(55),
         menu_goc_id: BigInt(10),
@@ -168,7 +168,6 @@ describe('MenuProposalsService', () => {
       });
 
       mockPrisma.de_xuat_thuc_don.update.mockResolvedValue({});
-      mockPrisma.thuc_don.update.mockResolvedValue({});
 
       const res = await service.approve({ id: '55', currentUser: mockAdmin });
 
@@ -180,10 +179,7 @@ describe('MenuProposalsService', () => {
           nguoi_phe_duyet_id: mockAdmin.id,
         }),
       });
-      expect(mockPrisma.thuc_don.update).toHaveBeenCalledWith({
-        where: { id: BigInt(10) },
-        data: { loai_thuc_don: 'CONG_KHAI' },
-      });
+      expect(mockPrisma.thuc_don.update).not.toHaveBeenCalled();
       expect(mockCache.invalidateTag).toHaveBeenCalledWith('menu-proposals');
       expect(mockCache.invalidateTag).toHaveBeenCalledWith('menus');
     });

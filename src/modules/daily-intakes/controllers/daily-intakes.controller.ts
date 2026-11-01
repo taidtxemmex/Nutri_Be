@@ -14,7 +14,6 @@ import {
   HttpException,
 } from '@nestjs/common';
 import { Response } from 'express';
-import * as fs from 'fs';
 import * as path from 'path';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiOperation, ApiParam, ApiQuery, ApiConsumes } from '@nestjs/swagger';
@@ -41,6 +40,7 @@ import {
   ApiFile,
 } from '../../../common/decorators';
 import { DailyIntakeClinicalReportType } from '../../../config/enums/domain.enum';
+import { UserRole } from '../../../config/enums/role.enum';
 
 @ApiController('DailyIntakes', ['daily-intakes', 'daily-intake'])
 export class DailyIntakesController {
@@ -79,6 +79,7 @@ export class DailyIntakesController {
   })
   async downloadTemplate(
     @Query('type') type: string | undefined,
+    @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
     const normalizedType =
@@ -88,16 +89,10 @@ export class DailyIntakesController {
         ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
         : 'Template_import_khau_phan_24h_theo_bua.xlsx';
     const safeFileName = path.basename(fileName);
-    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
     setExcelResponseHeaders({ res, filename: safeFileName });
 
-    if (fs.existsSync(filePath)) {
-      fs.createReadStream(filePath).pipe(res);
-      return;
-    }
-
-    const buffer = await this.excelService.generateTemplate({ type });
+    const buffer = await this.excelService.generateImportTemplate(user?.id, normalizedType);
     res.end(buffer);
   }
 
@@ -205,7 +200,8 @@ export class DailyIntakesController {
   }
 
   @Post('import')
-  @Auth()
+  @SkipTransform()
+  @Auth(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.USERPRO)
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
   @ApiFile('file', { description: 'Tập tin Excel nhập khẩu phần 24h' })
@@ -259,12 +255,28 @@ export class DailyIntakesController {
   }
 
   @Get(':id/export')
+  @Auth()
+  @SkipTransform()
+  @ApiOperation({
+    summary:
+      'Xuất 4 mẫu báo cáo lâm sàng khẩu phần 24h (ALL_IN_ONE, RDA_COMPARISON, PLC_STRUCTURE, MEAL_DISTRIBUTION) (GET)',
+  })
+  @ApiParam({ name: 'id', description: 'ID khẩu phần 24h' })
+  async exportClinicalReportGet(
+    @Param('id') id: string,
+    @Query('reportType') qReportType: DailyIntakeClinicalReportType,
+    @CurrentUser() user: any,
+    @Res() res: Response,
+  ): Promise<void> {
+    return this.executeExportClinicalReport({ id, reportType: qReportType, user, res });
+  }
+
   @Post(':id/export')
   @Auth()
   @SkipTransform()
   @ApiOperation({
     summary:
-      'Xuất 4 mẫu báo cáo lâm sàng khẩu phần 24h (ALL_IN_ONE, RDA_COMPARISON, PLC_STRUCTURE, MEAL_DISTRIBUTION)',
+      'Xuất 4 mẫu báo cáo lâm sàng khẩu phần 24h (ALL_IN_ONE, RDA_COMPARISON, PLC_STRUCTURE, MEAL_DISTRIBUTION) (POST)',
   })
   @ApiParam({ name: 'id', description: 'ID khẩu phần 24h' })
   async exportClinicalReport(
@@ -274,13 +286,27 @@ export class DailyIntakesController {
     @CurrentUser() user: any,
     @Res() res: Response,
   ): Promise<void> {
-    const reportType =
-      bodyDto?.reportType || qReportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
+    const reportType = bodyDto?.reportType || qReportType;
+    return this.executeExportClinicalReport({ id, reportType, user, res });
+  }
+
+  private async executeExportClinicalReport({
+    id,
+    reportType,
+    user,
+    res,
+  }: {
+    id: string;
+    reportType?: DailyIntakeClinicalReportType;
+    user: any;
+    res: Response;
+  }): Promise<void> {
+    const finalReportType = reportType || DailyIntakeClinicalReportType.ALL_IN_ONE;
 
     await this.excelService.streamClinicalReport({
       intakeIdOrData: BigInt(id),
       outputStream: res,
-      reportType,
+      reportType: finalReportType,
       currentUserId: user?.id,
     });
   }

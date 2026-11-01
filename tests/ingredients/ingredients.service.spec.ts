@@ -104,7 +104,7 @@ describe('IngredientsService', () => {
 
       expect(result).toHaveLength(2);
       expect(result[0]).toEqual({
-        id: '1',
+        id: 1,
         ten_nguyen_lieu: 'Gạo tẻ',
         material: 'Gạo tẻ',
       });
@@ -149,14 +149,15 @@ describe('IngredientsService', () => {
 
       const detail = await service.findById({ id: 1 });
 
-      expect(detail.id).toBe('1');
+      expect(detail.id).toBe(1);
       expect(detail.material).toBe('Gạo tẻ');
-      // Carbohydrate = 100 - (13.8 + 7.9 + 0.7 + 0.4 + 0.8) = 76.4
-      expect(detail.carbohydrate).toBe(76.4);
-      // Energy = 4 * 7.9 + 9 * 0.7 + 4 * 76.4 = 31.6 + 6.3 + 305.6 = 343.5
-      expect(detail.energy).toBe(343.5);
+      // Carbohydrate (Java legacy sync) = 100 - (13.8 + 7.9 + 0.7 + 0.8) = 76.8
+      expect(detail.carbohydrate).toBe(76.8);
+      // Energy = 4 * 7.9 + 9 * 0.7 + 4 * 76.8 = 31.6 + 6.3 + 307.2 = 345.1
+      expect(detail.energy).toBe(345.1);
       // Vitamin A RAE = 120 / 12 = 10
       expect(detail.vitaminARae).toBe(10);
+      expect((detail as any).VitaminARae).toBe(10);
     });
   });
 
@@ -235,6 +236,7 @@ describe('IngredientsService', () => {
         danh_muc: 1,
         loai_protein: 'THUC_VAT',
         edible: 100,
+        protein: 7.9,
       });
 
       mockPrisma.nguyen_lieu.create.mockResolvedValue({
@@ -247,7 +249,7 @@ describe('IngredientsService', () => {
 
       const result = await service.update({
         id: 1,
-        dto: { material: 'Gạo tẻ sửa đổi', edible: 95 } as any,
+        dto: { material: 'Gạo tẻ sửa đổi', edible: 95, protein: null } as any,
         currentUser: { id: 'user-uuid', role: UserRole.USER },
       });
 
@@ -256,15 +258,47 @@ describe('IngredientsService', () => {
       expect(createData.trang_thai).toBe('CHO_DUYET');
       expect(createData.tao_boi_id).toBe('user-uuid');
       expect(createData.edible).toBe(95);
-      expect(result.id).toBe('2');
+      expect(createData.protein).toBe(7.9);
+      expect(result.id).toBe(2);
     });
 
-    it('should update directly when ADMIN edits an approved ingredient', async () => {
+    it('should update directly when USER edits an approved ingredient without changing name (prevent P2002)', async () => {
       mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({
         id: BigInt(1),
         ten_nguyen_lieu: 'Gạo tẻ',
         trang_thai: 'DA_DUYET',
         danh_muc: 1,
+        loai_protein: 'THUC_VAT',
+        edible: 100,
+      });
+
+      mockPrisma.nguyen_lieu.update.mockResolvedValue({
+        id: BigInt(1),
+        ten_nguyen_lieu: 'Gạo tẻ',
+        trang_thai: 'CHO_DUYET',
+        tao_boi_id: 'user-uuid',
+        edible: 95,
+        danh_muc_nguyen_lieu_danh_mucTodanh_muc: null,
+      });
+
+      const result = await service.update({
+        id: 1,
+        dto: { material: 'Gạo tẻ', edible: 95 } as any,
+        currentUser: { id: 'user-uuid', role: UserRole.USER },
+      });
+
+      expect(mockPrisma.nguyen_lieu.update).toHaveBeenCalled();
+      expect(result.id).toBe(1);
+    });
+
+    it('should update directly when ADMIN edits an approved ingredient and preserve null/undefined nutrients', async () => {
+      mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({
+        id: BigInt(1),
+        ten_nguyen_lieu: 'Gạo tẻ',
+        trang_thai: 'DA_DUYET',
+        danh_muc: 1,
+        water: 13.8,
+        protein: 7.9,
       });
 
       mockPrisma.nguyen_lieu.findMany.mockResolvedValue([]);
@@ -277,7 +311,7 @@ describe('IngredientsService', () => {
 
       await service.update({
         id: 1,
-        dto: { material: 'Gạo tẻ thơm' } as any,
+        dto: { material: 'Gạo tẻ thơm', water: null, protein: undefined, fat: 1.2 } as any,
         currentUser: { id: 'admin-uuid', role: UserRole.ADMIN },
       });
 
@@ -285,6 +319,9 @@ describe('IngredientsService', () => {
       const updateData = mockPrisma.nguyen_lieu.update.mock.calls[0][0].data;
       expect(updateData.ten_nguyen_lieu).toBe('Gạo tẻ thơm');
       expect(updateData.trang_thai).toBe('DA_DUYET');
+      expect(updateData.water).toBeUndefined();
+      expect(updateData.protein).toBeUndefined();
+      expect(updateData.fat).toBe(1.2);
     });
   });
 

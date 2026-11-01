@@ -35,6 +35,7 @@ import {
   ApiController,
   ApiStandardResponse,
   Auth,
+  Public,
   CurrentUser,
   SkipTransform,
   ApiFile,
@@ -69,6 +70,8 @@ export class DishesController {
   }
 
   @Get('public')
+  @Public()
+  @Auth()
   @ApiOperation({ summary: 'Lấy danh sách món ăn công khai đã duyệt' })
   @ApiStandardResponse({
     type: DishSummaryDto,
@@ -96,6 +99,8 @@ export class DishesController {
   }
 
   @Get('autocomplete')
+  @Public()
+  @Auth()
   @ApiOperation({ summary: 'Tìm kiếm gợi ý món ăn nhanh (Autocomplete)' })
   @ApiQuery({ name: 'dishName', required: true, description: 'Từ khóa tên món' })
   @ApiQuery({ name: 'limit', required: false, description: 'Giới hạn số lượng (mặc định 10)' })
@@ -105,12 +110,17 @@ export class DishesController {
     description: 'Gợi ý món ăn thành công',
   })
   async autocomplete(
-    @Query('dishName') dishName: string,
+    @Query('dishName') dishName?: string,
+    @Query('q') q?: string,
+    @Query('name') name?: string,
+    @Query('keyword') keyword?: string,
+    @Query('search') search?: string,
     @Query('limit') limit?: number,
     @CurrentUser() user?: any,
   ): Promise<DishSummaryDto[]> {
+    const term = dishName || q || name || keyword || search || '';
     return this.dishesService.autocomplete({
-      keyword: dishName,
+      keyword: term,
       limit: limit || 10,
       currentUser: user,
     });
@@ -135,6 +145,7 @@ export class DishesController {
   }
 
   @Post('import')
+  @SkipTransform()
   @Auth()
   @UseInterceptors(FileInterceptor('file'))
   @ApiConsumes('multipart/form-data')
@@ -193,6 +204,8 @@ export class DishesController {
   }
 
   @Get(':id')
+  @Public()
+  @Auth()
   @ApiOperation({ summary: 'Lấy chi tiết món ăn (đầy đủ 86 chỉ tiêu vi chất)' })
   @ApiParam({ name: 'id', description: 'ID món ăn' })
   @ApiStandardResponse({

@@ -555,10 +555,11 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
         .expect(201);
 
       // Layer 2: API Contract Envelope
-      expect(res.body.data.success).toBe(true);
-      expect(res.body.data).toHaveProperty('proposalId');
+      const propBody = res.body.data ?? res.body;
+      expect(propBody.success).toBe(true);
+      expect(propBody).toHaveProperty('proposalId');
 
-      proposalId = res.body.data.proposalId;
+      proposalId = propBody.proposalId;
 
       // Layer 3: Direct Database Verification
       const prisma = helper.getPrisma();
@@ -607,7 +608,7 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
         where: { id: BigInt(weeklyMenuId) },
       });
       expect(dbMenu).not.toBeNull();
-      expect(dbMenu?.loai_thuc_don).toBe('CONG_KHAI');
+      expect(dbMenu?.loai_thuc_don).toBe(MenuType.TUAN);
     });
   });
 
@@ -790,7 +791,7 @@ describe('TC-S4-09: E2E Golden Journey - Full Hospital Clinical Nutrition Workfl
         where: { id: BigInt(weeklyMenuId) },
       });
       expect(dbMenu).not.toBeNull();
-      expect(dbMenu?.loai_thuc_don).toBe('CONG_KHAI');
+      expect(dbMenu?.loai_thuc_don).toBe(MenuType.TUAN);
     });
   });
 });

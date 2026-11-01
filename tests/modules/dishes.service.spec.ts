@@ -101,7 +101,7 @@ describe('DishesService', () => {
         currentUser: { id: 'user-1' },
       });
 
-      expect(res.id).toBe('100');
+      expect(res.id).toBe(100);
       expect(res.recipeHash).toBe(computeRecipeHash([{ ingredientId: 1, weight: 150 }]));
       expect(res.totalNutrients.protein).toBeCloseTo(30.0, 1);
       expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(
@@ -223,6 +223,7 @@ describe('DishesService', () => {
       mockPrisma.mon_an.findFirst
         .mockResolvedValueOnce({
           id: BigInt(10),
+          ten_mon: 'Món đề xuất',
           nguoi_dung_id: 'user-1',
           trang_thai: DishStatus.RIENG_TU,
           recipe_hash: hash,
@@ -231,16 +232,18 @@ describe('DishesService', () => {
         .mockResolvedValueOnce(null) // no pending
         .mockResolvedValueOnce(null); // no duplicate approved
 
-      mockPrisma.mon_an.update.mockResolvedValue({});
+      mockPrisma.mon_an.create.mockResolvedValue({ id: BigInt(200) });
 
       const res = await service.proposeDish({ dishId: 10, currentUser: { id: 'user-1' } });
       expect(res.message).toBe('Đã gửi đề xuất');
-      expect(mockPrisma.mon_an.update).toHaveBeenCalledWith({
-        where: { id: BigInt(10) },
-        data: {
+      expect(mockPrisma.mon_an.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          ten_mon: 'Món đề xuất',
           trang_thai: DishStatus.CHO_DUYET,
+          mon_goc_id: BigInt(10),
+          nguoi_dung_id: 'user-1',
           recipe_hash: hash,
-        },
+        }),
       });
       expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(
         expect.arrayContaining(['dishes', 'dish:10']),
@@ -335,8 +338,8 @@ describe('DishesService', () => {
         request: {},
         currentUser: { id: 'user-1' },
       });
-      expect(res.id).toBe('101');
-      expect(res.originalDishId).toBe('15');
+      expect(res.id).toBe(101);
+      expect(res.originalDishId).toBe(15);
       expect(mockCacheService.debouncedInvalidateTags).toHaveBeenCalledWith(
         expect.arrayContaining(['dishes', 'dish:101', 'dish:15']),
       );

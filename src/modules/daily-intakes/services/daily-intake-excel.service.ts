@@ -1,4 +1,11 @@
-import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs/common';
+import {
+  Injectable,
+  HttpException,
+  HttpStatus,
+  ForbiddenException,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import * as ExcelJS from 'exceljs';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -12,6 +19,8 @@ import {
   IntakeInputType,
 } from '../../../config/enums/domain.enum';
 import { UserRole } from '../../../config/enums/role.enum';
+import { AUTH_ERROR_FORBIDDEN } from '../../../config/constants/auth.constants';
+import { CACHE_TAG_DAILY_INTAKES } from '../../../config/constants/cache.constants';
 import {
   EXCEL_FONT_FAMILY,
   EXCEL_LIMITS,
@@ -94,7 +103,7 @@ export class DailyIntakeExcelService {
   private readonly logger = new Logger(DailyIntakeExcelService.name);
 
   private static readonly TEMPLATE_CACHE_KEY = 'daily_intake:import_template:buffer';
-  private static readonly TEMPLATE_CACHE_TAG = 'ingredients';
+  private static readonly TEMPLATE_CACHE_TAG = CACHE_TAG_DAILY_INTAKES;
   private static readonly TEMPLATE_CACHE_TTL = 1800; // 30 phút
 
   private static readonly DATA_SHEET = 'Khau_phan_24h';
@@ -120,14 +129,43 @@ export class DailyIntakeExcelService {
   // ==========================================
 
   /**
+   * Tạo template Excel mẫu để nhập khẩu phần 24h theo bác sĩ (userId) và loại (BY_MEAL / INGREDIENT_ONLY).
+   * Điền danh sách bệnh nhân của bác sĩ vào sheet DS_benh_nhan và danh sách nguyên liệu đã duyệt vào sheet DS_nguyen_lieu.
+   */
+  async generateImportTemplate(userId?: string, type?: string): Promise<Buffer> {
+    return this.generateTemplate({ type, userId } as any);
+  }
+
+  /**
    * Tạo template Excel mẫu để nhập khẩu phần 24h kèm bộ đệm CacheService (0ms)
    * Hỗ trợ 2 định dạng: BY_MEAL (theo bữa) và INGREDIENT_ONLY (theo ngày)
    */
-  async generateTemplate(param?: GenerateDailyIntakeTemplateParamDto | string): Promise<Buffer> {
-    const rawType = typeof param === 'string' ? param : param?.type;
+  async generateTemplate(
+    param?: (GenerateDailyIntakeTemplateParamDto & { userId?: string }) | string,
+    legacyType?: string,
+  ): Promise<Buffer> {
+    let rawType: string | undefined;
+    let userId: string | undefined;
+
+    if (typeof param === 'string') {
+      if (legacyType !== undefined) {
+        userId = param;
+        rawType = legacyType;
+      } else if (param.toUpperCase() === 'BY_MEAL' || param.toUpperCase() === 'INGREDIENT_ONLY') {
+        rawType = param;
+      } else {
+        userId = param;
+      }
+    } else if (param && typeof param === 'object') {
+      rawType = param.type;
+      userId = (param as any).userId;
+    }
+
     const normalizedType =
       rawType?.toUpperCase() === 'INGREDIENT_ONLY' ? 'INGREDIENT_ONLY' : 'BY_MEAL';
-    const cacheKey = `daily-intake:template:${normalizedType}`;
+    const cacheKey = userId
+      ? `daily-intake:template:${normalizedType}:${userId}`
+      : `daily-intake:template:${normalizedType}`;
 
     if (this.cacheService) {
       const cached = await this.cacheService.get<string>(cacheKey);
@@ -139,24 +177,10 @@ export class DailyIntakeExcelService {
       }
     }
 
-    const fileName =
-      normalizedType === 'INGREDIENT_ONLY'
-        ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
-        : 'Template_import_khau_phan_24h_theo_bua.xlsx';
-    const safeFileName = path.basename(fileName);
-    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
-
-    let buffer: Buffer | null = null;
-    if (fs.existsSync(filePath)) {
-      buffer = await fs.promises.readFile(filePath);
-    }
-
-    if (!buffer) {
-      this.logger.debug(
-        `🔄 [Cache Miss] Đang tạo mới template Excel khẩu phần 24h (${normalizedType}) từ DB...`,
-      );
-      buffer = await this.buildTemplateWorkbook();
-    }
+    this.logger.debug(
+      `🔄 [Cache Miss] Đang tạo mới template Excel khẩu phần 24h (${normalizedType}) từ DB...`,
+    );
+    const buffer = await this.buildTemplateWorkbook(userId, normalizedType);
 
     if (this.cacheService && buffer) {
       await this.cacheService.set(
@@ -173,8 +197,141 @@ export class DailyIntakeExcelService {
     return buffer;
   }
 
-  private async buildTemplateWorkbook(): Promise<Buffer> {
+  private async buildTemplateWorkbook(
+    userId?: string,
+    normalizedType: 'BY_MEAL' | 'INGREDIENT_ONLY' = 'BY_MEAL',
+  ): Promise<Buffer> {
+    // 1. Truy vấn danh sách bệnh nhân của bác sĩ (nguoi_dung_id: userId) và danh sách nguyên liệu (DA_DUYET hoặc của user)
+    const [patients, ingredients] = await Promise.all([
+      typeof this.prisma.benh_nhan?.findMany === 'function'
+        ? this.prisma.benh_nhan.findMany({
+            where: {
+              deleted_at: null,
+              ...(userId ? { nguoi_dung_id: userId } : {}),
+            },
+            select: { ma_benh_nhan_bv: true, ho_ten: true },
+            orderBy: { ma_benh_nhan_bv: 'asc' },
+          })
+        : Promise.resolve([]),
+      typeof this.prisma.nguyen_lieu?.findMany === 'function'
+        ? this.prisma.nguyen_lieu.findMany({
+            where: {
+              deleted_at: null,
+              OR: [
+                { trang_thai: 'DA_DUYET' },
+                { trang_thai: null },
+                ...(userId ? [{ tao_boi_id: userId }] : []),
+              ],
+            },
+            select: { ten_nguyen_lieu: true },
+            orderBy: { ten_nguyen_lieu: 'asc' },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const patientLabels = (patients || [])
+      .filter((p: any) => p.ma_benh_nhan_bv && String(p.ma_benh_nhan_bv).trim().length > 0)
+      .map((p: any) => `${String(p.ma_benh_nhan_bv).trim()} - ${p.ho_ten || ''}`);
+
+    const ingredientNames = (ingredients || [])
+      .map((i: any) => i.ten_nguyen_lieu?.trim())
+      .filter((name: any): name is string => !!name && name.length > 0);
+
+    const fileName =
+      normalizedType === 'INGREDIENT_ONLY'
+        ? 'Template_import_khau_phan_24h_theo_ngay.xlsx'
+        : 'Template_import_khau_phan_24h_theo_bua.xlsx';
+    const safeFileName = path.basename(fileName);
+    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
+
     const workbook = new ExcelJS.Workbook();
+    let loadedFromTemplateFile = false;
+
+    if (fs.existsSync(filePath)) {
+      try {
+        await workbook.xlsx.readFile(filePath);
+        loadedFromTemplateFile = true;
+      } catch (err: any) {
+        this.logger.warn(
+          `Không thể đọc file template tĩnh ${safeFileName}, chuyển sang khởi tạo động: ${err.message}`,
+        );
+      }
+    }
+
+    if (loadedFromTemplateFile) {
+      // Điền sheet DS_benh_nhan
+      let patientSheet = workbook.getWorksheet('DS_benh_nhan');
+      if (!patientSheet) {
+        patientSheet = workbook.addWorksheet('DS_benh_nhan');
+        patientSheet.addRow(['Danh sách bệnh nhân (Mã - Họ tên)']);
+      } else {
+        for (let r = 2; r <= patientSheet.rowCount; r++) {
+          patientSheet.getRow(r).getCell(1).value = null;
+        }
+      }
+      patientLabels.forEach((label, idx) => {
+        patientSheet!.getRow(idx + 2).getCell(1).value = label;
+      });
+
+      // Điền sheet DS_nguyen_lieu
+      let refSheet = workbook.getWorksheet(DailyIntakeExcelService.REF_SHEET);
+      if (!refSheet) {
+        refSheet = workbook.addWorksheet(DailyIntakeExcelService.REF_SHEET);
+        refSheet.addRow(['Tên nguyên liệu thực phẩm']);
+      } else {
+        for (let r = 2; r <= refSheet.rowCount; r++) {
+          refSheet.getRow(r).getCell(1).value = null;
+        }
+      }
+      ingredientNames.forEach((name, idx) => {
+        refSheet!.getRow(idx + 2).getCell(1).value = name;
+      });
+
+      // Cập nhật DataValidation cho sheet nhập liệu chính
+      const dataSheet =
+        workbook.getWorksheet(DailyIntakeExcelService.DATA_SHEET) || workbook.worksheets[0];
+      if (dataSheet) {
+        const ingColLetter = normalizedType === 'INGREDIENT_ONLY' ? 'C' : 'F';
+        const patientEndRow = Math.max(patientLabels.length + 1, 2);
+        const ingEndRow = Math.max(ingredientNames.length + 1, 2);
+
+        for (let r = 2; r <= EXCEL_LIMITS.MAX_IMPORT_ROWS; r++) {
+          if (patientLabels.length > 0) {
+            dataSheet.getCell(`A${r}`).dataValidation = {
+              type: 'list',
+              allowBlank: true,
+              formulae: [`DS_benh_nhan!$A$2:$A$${patientEndRow}`],
+              showErrorMessage: true,
+              errorTitle: 'Giá trị không hợp lệ',
+              error: 'Vui lòng chọn từ danh sách',
+            };
+          }
+          if (ingredientNames.length > 0) {
+            dataSheet.getCell(`${ingColLetter}${r}`).dataValidation = {
+              type: 'list',
+              allowBlank: true,
+              formulae: [`${DailyIntakeExcelService.REF_SHEET}!$A$2:$A$${ingEndRow}`],
+              showErrorMessage: true,
+              errorTitle: 'Giá trị không hợp lệ',
+              error: 'Vui lòng chọn từ danh sách',
+            };
+          }
+        }
+      }
+
+      if (!workbook.getWorksheet(DailyIntakeExcelService.DATA_SHEET) && workbook.worksheets[0]) {
+        workbook.worksheets[0].name = DailyIntakeExcelService.DATA_SHEET;
+      }
+      if (!workbook.getWorksheet(DailyIntakeExcelService.GUIDE_SHEET)) {
+        const guideSheet = workbook.addWorksheet(DailyIntakeExcelService.GUIDE_SHEET, {
+          views: [{ showGridLines: true }],
+        });
+        this.populateDailyIntakeGuideSheet(guideSheet);
+      }
+
+      return Buffer.from(await workbook.xlsx.writeBuffer());
+    }
+
     workbook.creator = 'Nutri Clinical Intelligence';
     workbook.created = new Date();
 
@@ -182,11 +339,28 @@ export class DailyIntakeExcelService {
     const dataSheet = workbook.addWorksheet(DailyIntakeExcelService.DATA_SHEET, {
       views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
     });
+    const patientSheet = workbook.addWorksheet('DS_benh_nhan', {
+      views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
+    });
     const guideSheet = workbook.addWorksheet(DailyIntakeExcelService.GUIDE_SHEET, {
       views: [{ showGridLines: true }],
     });
     const refSheet = workbook.addWorksheet(DailyIntakeExcelService.REF_SHEET, {
       views: [{ showGridLines: true, state: 'frozen', ySplit: 1 }],
+    });
+
+    // Điền DS_benh_nhan
+    const patientHeaderRow = patientSheet.addRow(['Danh sách bệnh nhân (Mã - Họ tên)']);
+    patientHeaderRow.height = 26;
+    patientHeaderRow.font = {
+      name: EXCEL_FONT_FAMILY,
+      size: 11,
+      bold: true,
+      color: { argb: 'FFFFFFFF' },
+    };
+    patientSheet.getColumn(1).width = 45;
+    patientLabels.forEach((label) => {
+      patientSheet.addRow([label]);
     });
 
     // Cấu hình Header
@@ -207,17 +381,6 @@ export class DailyIntakeExcelService {
     dataSheet.getColumn(5).width = 30; // Ghi chú
 
     this.applyRowBorder(headerRow, 'medium');
-
-    // Nạp danh sách nguyên liệu từ DB
-    const ingredients = await this.prisma.nguyen_lieu.findMany({
-      where: { deleted_at: null },
-      select: { ten_nguyen_lieu: true },
-      orderBy: { ten_nguyen_lieu: 'asc' },
-    });
-
-    const ingredientNames = ingredients
-      .map((i) => i.ten_nguyen_lieu?.trim())
-      .filter((name): name is string => !!name && name.length > 0);
 
     // 2. Sheet DS_nguyen_lieu (Tham chiếu cho Dropdown)
     const refHeaderRow = refSheet.addRow(['Tên nguyên liệu thực phẩm']);
@@ -379,6 +542,15 @@ export class DailyIntakeExcelService {
     fileBuffer,
     options,
   }: ImportDailyIntakeExcelParamDto): Promise<DailyIntakeImportResult> {
+    const role = options?.userRole ? String(options.userRole).toUpperCase() : '';
+    const allowedRoles: string[] = [UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.USERPRO];
+    if (!role || !allowedRoles.includes(role)) {
+      throw new ForbiddenException({
+        code: AUTH_ERROR_FORBIDDEN,
+        message: 'Bạn không có quyền thực hiện thao tác này.',
+      });
+    }
+
     if (!fileBuffer || fileBuffer.length === 0) {
       throw new HttpException(
         {
@@ -824,15 +996,33 @@ export class DailyIntakeExcelService {
                   );
                   dateOk = false;
                 } else {
-                  curIntakeDraft = {
-                    patient: curPatient,
-                    date: curDate,
-                    dateKey,
-                    inputType: isByMeal ? IntakeInputType.BY_MEAL : IntakeInputType.INGREDIENT_ONLY,
-                    meals: new Map(),
-                    notes: options.notes,
-                  };
-                  intakeDrafts.set(draftKey, curIntakeDraft);
+                  const existingInDb =
+                    !options.overwrite && typeof this.prisma.khau_phan_24h?.findFirst === 'function'
+                      ? await this.prisma.khau_phan_24h.findFirst({
+                          where: {
+                            benh_nhan_id: BigInt(String(curPatient.id)),
+                            ngay_an: curDate,
+                          },
+                          select: { id: true },
+                        })
+                      : null;
+
+                  if (existingInDb) {
+                    currentErrors.push('Đã tồn tại khẩu phần 24h của bệnh nhân trong ngày này');
+                    dateOk = false;
+                  } else {
+                    curIntakeDraft = {
+                      patient: curPatient,
+                      date: curDate,
+                      dateKey,
+                      inputType: isByMeal
+                        ? IntakeInputType.BY_MEAL
+                        : IntakeInputType.INGREDIENT_ONLY,
+                      meals: new Map(),
+                      notes: options.notes,
+                    };
+                    intakeDrafts.set(draftKey, curIntakeDraft);
+                  }
                 }
               }
             } else if (curDateRaw == null) {
@@ -950,7 +1140,7 @@ export class DailyIntakeExcelService {
                 if (!curIntakeDraft.meals.has(1)) {
                   curIntakeDraft.meals.set(1, {
                     order: 1,
-                    mealName: 'Bữa 1',
+                    mealName: null as any,
                     firstRow: rowNumber,
                     weights: new Map(),
                   });
@@ -1033,9 +1223,9 @@ export class DailyIntakeExcelService {
     if (hasAnyError || rowErrors.length > 0) {
       const errorBuffer = await ExcelStreamReader.generateErrorWorkbook({
         headers: currentHeaders,
-        rows: errorRowItems.slice(0, 500),
+        rows: errorRowItems,
         sheetName: 'Ket_qua_kiem_tra',
-        resultHeaderTitle: 'Chi tiết lỗi kiểm tra (Validation Errors)',
+        resultHeaderTitle: 'Kết quả kiểm tra / Validation Errors',
         resultColumnWidth: 45,
       });
 
@@ -1047,7 +1237,7 @@ export class DailyIntakeExcelService {
         skipped: totalDataRows,
         errorsCount: rowErrors.length,
         totalRows: totalDataRows,
-        errorRows: rowErrors.slice(0, 500),
+        errorRows: rowErrors,
         errorFileName: 'khau_phan_24h_loi_nhap_lieu.xlsx',
         errorFileBuffer: errorBuffer,
         message: `Import thất bại: Phát hiện ${rowErrors.length} lỗi trong bảng kê. Vui lòng kiểm tra file đính kèm để xem chi tiết.`,
@@ -1158,7 +1348,7 @@ export class DailyIntakeExcelService {
 
       if (this.cacheService) {
         await this.cacheService.invalidateTag(`daily_intake:${singlePatient.id}`);
-        await this.cacheService.invalidateTag('daily_intakes');
+        await this.cacheService.invalidateTag(CACHE_TAG_DAILY_INTAKES);
       }
 
       this.logger.log(
@@ -1248,7 +1438,10 @@ export class DailyIntakeExcelService {
             const createdMeal = await tx.khau_phan_24h_bua_an.create({
               data: {
                 khau_phan_24h_id: newIntake.id,
-                ten_bua: mealDraft.mealName,
+                ten_bua:
+                  draft.inputType === IntakeInputType.INGREDIENT_ONLY
+                    ? null
+                    : mealDraft.mealName || null,
                 gio_an: mealDraft.mealTime || null,
                 thu_tu_bua: mealDraft.order,
               },
@@ -1274,7 +1467,7 @@ export class DailyIntakeExcelService {
       for (const pId of affectedPatientIds) {
         await this.cacheService.invalidateTag(`daily_intake:${pId}`);
       }
-      await this.cacheService.invalidateTag('daily_intakes');
+      await this.cacheService.invalidateTag(CACHE_TAG_DAILY_INTAKES);
     }
 
     return {
@@ -1406,7 +1599,7 @@ export class DailyIntakeExcelService {
         cacheKey,
         buffer.toString('base64'),
         1800,
-        `daily_intake_${intake.id}`,
+        CACHE_TAG_DAILY_INTAKES,
       );
     }
 
@@ -1860,13 +2053,16 @@ export class DailyIntakeExcelService {
         const ing = item.nguyen_lieu || item.ingredient;
         const net = Number(item.khoi_luong_song_sach ?? item.netWeight ?? 0);
         if (ing && net > 0) {
-          const rawE = Number(
-            ing.energy ??
-              Number(ing.protein || 0) * 4 +
-                Number(ing.fat || 0) * 9 +
-                Number(ing.carbohydrate || 0) * 4,
+          const carbohydrate = Math.max(
+            0,
+            100 -
+              (Number(ing.water || 0) +
+                Number(ing.protein || 0) +
+                Number(ing.fat || 0) +
+                Number(ing.ash || 0)),
           );
-          mealEnergy += (rawE * net) / 100.0;
+          const energy = 4 * Number(ing.protein || 0) + 9 * Number(ing.fat || 0) + 4 * carbohydrate;
+          mealEnergy += (energy * net) / 100.0;
         }
       }
 
@@ -1985,15 +2181,19 @@ export class DailyIntakeExcelService {
         const raw = edible > 0 ? net / (edible / 100.0) : net;
 
         const ratio = net / 100.0;
-        const e =
-          Number(ing?.energy ?? 0) * ratio ||
-          (Number(ing?.protein || 0) * 4 +
-            Number(ing?.fat || 0) * 9 +
-            Number(ing?.carbohydrate || 0) * 4) *
-            ratio;
+        const carbohydrate = Math.max(
+          0,
+          100 -
+            (Number(ing?.water || 0) +
+              Number(ing?.protein || 0) +
+              Number(ing?.fat || 0) +
+              Number(ing?.ash || 0)),
+        );
+        const energy = 4 * Number(ing?.protein || 0) + 9 * Number(ing?.fat || 0) + 4 * carbohydrate;
+        const e = energy * ratio;
         const p = Number(ing?.protein ?? 0) * ratio;
         const f = Number(ing?.fat ?? 0) * ratio;
-        const c = Number(ing?.carbohydrate ?? 0) * ratio;
+        const c = carbohydrate * ratio;
         const ca = Number(ing?.calci ?? 0) * ratio;
         const fe = Number(ing?.iron ?? 0) * ratio;
         const vc = Number(ing?.vitaminC ?? 0) * ratio;
@@ -2115,8 +2315,25 @@ export class DailyIntakeExcelService {
         if (!ing || net <= 0) continue;
 
         const ratio = net / 100.0;
+        const carbohydrate = Math.max(
+          0,
+          100 -
+            (Number(ing.water || 0) +
+              Number(ing.protein || 0) +
+              Number(ing.fat || 0) +
+              Number(ing.ash || 0)),
+        );
+        const energy = 4 * Number(ing.protein || 0) + 9 * Number(ing.fat || 0) + 4 * carbohydrate;
+
         for (const code of NUTRIENT_CODES) {
-          const rawVal = Number(ing[code] ?? 0);
+          let rawVal = 0;
+          if (code === 'carbohydrate') {
+            rawVal = carbohydrate;
+          } else if (code === 'energy') {
+            rawVal = energy;
+          } else {
+            rawVal = Number(ing[code] ?? 0);
+          }
           totalNutrients[code] = (totalNutrients[code] || 0) + rawVal * ratio;
         }
       }
@@ -2232,7 +2449,7 @@ export class DailyIntakeExcelService {
     errors: DailyIntakeRowValidationError[],
   ): Promise<Buffer> {
     const errWorkbook = new ExcelJS.Workbook();
-    const errSheet = errWorkbook.addWorksheet('Ket_qua_kiem_tra', {
+    const errSheet = errWorkbook.addWorksheet(DailyIntakeExcelService.DATA_SHEET, {
       views: [{ showGridLines: true }],
     });
 
@@ -2259,7 +2476,7 @@ export class DailyIntakeExcelService {
     }
 
     const errColIdx = DailyIntakeExcelService.EXPECTED_HEADERS.length + 1;
-    headerRow.getCell(errColIdx).value = 'Chi tiết lỗi kiểm tra (Validation Errors)';
+    headerRow.getCell(errColIdx).value = 'Kết quả import';
     headerRow.getCell(errColIdx).font = EXCEL_STYLES.FONTS.HEADER;
     headerRow.getCell(errColIdx).fill = {
       type: 'pattern',
@@ -2323,7 +2540,18 @@ export class DailyIntakeExcelService {
         return false;
       }
     }
-    return true;
+    const extraCell = row.getCell
+      ? row.getCell(DailyIntakeExcelService.EXPECTED_HEADERS.length + 1)
+      : null;
+    const extraVal = (
+      ExcelStreamReader.readCellString({ cell: extraCell, sanitize: false }) || ''
+    ).toLowerCase();
+    return (
+      !extraVal ||
+      extraVal === 'kết quả import' ||
+      extraVal === 'ket_qua_import' ||
+      extraVal.includes('validation errors')
+    );
   }
 
   private extractPatientCode(raw: string): string {

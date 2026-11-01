@@ -53,9 +53,13 @@ export class ExcelThrottleGuard implements CanActivate {
 
     const response = context.switchToHttp().getResponse();
     if (response && typeof response.once === 'function') {
+      let released = false;
       const release = () => {
-        if (ExcelThrottleGuard.activeJobs > 0) {
-          ExcelThrottleGuard.activeJobs--;
+        if (!released) {
+          released = true;
+          if (ExcelThrottleGuard.activeJobs > 0) {
+            ExcelThrottleGuard.activeJobs--;
+          }
         }
       };
       response.once('finish', release);

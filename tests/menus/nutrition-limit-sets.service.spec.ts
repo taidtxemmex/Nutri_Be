@@ -60,7 +60,7 @@ describe('NutritionLimitSetsService', () => {
         currentUser: mockUser,
       });
 
-      expect(res.id).toBe('1');
+      expect(res.id).toBe(1);
       expect(res.warningRule).toBe(NutritionLimitWarning.GTE_5);
       expect(mockCache.invalidateTag).toHaveBeenCalledWith('nutrition-limit-sets');
     });
@@ -126,7 +126,7 @@ describe('NutritionLimitSetsService', () => {
       });
 
       const res = await service.getById({ id: '1', currentUser: mockUser });
-      expect(res.id).toBe('1');
+      expect(res.id).toBe(1);
     });
 
     it('cập nhật bộ giới hạn dinh dưỡng thành công', async () => {

@@ -36,18 +36,18 @@ export class CreateAnthropometryDto {
   @IsNotEmpty({ message: 'Cân nặng không được để trống' })
   @Type(() => Number)
   @IsNumber({}, { message: 'Cân nặng phải là số' })
-  @Min(0.5, { message: 'Cân nặng phải lớn hơn hoặc bằng 0.5 kg' })
+  @Min(0.01, { message: 'Cân nặng phải lớn hơn hoặc bằng 0.01 kg' })
   @Max(500, { message: 'Cân nặng không được vượt quá 500 kg' })
   weight: number;
 
   @ApiProperty({
-    description: 'Chiều cao (cm)',
+    description: 'Chiều cao (cm hoặc m)',
     example: 172.0,
   })
   @IsNotEmpty({ message: 'Chiều cao không được để trống' })
   @Type(() => Number)
   @IsNumber({}, { message: 'Chiều cao phải là số' })
-  @Min(20, { message: 'Chiều cao phải lớn hơn hoặc bằng 20 cm' })
+  @Min(0.01, { message: 'Chiều cao phải lớn hơn hoặc bằng 0.01' })
   @Max(300, { message: 'Chiều cao không được vượt quá 300 cm' })
   height: number;
 

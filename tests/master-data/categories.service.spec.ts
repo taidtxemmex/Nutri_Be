@@ -135,5 +135,27 @@ describe('CategoriesService', () => {
       expect(result.success).toBe(true);
       expect(mockCache.debouncedInvalidateTags).toHaveBeenCalledWith(['categories', 'category:1']);
     });
+
+    it('should ignore soft-deleted ingredients (deleted_at !== null) when deleting category', async () => {
+      mockPrisma.nguyen_lieu = {
+        count: jest.fn().mockResolvedValue(0),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      };
+      mockPrisma.danh_muc.findUnique.mockResolvedValue({
+        id: 1,
+        _count: {
+          nguyen_lieu_nguyen_lieu_danh_mucTodanh_muc: 0,
+          de_xuat_nguyen_lieu_de_xuat_nguyen_lieu_danh_mucTodanh_muc: 0,
+        },
+      });
+      mockPrisma.danh_muc.delete.mockResolvedValue({ id: 1 });
+
+      const result = await service.delete({ id: 1 });
+
+      expect(result.success).toBe(true);
+      expect(mockPrisma.nguyen_lieu.count).toHaveBeenCalledWith({
+        where: { danh_muc: 1, deleted_at: null },
+      });
+    });
   });
 });

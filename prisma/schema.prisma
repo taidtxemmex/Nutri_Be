@@ -561,7 +561,7 @@ model nguoi_dung {
 
 model nguyen_lieu {
   id                                      BigInt                      @id @default(autoincrement())
-  ten_nguyen_lieu                         String                      @db.VarChar(255)
+  ten_nguyen_lieu                         String                      @unique(map: "uk_ingredient_name") @db.VarChar(255)
   danh_muc                                Int?
   edible                                  Float?
   water                                   Float?

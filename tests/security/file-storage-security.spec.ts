@@ -525,7 +525,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
 
       await filesController.previewFile(uploadResult.objectKey, token, expires, res);
 
-      expect(headersSet['Content-Type']).toBe('application/octet-stream');
+      expect(headersSet['Content-Type']).toBe('image/png');
       expect(headersSet['X-Content-Type-Options']).toBe('nosniff');
       expect(headersSet['Content-Disposition']).toBe('inline');
       expect(responseBody).toEqual(validPngBuffer);

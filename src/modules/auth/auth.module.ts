@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { PrismaModule } from '../../core/database/prisma.module';
 import { AuthController } from './controllers/auth.controller';
 import { AuthService } from './services/auth.service';
+import { DeviceService } from './services/device.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
@@ -34,7 +35,15 @@ import { ACCESS_TOKEN_EXPIRES_IN } from '../../config/constants/auth.constants';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard],
-  exports: [AuthService, JwtStrategy, JwtAuthGuard, RolesGuard, JwtModule, PassportModule],
+  providers: [AuthService, DeviceService, JwtStrategy, JwtAuthGuard, RolesGuard],
+  exports: [
+    AuthService,
+    DeviceService,
+    JwtStrategy,
+    JwtAuthGuard,
+    RolesGuard,
+    JwtModule,
+    PassportModule,
+  ],
 })
 export class AuthModule {}

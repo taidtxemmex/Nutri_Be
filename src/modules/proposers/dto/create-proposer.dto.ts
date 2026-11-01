@@ -5,8 +5,14 @@ import { Transform } from 'class-transformer';
 export class CreateProposerDto {
   @ApiPropertyOptional({ example: 'Thạc sĩ Dinh dưỡng', description: 'Trình độ học vấn' })
   @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string'
+      ? value.trim()
+      : Array.isArray(value)
+        ? value.join(', ').trim()
+        : value,
+  )
   @IsString({ message: 'Trình độ học vấn phải là chuỗi' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @MaxLength(100, { message: 'Trình độ học vấn tối đa 100 ký tự' })
   education?: string;
 
@@ -43,4 +49,16 @@ export class CreateProposerDto {
   @IsString({ message: 'userId phải là chuỗi' })
   @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
   userId?: string;
+
+  @ApiPropertyOptional({ example: '0987654321', description: 'Số điện thoại (tùy chọn)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'CHO_DUYET', description: 'Trạng thái (tùy chọn)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  status?: string;
 }

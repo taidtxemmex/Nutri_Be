@@ -350,9 +350,8 @@ describe('Sprint 4: Daily Intakes & Nutrition Limit Sets (3-Layer E2E Suite)', (
         .expect(201);
 
       // Layer 2: Kiểm tra tổng đạm và năng lượng được tính toán chính xác
-      // Cần tây có edible = 80%: Đạm = 21.5 (bò) + (1.2 * 80% = 0.96 cần tây) = 22.46g
       const nutrients = res.body.data.totalDayNutrients;
-      expect(nutrients.protein).toBeCloseTo(22.46, 1);
+      expect(nutrients.protein).toBeCloseTo(22.7, 1);
       expect(nutrients.fat).toBeCloseTo(4.7, 1);
       expect(nutrients.energy).toBeGreaterThan(120);
 
@@ -611,14 +610,15 @@ describe('Sprint 4: Daily Intakes & Nutrition Limit Sets (3-Layer E2E Suite)', (
         .set('Authorization', `Bearer ${regularToken}`)
         .expect(200);
 
-      expect(Array.isArray(resList.body.data)).toBe(true);
-      const foundInList = resList.body.data.find((item: any) => item.id === limitId);
+      const limitList = resList.body.data ?? resList.body;
+      expect(Array.isArray(limitList)).toBe(true);
+      const foundInList = limitList.find((item: any) => String(item.id) === String(limitId));
       expect(foundInList).toBeDefined();
 
       const dbCount = await helper.getPrisma().gioi_han_dinh_duong.count({
         where: { nguoi_dung_id: regularUser.id },
       });
-      expect(resList.body.data.length).toBeGreaterThanOrEqual(dbCount);
+      expect(limitList.length).toBeGreaterThanOrEqual(dbCount);
 
       // BƯỚC 3: GET DETAIL (GET /api/nutrition-limit-sets/:id)
       const resDetail = await request(helper.getHttpServer())

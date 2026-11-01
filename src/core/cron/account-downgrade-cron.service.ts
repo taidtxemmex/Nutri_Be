@@ -99,6 +99,7 @@ export class AccountDowngradeCronService {
         },
         data: {
           vai_tro: UserRole.USER,
+          pro_expired_at: null,
         },
       });
 

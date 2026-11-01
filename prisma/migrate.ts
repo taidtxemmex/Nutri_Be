@@ -60,11 +60,17 @@ export async function down(targetMigrationName?: string): Promise<void> {
     console.log(`📖 Đang đọc script rollback từ: ${rollbackSqlPath}`);
     const sqlContent = fs.readFileSync(rollbackSqlPath, 'utf8');
 
-    // Tách các câu lệnh SQL theo dấu chấm phẩy
+    // Tách các câu lệnh SQL theo dấu chấm phẩy và loại bỏ comments
     const rawStatements = sqlContent
       .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 0 && !s.startsWith('--'));
+      .map((s) =>
+        s
+          .split('\n')
+          .filter((line) => !line.trim().startsWith('--'))
+          .join('\n')
+          .trim(),
+      )
+      .filter((s) => s.length > 0);
 
     console.log(
       `⚡ Đang thực thi ${rawStatements.length} câu lệnh DDL rollback cho [${targetName}]...`,

@@ -70,19 +70,24 @@ export class FileMagicBytePipe implements PipeTransform<
       });
     }
 
+    const originalName = file.originalname || '';
+    const rawExt = path.extname(originalName).toLowerCase();
+
     // 2. Nhận diện định dạng tệp qua Magic Bytes thực sự
-    const detected = this.detectMagicBytes(buffer);
+    const detected = this.detectMagicBytes(buffer, rawExt);
     if (!detected) {
       throw new BadRequestException({
         code: 'FILE_INVALID_MAGIC_BYTES',
         message:
-          'Mã nhận dạng tệp (Magic Bytes) không hợp lệ hoặc định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WebP, GIF hoặc PDF.',
+          'Mã nhận dạng tệp (Magic Bytes) không hợp lệ hoặc định dạng tệp không được hỗ trợ. Chỉ chấp nhận JPG, PNG, WebP, GIF, PDF, DOC, DOCX, XLS hoặc XLSX.',
       });
     }
 
     // 3. Kiểm tra phạm vi cho phép theo cấu hình
     const isImage = detected.mime.startsWith('image/');
-    const isDoc = detected.mime === 'application/pdf';
+    const isDoc = (FILE_SECURITY_CONFIG.ALLOWED_DOCUMENT_MIME_TYPES as readonly string[]).includes(
+      detected.mime,
+    );
 
     if (isImage && !this.options.allowImages) {
       throw new BadRequestException({
@@ -102,8 +107,6 @@ export class FileMagicBytePipe implements PipeTransform<
     this.assertNoMaliciousPayload(buffer);
 
     // 5. Kiểm tra tính tương thích giữa phần mở rộng và Magic Bytes (Chống MIME Spoofing)
-    const originalName = file.originalname || '';
-    const rawExt = path.extname(originalName).toLowerCase();
     const allowedExts = FILE_SECURITY_CONFIG.ALLOWED_EXTENSIONS[detected.mime];
 
     if (!rawExt || !allowedExts || !allowedExts.includes(rawExt)) {
@@ -124,7 +127,7 @@ export class FileMagicBytePipe implements PipeTransform<
     if (isDoc && buffer.length > FILE_SECURITY_CONFIG.MAX_DOCUMENT_SIZE_BYTES) {
       throw new BadRequestException({
         code: 'FILE_TOO_LARGE',
-        message: 'Dung lượng tài liệu PDF vượt quá giới hạn tối đa cho phép (10MB)',
+        message: 'Dung lượng tài liệu vượt quá giới hạn tối đa cho phép (10MB)',
       });
     }
 
@@ -139,7 +142,7 @@ export class FileMagicBytePipe implements PipeTransform<
   /**
    * Quét và nhận dạng chữ ký nhị phân Magic Bytes
    */
-  public detectMagicBytes(buffer: Buffer): DetectedFileType | null {
+  public detectMagicBytes(buffer: Buffer, rawExt?: string): DetectedFileType | null {
     const mb = FILE_SECURITY_CONFIG.MAGIC_BYTES;
 
     // JPEG: FF D8 FF
@@ -190,6 +193,43 @@ export class FileMagicBytePipe implements PipeTransform<
       buffer[3] === mb.GIF[3]
     ) {
       return { mime: 'image/gif', ext: '.gif' };
+    }
+
+    // ZIP / OOXML: 50 4B 03 04 (.docx, .xlsx)
+    if (
+      buffer[0] === mb.ZIP_OOXML[0] &&
+      buffer[1] === mb.ZIP_OOXML[1] &&
+      buffer[2] === mb.ZIP_OOXML[2] &&
+      buffer[3] === mb.ZIP_OOXML[3]
+    ) {
+      if (rawExt === '.xlsx') {
+        return {
+          mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          ext: '.xlsx',
+        };
+      }
+      return {
+        mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        ext: '.docx',
+      };
+    }
+
+    // OLE2 Compound Document: D0 CF 11 E0 A1 B1 1A E1 (.doc, .xls)
+    if (
+      buffer.length >= 8 &&
+      buffer[0] === mb.OLE2[0] &&
+      buffer[1] === mb.OLE2[1] &&
+      buffer[2] === mb.OLE2[2] &&
+      buffer[3] === mb.OLE2[3] &&
+      buffer[4] === mb.OLE2[4] &&
+      buffer[5] === mb.OLE2[5] &&
+      buffer[6] === mb.OLE2[6] &&
+      buffer[7] === mb.OLE2[7]
+    ) {
+      if (rawExt === '.xls') {
+        return { mime: 'application/vnd.ms-excel', ext: '.xls' };
+      }
+      return { mime: 'application/msword', ext: '.doc' };
     }
 
     return null;

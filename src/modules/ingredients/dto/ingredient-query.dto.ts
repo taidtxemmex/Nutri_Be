@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsInt, Min, IsIn, MaxLength } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Transform } from 'class-transformer';
 import { BasePaginationQueryDto } from '../../../common/dto/base-pagination-query.dto';
 
 export class IngredientQueryDto extends BasePaginationQueryDto {
@@ -18,10 +18,18 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
     return isNaN(num) ? undefined : num;
   })
   @IsOptional()
-  @Type(() => Number)
   @IsInt()
   @Min(1)
   categoryId?: number;
+
+  @ApiPropertyOptional({ description: 'Lọc theo tên hoặc ID nhóm nguyên liệu' })
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : String(value).trim(),
+  )
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  category?: string;
 
   @ApiPropertyOptional({
     description: 'Lọc theo loại protein',
@@ -29,6 +37,7 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
   })
   @Transform(({ value, obj }) => {
     const raw = value !== undefined ? value : obj?.proteinType;
+    if (raw === '' || raw === null || raw === undefined) return undefined;
     if (raw === 'Thực vật') return 'THUC_VAT';
     if (raw === 'Động vật' || raw === 'Động Vật') return 'DONG_VAT';
     return raw;
@@ -43,7 +52,11 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
     description: 'Lọc theo trạng thái duyệt',
     enum: ['DA_DUYET', 'CHO_DUYET', 'TU_CHOI'],
   })
-  @Transform(({ value, obj }) => (value !== undefined ? value : obj?.status))
+  @Transform(({ value, obj }) => {
+    const raw = value !== undefined ? value : obj?.status;
+    if (raw === '' || raw === null || raw === undefined) return undefined;
+    return raw;
+  })
   @IsOptional()
   @IsString()
   @MaxLength(50)

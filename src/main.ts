@@ -29,6 +29,10 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
+  // 0.1. Cấu hình giới hạn kích thước request body 20MB (đồng bộ với Java Spring Boot, hỗ trợ thực đơn 30 ngày & ảnh Base64)
+  app.useBodyParser('json', { limit: '20mb' });
+  app.useBodyParser('urlencoded', { limit: '20mb', extended: true });
+
   // 1. HTTP Security Headers (Helmet, noSniff, HSTS, SAMEORIGIN, strip X-Powered-By)
   applySecurityHeaders(app);
 
@@ -105,4 +109,7 @@ async function bootstrap() {
   logger.log(`🚀 Application running on: http://localhost:${port}/${globalPrefix}`);
 }
 
-bootstrap();
+bootstrap().catch((err) => {
+  console.error('Bootstrap error', err);
+  process.exit(1);
+});

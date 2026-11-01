@@ -80,15 +80,28 @@ export class DishesService {
     });
 
     return {
-      id: dish.id.toString(),
+      id: Number(dish.id) as any,
       name: dish.ten_mon,
+      coefficient: Number(dish.he_so_song_chin ?? 1),
+      dishWeight: calc.cookedWeightGrams,
       status: dish.trang_thai || null,
       recipeHash: dish.recipe_hash || null,
-      dishWeight: calc.cookedWeightGrams,
-      totalNutrients: calc.nutrients,
       isMine: Boolean(currentUserId && dish.nguoi_dung_id === currentUserId),
-      createdAt: dish.ngay_tao || null,
-    };
+      rejectReason: dish.ly_do_tu_choi ?? null,
+      createdAt: dish.ngay_tao ?? null,
+      createdBy: dish.nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung?.ten_dang_nhap ?? null,
+      approvedAt: dish.ngay_phe_duyet ?? null,
+      approvedBy: dish.nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung?.ten_dang_nhap ?? null,
+      totalNutrients: calc.nutrients,
+    } as any;
+  }
+
+  private mapDishEntityToResponse(dish: any): DishResponseDto {
+    return this.mapToDetailDto(dish);
+  }
+
+  private mapToResponseDto(dish: any): DishResponseDto {
+    return this.mapToDetailDto(dish);
   }
 
   private mapToDetailDto(dish: any): DishResponseDto {
@@ -105,29 +118,35 @@ export class DishesService {
     const details = (dish.chi_tiet_mon_an || []).map((cd: any, index: number) => {
       const breakdown = calc.ingredientBreakdown[index];
       const netWeight = cd.khoi_luong_song_sach != null ? Number(cd.khoi_luong_song_sach) : 0;
+      const ing = cd.nguyen_lieu;
 
       return {
-        ingredientId: cd.nguyen_lieu_id.toString(),
-        ingredientName: cd.nguyen_lieu?.ten_nguyen_lieu || '',
+        ingredientId: Number(cd.nguyen_lieu_id) as any,
+        ingredientName: ing?.ten_nguyen_lieu || '',
         netWeight,
-        edible: cd.nguyen_lieu?.edible != null ? Number(cd.nguyen_lieu.edible) : null,
+        edible: ing?.edible != null ? Number(ing.edible) : null,
+        proteinType: ing?.loai_protein ?? null,
+        categoryName: ing?.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc ?? null,
         nutrients: breakdown ? breakdown.nutrients : {},
       };
     });
 
     return {
-      id: dish.id.toString(),
+      id: Number(dish.id) as any,
       name: dish.ten_mon,
       status: dish.trang_thai || null,
       recipeHash: dish.recipe_hash || null,
       dishWeight: calc.cookedWeightGrams,
       totalNutrients: calc.nutrients,
       details,
-      originalDishId: dish.mon_goc_id ? dish.mon_goc_id.toString() : null,
-      rejectReason: dish.ly_do_tu_choi || null,
-      approvedAt: dish.ngay_phe_duyet || null,
-      createdAt: dish.ngay_tao || null,
-    };
+      originalDishId: (dish.mon_goc_id ? Number(dish.mon_goc_id) : null) as any,
+      userId: dish.nguoi_dung_id ?? null,
+      rejectReason: dish.ly_do_tu_choi ?? null,
+      createdAt: dish.ngay_tao ?? null,
+      createdBy: dish.nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung?.ten_dang_nhap ?? null,
+      approvedAt: dish.ngay_phe_duyet ?? null,
+      approvedBy: dish.nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung?.ten_dang_nhap ?? null,
+    } as any;
   }
 
   /**
@@ -221,8 +240,17 @@ export class DishesService {
         where: { id: dish.id },
         include: {
           chi_tiet_mon_an: {
-            include: { nguyen_lieu: true },
+            include: {
+              nguyen_lieu: {
+                include: {
+                  he_so_song_chin: true,
+                  danh_muc_nguyen_lieu_danh_mucTodanh_muc: { select: { ten_danh_muc: true } },
+                },
+              },
+            },
           },
+          nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+          nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
         },
       });
     });
@@ -273,11 +301,13 @@ export class DishesService {
       },
       include: {
         chi_tiet_mon_an: {
-          include: { nguyen_lieu: true },
+          include: { nguyen_lieu: { include: { he_so_song_chin: true } } },
         },
+        nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+        nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
       },
       orderBy: { id: 'desc' },
-      take: 100,
+      take: 1000,
     });
 
     return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId: currentUser.id }));
@@ -298,11 +328,13 @@ export class DishesService {
         },
         include: {
           chi_tiet_mon_an: {
-            include: { nguyen_lieu: true },
+            include: { nguyen_lieu: { include: { he_so_song_chin: true } } },
           },
+          nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+          nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
         },
         orderBy: { ten_mon: 'asc' },
-        take: 100,
+        take: 1000,
       });
 
       return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId }));
@@ -334,11 +366,13 @@ export class DishesService {
         },
         include: {
           chi_tiet_mon_an: {
-            include: { nguyen_lieu: true },
+            include: { nguyen_lieu: { include: { he_so_song_chin: true } } },
           },
+          nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+          nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
         },
         orderBy: { ten_mon: 'asc' },
-        take: 100,
+        take: 1000,
       });
 
       return dishes.map((d) => this.mapToSummaryDto({ dish: d }));
@@ -378,11 +412,13 @@ export class DishesService {
       },
       include: {
         chi_tiet_mon_an: {
-          include: { nguyen_lieu: true },
+          include: { nguyen_lieu: { include: { he_so_song_chin: true } } },
         },
+        nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+        nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
       },
       orderBy: { id: 'desc' },
-      take: 100,
+      take: 1000,
     });
 
     return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId: currentUser?.id }));
@@ -401,10 +437,13 @@ export class DishesService {
     const whereConditions: any[] = [
       { trang_thai: DishStatus.DA_DUYET },
       { trang_thai: DishStatus.HE_THONG },
+      { trang_thai: 'HE_THONG' },
+      { trang_thai: 'DA_DUYET' },
+      { nguoi_dung_id: null },
     ];
 
     if (currentUser?.id) {
-      whereConditions.push({ nguoi_dung_id: currentUser.id });
+      whereConditions.push({ nguoi_dung_id: currentUser.id, trang_thai: DishStatus.RIENG_TU });
     }
 
     const dishes = await this.prisma.mon_an.findMany({
@@ -415,11 +454,13 @@ export class DishesService {
       },
       include: {
         chi_tiet_mon_an: {
-          include: { nguyen_lieu: true },
+          include: { nguyen_lieu: { include: { he_so_song_chin: true } } },
         },
+        nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+        nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
       },
       take: Number(limit) || 10,
-      orderBy: { id: 'desc' },
+      orderBy: { ten_mon: 'asc' },
     });
 
     return dishes.map((d) => this.mapToSummaryDto({ dish: d, currentUserId: currentUser?.id }));
@@ -434,8 +475,17 @@ export class DishesService {
         where: { id: BigInt(id), deleted_at: null },
         include: {
           chi_tiet_mon_an: {
-            include: { nguyen_lieu: true },
+            include: {
+              nguyen_lieu: {
+                include: {
+                  he_so_song_chin: true,
+                  danh_muc_nguyen_lieu_danh_mucTodanh_muc: { select: { ten_danh_muc: true } },
+                },
+              },
+            },
           },
+          nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+          nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
         },
       });
     };
@@ -463,8 +513,35 @@ export class DishesService {
     const isOwner = currentUser?.id && dish.nguoi_dung_id === currentUser.id;
     const isAdminUser = this.isAdmin(currentUser);
 
-    // Không đủ quyền -> ném PROP_019 NOT_FOUND để bảo mật không lộ ID
+    // Không đủ quyền -> kiểm tra xem món gốc có bản đề xuất con đã duyệt hay không, nếu không ném PROP_019 NOT_FOUND
     if (!isPublic && !isOwner && !(isAdminUser && dish.trang_thai !== DishStatus.RIENG_TU)) {
+      const approvedChild = await this.prisma.mon_an.findFirst({
+        where: {
+          mon_goc_id: BigInt(id),
+          trang_thai: DishStatus.DA_DUYET,
+          deleted_at: null,
+        },
+        include: {
+          chi_tiet_mon_an: {
+            include: {
+              nguyen_lieu: {
+                include: {
+                  he_so_song_chin: true,
+                  danh_muc_nguyen_lieu_danh_mucTodanh_muc: { select: { ten_danh_muc: true } },
+                },
+              },
+            },
+          },
+          nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+          nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+        },
+        orderBy: { id: 'desc' },
+      });
+
+      if (approvedChild && approvedChild.trang_thai === DishStatus.DA_DUYET) {
+        return this.mapToDetailDto(approvedChild);
+      }
+
       throw new HttpException(
         { code: 'PROP_019', message: 'Không tìm thấy món ăn' },
         HttpStatus.NOT_FOUND,
@@ -600,8 +677,17 @@ export class DishesService {
         where: { id: BigInt(id) },
         include: {
           chi_tiet_mon_an: {
-            include: { nguyen_lieu: true },
+            include: {
+              nguyen_lieu: {
+                include: {
+                  he_so_song_chin: true,
+                  danh_muc_nguyen_lieu_danh_mucTodanh_muc: { select: { ten_danh_muc: true } },
+                },
+              },
+            },
           },
+          nguoi_dung_mon_an_nguoi_dung_idTonguoi_dung: { select: { ten_dang_nhap: true } },
+          nguoi_dung_mon_an_nguoi_phe_duyet_idTonguoi_dung: { select: { ten_dang_nhap: true } },
         },
       });
     });
@@ -642,15 +728,25 @@ export class DishesService {
     const isAdminUser = this.isAdmin(currentUser);
 
     if (!isPublic && !isOwner && !(isAdminUser && original.trang_thai !== DishStatus.RIENG_TU)) {
-      throw new HttpException(
-        { code: 'PROP_019', message: 'Không tìm thấy món ăn' },
-        HttpStatus.NOT_FOUND,
-      );
+      const approvedChild = await this.prisma.mon_an.findFirst({
+        where: {
+          mon_goc_id: BigInt(dishId),
+          trang_thai: DishStatus.DA_DUYET,
+          deleted_at: null,
+        },
+        select: { id: true, trang_thai: true },
+      });
+      if (!approvedChild || approvedChild.trang_thai !== DishStatus.DA_DUYET) {
+        throw new HttpException(
+          { code: 'PROP_019', message: 'Không tìm thấy món ăn' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
     }
 
     const detailsToClone: Array<{ ingredientId: bigint; netWeight: number }> = [];
 
-    if (request.ingredients && request.ingredients.length > 0) {
+    if (request?.ingredients && request.ingredients.length > 0) {
       for (const ing of request.ingredients) {
         detailsToClone.push({
           ingredientId: BigInt(ing.ingredientId),
@@ -673,7 +769,9 @@ export class DishesService {
       })),
     );
 
-    const cloneName = request.newName ? request.newName.trim() : `${original.ten_mon} (Bản sao)`;
+    const cloneName = request?.newName?.trim()
+      ? request.newName.trim()
+      : `${original.ten_mon} (Bản sao)`;
 
     const cloned = await this.prisma.$transaction(async (tx) => {
       const clone = await tx.mon_an.create({
@@ -712,8 +810,8 @@ export class DishesService {
       }
     }
     return {
-      id: cloned.id.toString(),
-      originalDishId: original.id.toString(),
+      id: Number(cloned.id) as any,
+      originalDishId: Number(original.id) as any,
       name: cloned.ten_mon,
     };
   }
@@ -721,6 +819,7 @@ export class DishesService {
   /**
    * 9. Đề xuất món ăn: PUT /api/dish/:id/propose (và POST)
    * Tối ưu O(1) chống OOM: Kiểm tra trùng công thức qua index DB recipe_hash (idx_mon_an_recipe_hash)
+   * Tạo bản ghi mon_an mới (trang_thai = CHO_DUYET, mon_goc_id = originalDish.id), giữ nguyên món gốc RIENG_TU
    */
   async proposeDish({ dishId, currentUser }: ProposeDishParamsDto): Promise<{ message: string }> {
     const dish = await this.prisma.mon_an.findFirst({
@@ -790,12 +889,37 @@ export class DishesService {
       }
     }
 
-    await this.prisma.mon_an.update({
-      where: { id: BigInt(dishId) },
-      data: {
-        trang_thai: DishStatus.CHO_DUYET,
-        recipe_hash: hash,
-      },
+    const createdProposal = await this.prisma.$transaction(async (tx) => {
+      await tx.mon_an.update({
+        where: { id: dish.id },
+        data: {
+          trang_thai: DishStatus.CHO_DUYET,
+          ...(hash ? { recipe_hash: hash } : {}),
+        },
+      });
+
+      const proposal = await tx.mon_an.create({
+        data: {
+          ten_mon: dish.ten_mon,
+          trang_thai: DishStatus.CHO_DUYET,
+          mon_goc_id: dish.id,
+          nguoi_dung_id: dish.nguoi_dung_id,
+          ngay_tao: new Date(),
+          recipe_hash: hash,
+        },
+      });
+
+      if (dish.chi_tiet_mon_an && dish.chi_tiet_mon_an.length > 0) {
+        await tx.chi_tiet_mon_an.createMany({
+          data: dish.chi_tiet_mon_an.map((oldDetail) => ({
+            mon_an_id: proposal.id,
+            nguyen_lieu_id: oldDetail.nguyen_lieu_id,
+            khoi_luong_song_sach: oldDetail.khoi_luong_song_sach,
+          })),
+        });
+      }
+
+      return proposal;
     });
 
     if (this.cacheService) {
@@ -808,7 +932,10 @@ export class DishesService {
         await this.cacheService.invalidateTag(CACHE_TAG_DISHES);
       }
     }
-    return { message: 'Đã gửi đề xuất' };
+    return {
+      message: 'Đã gửi đề xuất',
+      ...(createdProposal?.id != null ? { id: createdProposal.id.toString() } : {}),
+    };
   }
 
   /**
@@ -826,15 +953,29 @@ export class DishesService {
       );
     }
 
-    if (dish.trang_thai !== DishStatus.CHO_DUYET) {
-      throw new HttpException(
-        { code: 'DISH_001', message: 'Món ăn không ở trạng thái chờ duyệt' },
-        HttpStatus.BAD_REQUEST,
-      );
+    let targetDish = dish;
+    if (targetDish.trang_thai !== DishStatus.CHO_DUYET) {
+      const childProposal = await this.prisma.mon_an.findFirst({
+        where: {
+          mon_goc_id: BigInt(id),
+          trang_thai: DishStatus.CHO_DUYET,
+          deleted_at: null,
+        },
+        orderBy: { id: 'desc' },
+      });
+
+      if (childProposal && childProposal.trang_thai === DishStatus.CHO_DUYET) {
+        targetDish = childProposal;
+      } else {
+        throw new HttpException(
+          { code: 'DISH_001', message: 'Món ăn không ở trạng thái chờ duyệt' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
     }
 
     await this.prisma.mon_an.update({
-      where: { id: BigInt(id) },
+      where: { id: targetDish.id },
       data: {
         trang_thai: DishStatus.DA_DUYET,
         ngay_phe_duyet: new Date(),
@@ -842,6 +983,28 @@ export class DishesService {
         ly_do_tu_choi: null,
       },
     });
+
+    if (targetDish.mon_goc_id) {
+      await this.prisma.mon_an.updateMany({
+        where: { id: targetDish.mon_goc_id, trang_thai: DishStatus.CHO_DUYET },
+        data: {
+          trang_thai: DishStatus.DA_DUYET,
+          ngay_phe_duyet: new Date(),
+          nguoi_phe_duyet_id: adminUser.id,
+          ly_do_tu_choi: null,
+        },
+      });
+    } else {
+      await this.prisma.mon_an.updateMany({
+        where: { mon_goc_id: targetDish.id, trang_thai: DishStatus.CHO_DUYET },
+        data: {
+          trang_thai: DishStatus.DA_DUYET,
+          ngay_phe_duyet: new Date(),
+          nguoi_phe_duyet_id: adminUser.id,
+          ly_do_tu_choi: null,
+        },
+      });
+    }
 
     if (this.cacheService) {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
@@ -868,15 +1031,29 @@ export class DishesService {
       );
     }
 
-    if (dish.trang_thai !== DishStatus.CHO_DUYET) {
-      throw new HttpException(
-        { code: 'DISH_001', message: 'Món ăn không ở trạng thái chờ duyệt' },
-        HttpStatus.BAD_REQUEST,
-      );
+    let targetDish = dish;
+    if (targetDish.trang_thai !== DishStatus.CHO_DUYET) {
+      const childProposal = await this.prisma.mon_an.findFirst({
+        where: {
+          mon_goc_id: BigInt(id),
+          trang_thai: DishStatus.CHO_DUYET,
+          deleted_at: null,
+        },
+        orderBy: { id: 'desc' },
+      });
+
+      if (childProposal && childProposal.trang_thai === DishStatus.CHO_DUYET) {
+        targetDish = childProposal;
+      } else {
+        throw new HttpException(
+          { code: 'DISH_001', message: 'Món ăn không ở trạng thái chờ duyệt' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
     }
 
     await this.prisma.mon_an.update({
-      where: { id: BigInt(id) },
+      where: { id: targetDish.id },
       data: {
         trang_thai: DishStatus.TU_CHOI,
         ly_do_tu_choi: reason,
@@ -884,6 +1061,28 @@ export class DishesService {
         nguoi_phe_duyet_id: adminUser.id,
       },
     });
+
+    if (targetDish.mon_goc_id) {
+      await this.prisma.mon_an.updateMany({
+        where: { id: targetDish.mon_goc_id, trang_thai: DishStatus.CHO_DUYET },
+        data: {
+          trang_thai: DishStatus.TU_CHOI,
+          ly_do_tu_choi: reason,
+          ngay_phe_duyet: new Date(),
+          nguoi_phe_duyet_id: adminUser.id,
+        },
+      });
+    } else {
+      await this.prisma.mon_an.updateMany({
+        where: { mon_goc_id: targetDish.id, trang_thai: DishStatus.CHO_DUYET },
+        data: {
+          trang_thai: DishStatus.TU_CHOI,
+          ly_do_tu_choi: reason,
+          ngay_phe_duyet: new Date(),
+          nguoi_phe_duyet_id: adminUser.id,
+        },
+      });
+    }
 
     if (this.cacheService) {
       if (typeof this.cacheService.debouncedInvalidateTags === 'function') {

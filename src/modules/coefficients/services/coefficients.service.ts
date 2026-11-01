@@ -23,7 +23,7 @@ export class CoefficientsService {
     private readonly cacheService: CacheService,
   ) {}
 
-  private isAdmin(user?: { role?: string }): boolean {
+  private isAdmin(user?: { id?: string; role?: string }): boolean {
     return isAdminRole(user);
   }
 
@@ -32,26 +32,39 @@ export class CoefficientsService {
       id: item.id.toString(),
       ingredientId: item.nguyen_lieu_id ? Number(item.nguyen_lieu_id) : null,
       ingredientName: item.nguyen_lieu?.ten_nguyen_lieu || null,
+      ingredient: {
+        id: Number(item.nguyen_lieu_id),
+        material: item.nguyen_lieu?.ten_nguyen_lieu ?? null,
+        name: item.nguyen_lieu?.ten_nguyen_lieu ?? null,
+      },
       processingMethod: item.phuong_phap_che_bien || null,
       coefficient: item.he_so != null ? Number(item.he_so) : null,
       isPublic: Boolean(item.is_public),
       userId: item.nguoi_dung_id || null,
-    };
+    } as CoefficientResponseDto;
   }
 
-  async create({ dto, currentUser }: CreateCoefficientParamsDto): Promise<CoefficientResponseDto> {
-    if (dto.coefficient < 0.1 || dto.coefficient > 5.0) {
+  private validateCoefficient(coefficient: number): void {
+    if (coefficient <= 0 || coefficient > 10) {
       throw new HttpException(
         {
           code: 'COEF_INVALID_RANGE',
-          message: 'Hệ số sống chín phải nằm trong khoảng sinh hóa hợp lệ (0.1 đến 5.0)',
+          message: 'Hệ số sống chín phải lớn hơn 0 và không vượt quá 10',
         },
         HttpStatus.BAD_REQUEST,
       );
     }
+  }
+
+  async create({ dto, currentUser }: CreateCoefficientParamsDto): Promise<CoefficientResponseDto> {
+    const resolvedIngredientId = dto.ingredientId ?? (dto as any).nguyenLieuId;
+    const resolvedProcessingMethod = dto.processingMethod ?? (dto as any).phuongPhapCheBien;
+    const resolvedCoefficient = dto.coefficient ?? (dto as any).heSo;
+
+    this.validateCoefficient(resolvedCoefficient);
 
     const ingredient = await this.prisma.nguyen_lieu.findFirst({
-      where: { id: BigInt(dto.ingredientId), deleted_at: null },
+      where: { id: BigInt(resolvedIngredientId), deleted_at: null },
       select: { id: true, ten_nguyen_lieu: true },
     });
 
@@ -68,8 +81,8 @@ export class CoefficientsService {
     if (shouldBePublic) {
       const existedPublic = await this.prisma.he_so_song_chin.findFirst({
         where: {
-          nguyen_lieu_id: BigInt(dto.ingredientId),
-          phuong_phap_che_bien: dto.processingMethod,
+          nguyen_lieu_id: BigInt(resolvedIngredientId),
+          phuong_phap_che_bien: resolvedProcessingMethod,
           is_public: true,
         },
       });
@@ -83,9 +96,9 @@ export class CoefficientsService {
 
       const created = await this.prisma.he_so_song_chin.create({
         data: {
-          nguyen_lieu_id: BigInt(dto.ingredientId),
-          phuong_phap_che_bien: dto.processingMethod,
-          he_so: dto.coefficient,
+          nguyen_lieu_id: BigInt(resolvedIngredientId),
+          phuong_phap_che_bien: resolvedProcessingMethod,
+          he_so: resolvedCoefficient,
           is_public: true,
           nguoi_dung_id: null,
         },
@@ -99,8 +112,8 @@ export class CoefficientsService {
     } else {
       const existedUser = await this.prisma.he_so_song_chin.findFirst({
         where: {
-          nguyen_lieu_id: BigInt(dto.ingredientId),
-          phuong_phap_che_bien: dto.processingMethod,
+          nguyen_lieu_id: BigInt(resolvedIngredientId),
+          phuong_phap_che_bien: resolvedProcessingMethod,
           nguoi_dung_id: currentUser.id,
         },
       });
@@ -114,9 +127,9 @@ export class CoefficientsService {
 
       const created = await this.prisma.he_so_song_chin.create({
         data: {
-          nguyen_lieu_id: BigInt(dto.ingredientId),
-          phuong_phap_che_bien: dto.processingMethod,
-          he_so: dto.coefficient,
+          nguyen_lieu_id: BigInt(resolvedIngredientId),
+          phuong_phap_che_bien: resolvedProcessingMethod,
+          he_so: resolvedCoefficient,
           is_public: false,
           nguoi_dung_id: currentUser.id,
         },
@@ -157,6 +170,25 @@ export class CoefficientsService {
       orderBy: { id: 'desc' },
     });
 
+    if (currentUser?.id) {
+      items.sort((a, b) => {
+        const aIsOwn = a.nguoi_dung_id === currentUser.id ? 0 : 1;
+        const bIsOwn = b.nguoi_dung_id === currentUser.id ? 0 : 1;
+        return aIsOwn - bIsOwn;
+      });
+
+      if (!isAdminUser) {
+        const dedupedMap = new Map<string, (typeof items)[number]>();
+        for (const item of items) {
+          const key = `${String(item.nguyen_lieu_id)}:${item.phuong_phap_che_bien}`;
+          if (!dedupedMap.has(key)) {
+            dedupedMap.set(key, item);
+          }
+        }
+        return Array.from(dedupedMap.values()).map((item) => this.mapToDto(item));
+      }
+    }
+
     return items.map((item) => this.mapToDto(item));
   }
 
@@ -187,13 +219,20 @@ export class CoefficientsService {
   }
 
   async findMy({ currentUser }: FindMyCoefficientsParamsDto): Promise<CoefficientResponseDto[]> {
-    const cacheKey = `${this.CACHE_TAG}:my:${currentUser.id}`;
+    const isAdminUser = this.isAdmin(currentUser);
+    const cacheKey = `${this.CACHE_TAG}:my:${currentUser.id}:${isAdminUser ? 'admin' : 'user'}`;
     return this.cacheService.getOrSet(
       cacheKey,
       CACHE_TTL_PERPETUAL,
       async () => {
+        const whereClause = isAdminUser
+          ? {
+              OR: [{ nguoi_dung_id: currentUser.id }, { is_public: true, nguoi_dung_id: null }],
+            }
+          : { nguoi_dung_id: currentUser.id };
+
         const items = await this.prisma.he_so_song_chin.findMany({
-          where: { nguoi_dung_id: currentUser.id },
+          where: whereClause,
           select: {
             id: true,
             nguyen_lieu_id: true,
@@ -243,14 +282,12 @@ export class CoefficientsService {
     dto,
     currentUser,
   }: UpdateCoefficientParamsDto): Promise<CoefficientResponseDto> {
-    if (dto.coefficient !== undefined && (dto.coefficient < 0.1 || dto.coefficient > 5.0)) {
-      throw new HttpException(
-        {
-          code: 'COEF_INVALID_RANGE',
-          message: 'Hệ số sống chín phải nằm trong khoảng sinh hóa hợp lệ (0.1 đến 5.0)',
-        },
-        HttpStatus.BAD_REQUEST,
-      );
+    const resolvedIngredientId = dto.ingredientId ?? (dto as any).nguyenLieuId;
+    const resolvedProcessingMethod = dto.processingMethod ?? (dto as any).phuongPhapCheBien;
+    const resolvedCoefficient = dto.coefficient ?? (dto as any).heSo;
+
+    if (resolvedCoefficient !== undefined) {
+      this.validateCoefficient(resolvedCoefficient);
     }
 
     const existing = await this.prisma.he_so_song_chin.findUnique({
@@ -280,9 +317,9 @@ export class CoefficientsService {
       );
     }
 
-    if (dto.ingredientId) {
+    if (resolvedIngredientId) {
       const ingredient = await this.prisma.nguyen_lieu.findFirst({
-        where: { id: BigInt(dto.ingredientId), deleted_at: null },
+        where: { id: BigInt(resolvedIngredientId), deleted_at: null },
       });
       if (!ingredient) {
         throw new HttpException(
@@ -292,13 +329,20 @@ export class CoefficientsService {
       }
     }
 
+    const nextIsPublic =
+      existing.nguoi_dung_id === null
+        ? existing.is_public
+        : isAdminUser && dto.isPublic !== undefined
+          ? dto.isPublic
+          : undefined;
+
     const updated = await this.prisma.he_so_song_chin.update({
       where: { id: BigInt(id) },
       data: {
-        nguyen_lieu_id: dto.ingredientId ? BigInt(dto.ingredientId) : undefined,
-        phuong_phap_che_bien: dto.processingMethod ?? undefined,
-        he_so: dto.coefficient !== undefined ? dto.coefficient : undefined,
-        is_public: isAdminUser && dto.isPublic !== undefined ? dto.isPublic : undefined,
+        nguyen_lieu_id: resolvedIngredientId ? BigInt(resolvedIngredientId) : undefined,
+        phuong_phap_che_bien: resolvedProcessingMethod ?? undefined,
+        he_so: resolvedCoefficient !== undefined ? resolvedCoefficient : undefined,
+        is_public: nextIsPublic,
       },
       include: {
         nguyen_lieu: { select: { ten_nguyen_lieu: true } },

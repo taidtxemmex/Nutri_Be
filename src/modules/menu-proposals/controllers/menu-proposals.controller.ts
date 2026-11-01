@@ -1,4 +1,15 @@
-import { Get, Post, Put, Delete, Body, Param, Query, Res, HttpStatus } from '@nestjs/common';
+import {
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  Res,
+  HttpStatus,
+  HttpCode,
+} from '@nestjs/common';
 import { Response } from 'express';
 import { ApiOperation, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { setExcelResponseHeaders } from '../../../core/excel-engine';
@@ -35,7 +46,7 @@ export class MenuProposalsController {
   async propose(
     @Param('menuId', ParseBigIntPipe) menuId: bigint,
     @CurrentUser() user: any,
-  ): Promise<{ success: boolean; message: string; proposalId: string }> {
+  ): Promise<{ id?: string; success: boolean; message: string; proposalId: string }> {
     return this.service.proposeMenu({ menuIdParam: menuId, currentUser: user });
   }
 
@@ -139,6 +150,7 @@ export class MenuProposalsController {
   }
 
   @Post(':id/export')
+  @HttpCode(HttpStatus.OK)
   @Auth()
   @SkipTransform()
   @ApiOperation({ summary: 'Xuất file Excel đề xuất thực đơn từ Snapshot' })
@@ -155,7 +167,7 @@ export class MenuProposalsController {
       currentUser: user,
     });
 
-    setExcelResponseHeaders({ res, filename: `de_xuat_thuc_don_${id}.xlsx` });
+    setExcelResponseHeaders({ res, filename: `menu_proposal_${id}.xlsx` });
     res.setHeader('Content-Length', buffer.length);
     res.end(buffer);
   }

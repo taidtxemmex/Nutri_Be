@@ -74,17 +74,17 @@ export class SubscriptionResponseDto {
   @ApiPropertyOptional({ example: null, description: 'Lý do từ chối (snake_case)' })
   ly_do_tu_choi?: string | null;
 
-  @ApiPropertyOptional({ example: '2026-10-27T00:00:00.000Z' })
-  ngayTao?: Date | string | null;
+  @ApiPropertyOptional({ example: '2026-10-27T00:00:00.000' })
+  ngayTao?: string | null;
 
-  @ApiPropertyOptional({ example: '2026-10-27T00:00:00.000Z' })
-  ngay_tao?: Date | string | null;
-
-  @ApiPropertyOptional({ example: null })
-  ngayPheDuyet?: Date | string | null;
+  @ApiPropertyOptional({ example: '2026-10-27T00:00:00.000' })
+  ngay_tao?: string | null;
 
   @ApiPropertyOptional({ example: null })
-  ngay_phe_duyet?: Date | string | null;
+  ngayPheDuyet?: string | null;
+
+  @ApiPropertyOptional({ example: null })
+  ngay_phe_duyet?: string | null;
 
   @ApiPropertyOptional({ type: [SubscriptionDocumentResponseDto] })
   documents?: SubscriptionDocumentResponseDto[];
@@ -113,8 +113,17 @@ export class SubscriptionResponseDto {
     const trangThai = (entity.trang_thai || 'PENDING').toUpperCase();
     const lyDo = entity.ly_do_tu_choi || null;
 
-    const username = userProfile?.username ?? entity.nguoi_dung?.ten_dang_nhap ?? null;
-    const fullName = userProfile?.fullName ?? entity.nguoi_dung?.ho_so_ca_nhan?.ho_ten ?? null;
+    const linkedUser =
+      entity.nguoi_dung || entity.nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung;
+    const username = userProfile?.username ?? linkedUser?.ten_dang_nhap ?? null;
+    const fullName = userProfile?.fullName ?? linkedUser?.ho_so_ca_nhan?.ho_ten ?? null;
+
+    const ngayTao = entity.ngay_tao
+      ? new Date(entity.ngay_tao).toISOString().replace(/Z$/i, '')
+      : null;
+    const ngayPheDuyet = entity.ngay_phe_duyet
+      ? new Date(entity.ngay_phe_duyet).toISOString().replace(/Z$/i, '')
+      : null;
 
     const docs: SubscriptionDocumentResponseDto[] = (entity.minh_chung || []).map((d: any) => ({
       id: d.id ? d.id.toString() : '',
@@ -142,10 +151,10 @@ export class SubscriptionResponseDto {
       trang_thai: trangThai,
       lyDoTuChoi: lyDo,
       ly_do_tu_choi: lyDo,
-      ngayTao: entity.ngay_tao ?? null,
-      ngay_tao: entity.ngay_tao ?? null,
-      ngayPheDuyet: entity.ngay_phe_duyet ?? null,
-      ngay_phe_duyet: entity.ngay_phe_duyet ?? null,
+      ngayTao,
+      ngay_tao: ngayTao,
+      ngayPheDuyet,
+      ngay_phe_duyet: ngayPheDuyet,
       documents: docs,
     };
   }

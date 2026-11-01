@@ -29,8 +29,8 @@ export class NutritionLimitSetsService {
 
   private mapToDto(entity: any): NutritionLimitSetResponseDto {
     return {
-      id: entity.id.toString(),
-      name: entity.ten_gioi_han || 'Giới hạn dinh dưỡng',
+      id: Number(entity.id) as any,
+      name: entity.ten_gioi_han || 'Giới hạn tạm',
       warningRule: entity.canh_bao || NutritionLimitWarning.OFF,
       reusable: Boolean(entity.tai_su_dung),
       limits:
@@ -47,13 +47,13 @@ export class NutritionLimitSetsService {
     currentUser,
   }: CreateNutritionLimitSetParamsDto): Promise<NutritionLimitSetResponseDto> {
     const isReusable = Boolean(dto.reusable);
-    const name = dto.name?.trim() || 'Giới hạn dinh dưỡng';
+    const name = dto.name?.trim() || 'Giới hạn tạm';
 
-    if (isReusable && name) {
+    if (isReusable && dto.name && dto.name.trim() !== '') {
       const existing = await this.prisma.gioi_han_dinh_duong.findFirst({
         where: {
           nguoi_dung_id: currentUser.id,
-          ten_gioi_han: name,
+          ten_gioi_han: dto.name.trim(),
           tai_su_dung: true,
         },
         select: { id: true },
@@ -126,10 +126,7 @@ export class NutritionLimitSetsService {
     return this.mapToDto(updated);
   }
 
-  async getById({
-    id,
-    currentUser,
-  }: GetNutritionLimitSetByIdParamsDto): Promise<NutritionLimitSetResponseDto> {
+  async getById({ id }: GetNutritionLimitSetByIdParamsDto): Promise<NutritionLimitSetResponseDto> {
     const limitId = BigInt(id);
     const cacheKey = `nutrition_limit:detail:${limitId.toString()}`;
     const existing = await this.cacheService.getOrSet(
@@ -144,16 +141,6 @@ export class NutritionLimitSetsService {
     );
 
     if (!existing) {
-      throw new HttpException(
-        { code: 'NLS_004', message: 'Không tìm thấy bộ giới hạn dinh dưỡng' },
-        HttpStatus.NOT_FOUND,
-      );
-    }
-
-    const isOwner = existing.nguoi_dung_id === currentUser.id;
-    const isPublicTemplate = Boolean(existing.tai_su_dung);
-
-    if (!isOwner && !isPublicTemplate && !this.isAdmin(currentUser)) {
       throw new HttpException(
         { code: 'NLS_004', message: 'Không tìm thấy bộ giới hạn dinh dưỡng' },
         HttpStatus.NOT_FOUND,
@@ -175,7 +162,8 @@ export class NutritionLimitSetsService {
       async () => {
         const sets = await this.prisma.gioi_han_dinh_duong.findMany({
           where: {
-            OR: [{ nguoi_dung_id: currentUser.id }, { tai_su_dung: true }],
+            nguoi_dung_id: currentUser.id,
+            tai_su_dung: true,
           },
           select: {
             id: true,

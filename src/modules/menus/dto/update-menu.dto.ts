@@ -10,7 +10,7 @@ import {
   MaxLength,
   ArrayMaxSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { MenuType, TargetType } from '../../../config/enums/domain.enum';
 import { MenuMealDto, MenuWeekDto } from './create-menu.dto';
 
@@ -43,6 +43,9 @@ export class UpdateMenuDto {
 
   @ApiPropertyOptional({ description: 'ID nhóm bệnh mở rộng' })
   @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'ID nhóm bệnh phải là số nguyên' })
   @Min(1, { message: 'ID nhóm bệnh phải lớn hơn 0' })
   diseaseGroupId?: number;

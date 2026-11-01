@@ -67,6 +67,14 @@ export class UpdateExtendedDiseaseGroupDto {
   @Min(1, { message: 'ID nhóm bệnh cha phải lớn hơn 0' })
   parentId?: number;
 
+  @ApiPropertyOptional({
+    example: 'uuid-1',
+    description: 'User ID (tùy chọn, hệ thống ưu tiên lấy từ JWT)',
+  })
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
   getExtendedCode(): string {
     const raw = this.extendedCode || this.maNhomBenh || this.maNhomMoRong || '';
     return raw.trim();

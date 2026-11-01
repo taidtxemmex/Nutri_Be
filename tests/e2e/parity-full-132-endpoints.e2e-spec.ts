@@ -181,9 +181,19 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
     });
 
     it('5. POST /api/v1/auth/logout & /api/auth/logout', async () => {
+      const logoutToken = helper.getJwtService().sign(
+        {
+          sub: _adminUser.id,
+          userId: _adminUser.id,
+          username: _adminUser.ten_dang_nhap,
+          role: _adminUser.vai_tro,
+          jti: 'disposable-logout-token',
+        },
+        { expiresIn: '15m' },
+      );
       const res = await request(helper.getHttpServer())
         .post('/api/auth/logout')
-        .set('Authorization', `Bearer ${adminToken}`)
+        .set('Authorization', `Bearer ${logoutToken}`)
         .send({});
       expect([HttpStatus.OK, HttpStatus.NO_CONTENT]).toContain(res.status);
     });
@@ -235,7 +245,9 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
       expect(res1.status).toBe(HttpStatus.OK);
       expect(res2.status).toBe(HttpStatus.OK);
       expect(res3.status).toBe(HttpStatus.OK);
-      expect(res1.body).toHaveProperty('data');
+      expect(Array.isArray(res1.body)).toBe(true);
+      expect(Array.isArray(res2.body)).toBe(true);
+      expect(res3.body).toHaveProperty('data');
     });
 
     it('11. GET /api/category/:id (Detail category)', async () => {
@@ -298,7 +310,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
         .get('/api/coefficients')
         .set('Authorization', `Bearer ${doctorToken}`);
       expect(res.status).toBe(HttpStatus.OK);
-      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('16. GET /api/coefficients/:id (Get detail)', async () => {
@@ -474,7 +486,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
     it('31. GET /api/disease-groups (List all)', async () => {
       const res = await request(helper.getHttpServer()).get('/api/disease-groups');
       expect(res.status).toBe(HttpStatus.OK);
-      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('32. GET /api/disease-groups/:id (Get detail)', async () => {
@@ -790,7 +802,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
     it('62. GET /api/ingredient/summary (Summary list)', async () => {
       const res = await request(helper.getHttpServer()).get('/api/ingredient/summary');
       expect(res.status).toBe(HttpStatus.OK);
-      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('63. GET /api/ingredient (Paginated list)', async () => {
@@ -802,7 +814,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
     it('64. GET /api/ingredient/all (All ingredients)', async () => {
       const res = await request(helper.getHttpServer()).get('/api/ingredient/all');
       expect(res.status).toBe(HttpStatus.OK);
-      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('65. GET /api/ingredient/:id (Detail 86 nutrients)', async () => {
@@ -1356,7 +1368,7 @@ describe('Sprint 8: Full Parity 132 APIs Verification (Spring Boot ➔ NestJS)',
         .get('/api/patients')
         .set('Authorization', `Bearer ${doctorToken}`);
       expect(res.status).toBe(HttpStatus.OK);
-      expect(res.body).toHaveProperty('data');
+      expect(Array.isArray(res.body)).toBe(true);
     });
 
     it('116. GET /api/patients/import-template (Download template)', async () => {

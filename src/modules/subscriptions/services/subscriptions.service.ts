@@ -70,6 +70,36 @@ export class SubscriptionsService {
     return `TX-${datePart}-${randomHex}`;
   }
 
+  /**
+   * Phân giải địa chỉ email người dùng an toàn:
+   * Ưu tiên email trong hồ sơ cá nhân (ho_so_ca_nhan.email)
+   * Fallback về tên đăng nhập nếu có định dạng email hợp lệ, hoặc ghi log cảnh báo
+   */
+  private resolveUserEmail(
+    user?: {
+      ten_dang_nhap?: string | null;
+      ho_so_ca_nhan?: { email?: string | null } | null;
+    } | null,
+  ): string | null {
+    if (!user) return null;
+    const personalEmail = user.ho_so_ca_nhan?.email?.trim();
+    if (personalEmail && this.isValidEmail(personalEmail)) {
+      return personalEmail;
+    }
+    const username = user.ten_dang_nhap?.trim();
+    if (username && this.isValidEmail(username)) {
+      return username;
+    }
+    this.logger.warn(
+      `Không tìm thấy địa chỉ email hợp lệ cho người dùng: ${username || 'Unknown'}`,
+    );
+    return null;
+  }
+
+  private isValidEmail(email: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  }
+
   // =========================================================================
   // 1. QUẢN LÝ GÓI CƯỚC (PACKAGES / PLANS)
   // =========================================================================
@@ -172,9 +202,7 @@ export class SubscriptionsService {
             ngay_tao: true,
             ngay_cap_nhat: true,
           },
-          orderBy: {
-            gia_tien: 'asc',
-          },
+          orderBy: [{ trang_thai: 'asc' }, { so_ngay_su_dung: 'asc' }],
         });
 
         return plans.map((p) => PlanResponseDto.fromEntity(p));
@@ -402,7 +430,7 @@ export class SubscriptionsService {
       select: {
         id: true,
         ten_dang_nhap: true,
-        ho_so_ca_nhan: { select: { ho_ten: true } },
+        ho_so_ca_nhan: { select: { ho_ten: true, email: true } },
       },
     });
 
@@ -480,18 +508,49 @@ export class SubscriptionsService {
     // A4: Enqueue job thông báo tạo yêu cầu thanh toán
     if (this.queueService) {
       try {
-        await this.queueService.enqueue({
-          queueName: 'mail:send',
-          payload: {
-            to: user.ten_dang_nhap || 'user@nutri.vn',
-            subject: 'Xác nhận tạo yêu cầu thanh toán gói cước',
+        const userFullName = user.ho_so_ca_nhan?.ho_ten || user.ten_dang_nhap;
+        const userEmail = this.resolveUserEmail(user);
+
+        if (userEmail) {
+          await this.queueService.enqueue({
+            queueName: 'mail:send',
             payload: {
-              maGiaoDich: created.ma_giao_dich,
-              tenGoi: packageEntity.ten_goi,
-              soTien: packageEntity.gia_tien,
+              to: userEmail,
+              subject: `Xác nhận yêu cầu đăng ký gói ${packageEntity.ten_goi}`,
+              payload: {
+                fullName: userFullName,
+                maGiaoDich: created.ma_giao_dich,
+                tenGoi: packageEntity.ten_goi,
+                soTien: packageEntity.gia_tien,
+              },
             },
-          },
+          });
+        }
+
+        // Thông báo SuperAdmin có yêu cầu thanh toán mới (Query động danh sách SuperAdmin)
+        const superAdmins = await this.prisma.nguoi_dung.findMany({
+          where: { vai_tro: 'SUPERADMIN', deleted_at: null },
+          include: { ho_so_ca_nhan: true },
         });
+
+        for (const admin of superAdmins) {
+          const adminEmail = this.resolveUserEmail(admin);
+          if (adminEmail) {
+            await this.queueService.enqueue({
+              queueName: 'mail:send',
+              payload: {
+                to: adminEmail,
+                subject: `Yêu cầu đăng ký gói mới từ ${userFullName}`,
+                payload: {
+                  fullName: userFullName,
+                  maGiaoDich: created.ma_giao_dich,
+                  tenGoi: packageEntity.ten_goi,
+                  soTien: packageEntity.gia_tien,
+                },
+              },
+            });
+          }
+        }
       } catch (err: any) {
         this.logger.warn(`Lỗi đẩy email tạo yêu cầu thanh toán vào queue: ${err?.message}`);
       }
@@ -685,7 +744,7 @@ export class SubscriptionsService {
           nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung: {
             select: {
               ten_dang_nhap: true,
-              ho_so_ca_nhan: { select: { ho_ten: true } },
+              ho_so_ca_nhan: { select: { ho_ten: true, email: true } },
             },
           },
         },
@@ -706,19 +765,27 @@ export class SubscriptionsService {
     // A4: Enqueue job thông báo kích hoạt gói PRO
     if (this.queueService) {
       try {
-        await this.queueService.enqueue({
-          queueName: 'mail:send',
-          payload: {
-            to:
-              updatedRequest.nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung
-                ?.ten_dang_nhap || 'user@nutri.vn',
-            subject: 'Kích hoạt gói dịch vụ PRO thành công',
+        const recipientUser =
+          (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
+        const recipientFullName =
+          recipientUser.ho_so_ca_nhan?.ho_ten || recipientUser.ten_dang_nhap || 'Quý khách';
+        const recipientEmail = this.resolveUserEmail(recipientUser);
+
+        if (recipientEmail) {
+          await this.queueService.enqueue({
+            queueName: 'mail:send',
             payload: {
-              maGiaoDich: updatedRequest.ma_giao_dich,
-              tenGoi: updatedRequest.ten_goi,
+              to: recipientEmail,
+              subject: 'Yêu cầu đăng ký gói đã được phê duyệt',
+              payload: {
+                fullName: recipientFullName,
+                maGiaoDich: updatedRequest.ma_giao_dich,
+                tenGoi: updatedRequest.ten_goi,
+                usageDays: updatedRequest.so_ngay_su_dung || 30,
+              },
             },
-          },
-        });
+          });
+        }
       } catch (err: any) {
         this.logger.warn(`Lỗi đẩy email duyệt thanh toán vào queue: ${err?.message}`);
       }
@@ -759,6 +826,10 @@ export class SubscriptionsService {
     }
 
     const numericId = BigInt(requestId);
+    const rejectReason =
+      (dto && typeof dto.getRejectionReason === 'function'
+        ? dto.getRejectionReason()
+        : (dto as any)?.lyDoTuChoi || (dto as any)?.reason) || 'Từ chối bởi quản trị viên';
 
     const updatedRequest = await this.prisma.$transaction(async (tx) => {
       const request = await tx.yeu_cau_thanh_toan.findUnique({
@@ -786,7 +857,7 @@ export class SubscriptionsService {
           },
           data: {
             trang_thai: 'REJECTED',
-            ly_do_tu_choi: dto.getRejectionReason() || 'Từ chối bởi quản trị viên',
+            ly_do_tu_choi: rejectReason,
             ngay_phe_duyet: new Date(),
             nguoi_phe_duyet_id: adminId,
           },
@@ -801,7 +872,7 @@ export class SubscriptionsService {
         where: { id: numericId },
         data: {
           trang_thai: 'REJECTED',
-          ly_do_tu_choi: dto.getRejectionReason() || 'Từ chối bởi quản trị viên',
+          ly_do_tu_choi: rejectReason,
           ngay_phe_duyet: new Date(),
           nguoi_phe_duyet_id: adminId,
         },
@@ -810,7 +881,7 @@ export class SubscriptionsService {
           nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung: {
             select: {
               ten_dang_nhap: true,
-              ho_so_ca_nhan: { select: { ho_ten: true } },
+              ho_so_ca_nhan: { select: { ho_ten: true, email: true } },
             },
           },
         },
@@ -822,19 +893,27 @@ export class SubscriptionsService {
     // A4: Enqueue job thông báo từ chối thanh toán
     if (this.queueService) {
       try {
-        await this.queueService.enqueue({
-          queueName: 'mail:send',
-          payload: {
-            to:
-              (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung
-                ?.ten_dang_nhap || 'user@nutri.vn',
-            subject: 'Thông báo về yêu cầu thanh toán gói cước',
+        const recipientUser =
+          (updatedRequest as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
+        const recipientFullName =
+          recipientUser.ho_so_ca_nhan?.ho_ten || recipientUser.ten_dang_nhap || 'Quý khách';
+        const recipientEmail = this.resolveUserEmail(recipientUser);
+
+        if (recipientEmail) {
+          await this.queueService.enqueue({
+            queueName: 'mail:send',
             payload: {
-              maGiaoDich: (updatedRequest as any).ma_giao_dich,
-              lyDoTuChoi: dto.getRejectionReason(),
+              to: recipientEmail,
+              subject: 'Yêu cầu đăng ký gói bị từ chối',
+              payload: {
+                fullName: recipientFullName,
+                maGiaoDich: (updatedRequest as any).ma_giao_dich,
+                tenGoi: (updatedRequest as any).ten_goi,
+                lyDoTuChoi: rejectReason,
+              },
             },
-          },
-        });
+          });
+        }
       } catch (err: any) {
         this.logger.warn(`Lỗi đẩy email từ chối thanh toán vào queue: ${err?.message}`);
       }
@@ -866,12 +945,29 @@ export class SubscriptionsService {
     const requests = await this.prisma.yeu_cau_thanh_toan.findMany({
       where: { nguoi_dung_id: userId },
       orderBy: { ngay_tao: 'desc' },
+      take: 1000,
       include: {
         minh_chung: true,
+        nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung: {
+          select: {
+            id: true,
+            ten_dang_nhap: true,
+            ho_so_ca_nhan: { select: { ho_ten: true } },
+          },
+        },
       },
     });
 
-    return requests.map((r) => SubscriptionResponseDto.fromEntity(r));
+    return requests.map((r) => {
+      const linkedUser = (r as any).nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung || {};
+      return SubscriptionResponseDto.fromEntity({
+        entity: r,
+        userProfile: {
+          username: linkedUser.ten_dang_nhap,
+          fullName: linkedUser.ho_so_ca_nhan?.ho_ten ?? undefined,
+        },
+      });
+    });
   }
 
   /**
@@ -898,6 +994,7 @@ export class SubscriptionsService {
         ...(statusFilter && statusFilter.length > 0 ? { trang_thai: { in: statusFilter } } : {}),
       },
       orderBy: { ngay_tao: 'desc' },
+      take: 1000,
       include: {
         minh_chung: true,
         nguoi_dung_yeu_cau_thanh_toan_nguoi_dung_idTonguoi_dung: {

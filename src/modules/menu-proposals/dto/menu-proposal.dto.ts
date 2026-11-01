@@ -1,6 +1,48 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsInt, Min, Max, MaxLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsString,
+  IsOptional,
+  IsInt,
+  IsNumber,
+  IsArray,
+  Min,
+  Max,
+  MaxLength,
+  ArrayMaxSize,
+} from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+
+export class ExportProposalExcelDto {
+  @ApiPropertyOptional({
+    description: 'Chế độ xuất Excel: FULL | NET | NET_NUTRITION | RAW | COOKED',
+  })
+  @IsOptional()
+  @IsString()
+  exportType?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: 'Danh sách mã chỉ tiêu dinh dưỡng cần xuất',
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100, { message: 'Danh sách mã chỉ tiêu dinh dưỡng tối đa 100 mục' })
+  @IsString({ each: true })
+  @MaxLength(100, { each: true, message: 'Mã chỉ tiêu dinh dưỡng tối đa 100 ký tự' })
+  columns?: string[];
+
+  @ApiPropertyOptional({
+    type: Number,
+    default: 1,
+    description: 'Số suất ăn cần tính toán định lượng',
+  })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
+  @IsNumber()
+  servings?: number;
+}
 
 export class RejectProposalDto {
   @ApiPropertyOptional({
@@ -36,13 +78,15 @@ export class MenuProposalQueryDto {
   @Min(1)
   page?: number = 1;
 
-  @ApiPropertyOptional({ description: 'Số lượng mục mỗi trang', default: 10 })
+  @ApiPropertyOptional({ description: 'Số lượng mục mỗi trang' })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt()
   @Min(1)
-  @Max(100)
-  limit?: number = 10;
+  @Max(5000)
+  limit?: number;
 }
 
 export class MenuProposalListDto {

@@ -21,6 +21,7 @@ export const REQUIRE_PRO_KEY = 'require_pro';
 export const REFRESH_TOKEN_CACHE_TAG = 'refresh_token';
 export const REFRESH_TOKEN_KEY_PREFIX = 'rt:';
 export const TOKEN_DENYLIST_PREFIX = 'denylist:token:';
+export const TOKEN_BLACKLIST_PREFIX = 'blacklist:token:';
 export const USER_TOKENS_TAG_PREFIX = 'user_tokens:';
 
 export const AUTH_ERROR_UNAUTHORIZED = 'AUTH_001';

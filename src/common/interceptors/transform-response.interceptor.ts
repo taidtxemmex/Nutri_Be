@@ -10,12 +10,38 @@ export interface StandardResponse<T> {
   meta: Record<string, any>;
 }
 
+const LEGACY_RAW_ARRAY_PATTERNS: readonly RegExp[] = [
+  /^\/api\/categor(y|ies)(\/public-lookup)?\/?$/i,
+  /^\/api\/coefficients(\/(public|my))?\/?$/i,
+  /^\/api\/daily-intakes\/patient\/[^/]+\/?$/i,
+  /^\/api\/dish(es)?(\/(public|my|admin|autocomplete))?\/?$/i,
+  /^\/api\/disease-groups\/?$/i,
+  /^\/api\/extended-disease-groups\/?$/i,
+  /^\/api\/ingredients?\/(summary|all)\/?$/i,
+  /^\/api\/meals?\/?$/i,
+  /^\/api\/menus?\/?$/i,
+  /^\/api\/nutrition-limit-sets\/?$/i,
+  /^\/api\/patients\/?$/i,
+  /^\/api\/proposers?\/?$/i,
+];
+
 @Injectable()
 export class TransformResponseInterceptor<T> implements NestInterceptor<
   T,
   StandardResponse<T> | T
 > {
   private reflector = new Reflector();
+
+  isLegacyRawArrayRoute(method: string, url: string): boolean {
+    if ((method || '').toUpperCase() !== 'GET') {
+      return false;
+    }
+    const cleanPath = (url || '').split('?')[0];
+    if (cleanPath.toLowerCase().startsWith('/api/v1/')) {
+      return false;
+    }
+    return LEGACY_RAW_ARRAY_PATTERNS.some((pattern) => pattern.test(cleanPath));
+  }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     const isSkipTransform = this.reflector.getAllAndOverride<boolean>(SKIP_TRANSFORM_KEY, [
@@ -35,6 +61,9 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
       httpResponse.setHeader('X-Trace-Id', traceId);
     }
 
+    const reqMethod = request?.method || 'GET';
+    const reqUrl = request?.originalUrl || request?.url || '';
+
     return next.handle().pipe(
       map((response) => {
         const timestamp = new Date().toISOString();
@@ -51,6 +80,16 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
           return response;
         }
 
+        // 1b. Legacy Java Raw-Array GET routes (NutriFE expects Array.isArray(res.data))
+        if (this.isLegacyRawArrayRoute(reqMethod, reqUrl)) {
+          if (response && Array.isArray((response as any).items)) {
+            return (response as any).items;
+          }
+          if (Array.isArray(response)) {
+            return response;
+          }
+        }
+
         // 2. Paginated list: { items, total, page, limit }
         if (response && Array.isArray(response.items) && typeof response.total === 'number') {
           const page = Number(response.page) || 1;
@@ -61,7 +100,13 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
             status: statusCode,
             message: 'success',
             data: response.items,
+            items: response.items,
             content: response.items,
+            totalItems: response.total,
+            totalElements: response.total,
+            totalPages,
+            page,
+            size: limit,
             meta: {
               page,
               limit,
@@ -76,6 +121,20 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
         }
 
         // 3. Single Entity or Mutation
+        if (response && typeof response === 'object' && !Array.isArray(response)) {
+          return {
+            ...response,
+            status:
+              typeof (response as any).status === 'string' ? (response as any).status : statusCode,
+            message: (response as any).message || 'success',
+            data: response,
+            meta: {
+              timestamp,
+              traceId,
+            },
+          };
+        }
+
         return {
           status: statusCode,
           message: 'success',

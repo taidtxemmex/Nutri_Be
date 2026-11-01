@@ -135,7 +135,7 @@ export class PatientsService {
     });
 
     let tdee: number | null = null;
-    if (weight && height && age != null && age > 0) {
+    if (weight && height && age !== null && age !== undefined && age >= 0) {
       const gender = (patient.gioi_tinh || 'NAM').toUpperCase();
       const isMale = gender === 'NAM' || gender === 'MALE';
       tdee = AnthropometryEngine.calculateTdee({
@@ -244,8 +244,8 @@ export class PatientsService {
     page: number;
     limit: number;
   }> {
-    const page = Math.max(Number(query.page) || 1, 1);
-    const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const page = Math.max(Number(query?.page) || 1, 1);
+    const limit = Math.min(Math.max(Number(query?.limit) || 1000, 1), 1000);
     const skip = (page - 1) * limit;
 
     const cacheKey = this.cacheService?.generateKey({
@@ -294,7 +294,7 @@ export class PatientsService {
         where,
         skip,
         take: limit,
-        orderBy: { id: 'desc' },
+        orderBy: [{ tao_luc: 'desc' }, { id: 'desc' }],
       }),
     ]);
 
@@ -340,25 +340,31 @@ export class PatientsService {
 
     const rawNote = dto.notes || dto.note;
     const lockKey = `${currentUser.id}_${dto.phoneNumber?.trim() || 'NO_PHONE'}`;
+    const autoCode =
+      (dto as any).autoGenerateCode !== undefined
+        ? (dto as any).autoGenerateCode
+        : (dto as any).autoCode;
 
     const patient = await this.codeAllocatorService.withLock(lockKey, async () => {
       return this.prisma.$transaction(async (tx) => {
-        let patientCode: string;
+        let patientCode: string | null = null;
 
-        if (dto.patientCode && dto.patientCode.trim()) {
-          patientCode = await this.codeAllocatorService.allocateCodeInTx({
-            tx,
-            userId: currentUser.id,
-            phone: dto.phoneNumber,
-            customCode: dto.patientCode,
-          });
-        } else if ((dto as any).autoGenerateCode === true || (dto as any).autoCode === true) {
+        if (autoCode === true) {
           patientCode = await this.codeAllocatorService.allocateCodeInTx({
             tx,
             userId: currentUser.id,
             phone: dto.phoneNumber,
             customCode: null,
           });
+        } else if (dto.patientCode && dto.patientCode.trim()) {
+          patientCode = await this.codeAllocatorService.allocateCodeInTx({
+            tx,
+            userId: currentUser.id,
+            phone: dto.phoneNumber,
+            customCode: dto.patientCode,
+          });
+        } else if (autoCode === false) {
+          patientCode = null;
         } else {
           patientCode = `BN-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
         }
@@ -373,7 +379,12 @@ export class PatientsService {
             chi_nam_sinh: isBirthYearOnly,
             gioi_tinh: dto.gender || 'NAM',
             can_nang: dto.weight != null ? Number(dto.weight) : null,
-            chieu_cao: dto.height != null ? Number(dto.height) : null,
+            chieu_cao:
+              dto.height != null
+                ? Number(dto.height) > 0 && Number(dto.height) <= 2.5
+                  ? Math.round(Number(dto.height) * 100 * 10) / 10
+                  : Number(dto.height)
+                : null,
             he_so_hoat_dong: dto.activityFactor != null ? Number(dto.activityFactor) : null,
             ghi_chu: rawNote?.trim() || null,
             tao_luc: new Date(),
@@ -403,23 +414,48 @@ export class PatientsService {
       forbiddenMessage: 'Bạn không có quyền chỉnh sửa hồ sơ này',
     });
 
-    if (dto.patientCode && dto.patientCode.trim()) {
-      const codeTrimmed = dto.patientCode.trim();
-      const duplicateCode = await this.prisma.benh_nhan.findFirst({
-        where: {
-          nguoi_dung_id: existingPatient.nguoi_dung_id,
-          ma_benh_nhan_bv: codeTrimmed,
-          id: { not: patientId },
-          deleted_at: null,
-        },
-        select: { id: true },
+    const autoCode =
+      (dto as any).autoGenerateCode !== undefined
+        ? (dto as any).autoGenerateCode
+        : (dto as any).autoCode;
+    const effectivePhone =
+      dto.phoneNumber !== undefined
+        ? dto.phoneNumber?.trim() || null
+        : existingPatient.so_dien_thoai;
+
+    let nextPatientCode: string | null | undefined = undefined;
+
+    if (autoCode === true) {
+      const preview = await this.codeAllocatorService.previewCode({
+        userId: existingPatient.nguoi_dung_id,
+        phone: effectivePhone || undefined,
+        excludeId: patientId.toString(),
       });
-      if (duplicateCode) {
-        throw new HttpException(
-          { code: 'PAT_002', message: 'Mã bệnh nhân đã tồn tại trong danh sách của bạn' },
-          HttpStatus.CONFLICT,
-        );
+      nextPatientCode = preview.code;
+    } else if (dto.patientCode !== undefined) {
+      if (dto.patientCode && dto.patientCode.trim()) {
+        const codeTrimmed = dto.patientCode.trim();
+        const duplicateCode = await this.prisma.benh_nhan.findFirst({
+          where: {
+            nguoi_dung_id: existingPatient.nguoi_dung_id,
+            ma_benh_nhan_bv: codeTrimmed,
+            id: { not: patientId },
+            deleted_at: null,
+          },
+          select: { id: true },
+        });
+        if (duplicateCode) {
+          throw new HttpException(
+            { code: 'PAT_002', message: 'Mã bệnh nhân đã tồn tại trong danh sách của bạn' },
+            HttpStatus.CONFLICT,
+          );
+        }
+        nextPatientCode = codeTrimmed;
+      } else {
+        nextPatientCode = null;
       }
+    } else if (autoCode === false) {
+      nextPatientCode = existingPatient.ma_benh_nhan_bv;
     }
 
     const rawDob = dto.dob !== undefined ? dto.dob : dto.dateOfBirth;
@@ -448,14 +484,20 @@ export class PatientsService {
       data: {
         ho_ten: dto.fullName ? dto.fullName.trim() : undefined,
         so_dien_thoai: dto.phoneNumber !== undefined ? dto.phoneNumber?.trim() || null : undefined,
-        ma_benh_nhan_bv: dto.patientCode ? dto.patientCode.trim() : undefined,
+        ma_benh_nhan_bv: nextPatientCode,
         ngay_sinh: birthDate,
         chi_nam_sinh: isBirthYearOnly,
         gioi_tinh: dto.gender || undefined,
         can_nang:
           dto.weight !== undefined ? (dto.weight != null ? Number(dto.weight) : null) : undefined,
         chieu_cao:
-          dto.height !== undefined ? (dto.height != null ? Number(dto.height) : null) : undefined,
+          dto.height !== undefined
+            ? dto.height != null
+              ? Number(dto.height) > 0 && Number(dto.height) <= 2.5
+                ? Math.round(Number(dto.height) * 100 * 10) / 10
+                : Number(dto.height)
+              : null
+            : undefined,
         he_so_hoat_dong:
           dto.activityFactor !== undefined
             ? dto.activityFactor != null
@@ -535,7 +577,20 @@ export class PatientsService {
     sharedWith: string[];
   }> {
     const userId = currentUser?.id || '';
-    return this.codeAllocatorService.previewCode({ userId, phone, excludeId });
+    const res = await this.codeAllocatorService.previewCode({ userId, phone, excludeId });
+    return {
+      code: res.code,
+      previewCode: res.previewCode || res.code,
+      sharedWith: Array.isArray(res.sharedWith) ? res.sharedWith : [],
+    };
+  }
+
+  async previewPatientCode(params: PreviewPatientCodeParamDto = {}): Promise<{
+    previewCode: string;
+    code: string;
+    sharedWith: string[];
+  }> {
+    return this.previewCode(params);
   }
 
   /**
@@ -613,10 +668,13 @@ export class PatientsService {
     });
 
     const weight = Number(dto.weight);
-    const height = Number(dto.height);
+    const heightCm =
+      Number(dto.height) > 0 && Number(dto.height) <= 2.5
+        ? Math.round(Number(dto.height) * 100 * 10) / 10
+        : Number(dto.height);
     const { bmi, bmiLevel } = AnthropometryEngine.calculateBmi({
       weightKg: weight,
-      heightCm: height,
+      heightCm,
     });
 
     const age = AnthropometryEngine.calculateExactAge({
@@ -635,13 +693,13 @@ export class PatientsService {
     const bmr = AnthropometryEngine.calculateBmr({
       isMale,
       weightKg: weight,
-      heightCm: height,
+      heightCm,
       age,
     });
     const tdee = AnthropometryEngine.calculateTdee({
       isMale,
       weightKg: weight,
-      heightCm: height,
+      heightCm,
       age,
       activityFactor: actFactor,
     });
@@ -658,7 +716,7 @@ export class PatientsService {
           benh_nhan_id: patientId,
           ngay_do: measuredDate,
           can_nang: weight,
-          chieu_cao: height,
+          chieu_cao: heightCm,
           bmi: bmi || 0,
           phan_loai_bmi: bmiLevel ? bmiLevel.toLowerCase().replace('_', '') : 'normal',
           bmr: bmr > 0 ? bmr : null,
@@ -681,7 +739,7 @@ export class PatientsService {
         where: { id: patientId },
         data: {
           can_nang: weight,
-          chieu_cao: height,
+          chieu_cao: heightCm,
           he_so_hoat_dong: actFactor,
         },
       });

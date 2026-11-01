@@ -28,8 +28,8 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       // Verify canonical string structure
       const canonicalA = buildCanonicalRecipeString(orderA);
       const canonicalB = buildCanonicalRecipeString(orderB);
-      expect(canonicalA).toBe('1:100.0000|2:50.0000');
-      expect(canonicalB).toBe('1:100.0000|2:50.0000');
+      expect(canonicalA).toBe('1:100.000|2:50.000');
+      expect(canonicalB).toBe('1:100.000|2:50.000');
     });
 
     it('should handle multi-element arrays with random permutations identically', () => {
@@ -49,23 +49,21 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
 
       expect(hashOriginal).toBe(hashReversed);
       expect(hashOriginal).toBe(hashShuffled);
-      expect(buildCanonicalRecipeString(components)).toBe(
-        '1:10.0000|3:200.0000|15:45.7500|99:12.5000',
-      );
+      expect(buildCanonicalRecipeString(components)).toBe('1:10.000|3:200.000|15:45.750|99:12.500');
     });
   });
 
   describe('2. Floating-Point Precision & Rounding Consistency', () => {
-    it('should handle 10.00001 and 10.00004 consistently after toFixed(4)', () => {
-      const recipe1: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.00001 }];
-      const recipe2: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.00004 }];
+    it('should handle 10.0001 and 10.0004 consistently after toFixed(3)', () => {
+      const recipe1: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.0001 }];
+      const recipe2: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.0004 }];
 
       const canonical1 = buildCanonicalRecipeString(recipe1);
       const canonical2 = buildCanonicalRecipeString(recipe2);
 
-      // Both round down to 10.0000 with 4 decimal places
-      expect(canonical1).toBe('1:10.0000');
-      expect(canonical2).toBe('1:10.0000');
+      // Both round down to 10.000 with 3 decimal places
+      expect(canonical1).toBe('1:10.000');
+      expect(canonical2).toBe('1:10.000');
 
       const hash1 = computeRecipeHash(recipe1);
       const hash2 = computeRecipeHash(recipe2);
@@ -74,15 +72,15 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       expect(hash1).toHaveLength(64);
     });
 
-    it('should correctly round half-up for 5th decimal digit', () => {
-      const recipeUnder: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.00004 }];
-      const recipeOver: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.00005 }];
+    it('should correctly round half-up for 4th decimal digit', () => {
+      const recipeUnder: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.0004 }];
+      const recipeOver: RecipeComponentInput[] = [{ ingredientId: 1, weight: 10.0005 }];
 
       const canonicalUnder = buildCanonicalRecipeString(recipeUnder);
       const canonicalOver = buildCanonicalRecipeString(recipeOver);
 
-      expect(canonicalUnder).toBe('1:10.0000');
-      expect(canonicalOver).toBe('1:10.0001');
+      expect(canonicalUnder).toBe('1:10.000');
+      expect(canonicalOver).toBe('1:10.001');
 
       const hashUnder = computeRecipeHash(recipeUnder);
       const hashOver = computeRecipeHash(recipeOver);
@@ -102,8 +100,8 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       const canonicalSplit = buildCanonicalRecipeString(splitIngredients);
       const canonicalSingle = buildCanonicalRecipeString(singleIngredient);
 
-      expect(canonicalSplit).toBe('5:0.3000');
-      expect(canonicalSingle).toBe('5:0.3000');
+      expect(canonicalSplit).toBe('5:0.300');
+      expect(canonicalSingle).toBe('5:0.300');
 
       expect(computeRecipeHash(splitIngredients)).toBe(computeRecipeHash(singleIngredient));
     });
@@ -179,7 +177,7 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       const components: RecipeComponentInput[] = [{ ingredientId: 1, weight: -50.25 }];
       const canonical = buildCanonicalRecipeString(components);
 
-      expect(canonical).toBe('1:50.2500');
+      expect(canonical).toBe('1:50.250');
     });
 
     it('should handle zero and falsy weights safely', () => {
@@ -189,7 +187,7 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       ];
 
       const canonical = buildCanonicalRecipeString(components);
-      expect(canonical).toBe('1:0.0000|2:0.0000');
+      expect(canonical).toBe('1:0.000|2:0.000');
     });
   });
 
@@ -206,9 +204,9 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       expect(hashNumber).toBe(hashBigInt);
       expect(hashNumber).toBe(hashString);
 
-      expect(buildCanonicalRecipeString(withNumber)).toBe('10:50.0000');
-      expect(buildCanonicalRecipeString(withBigInt)).toBe('10:50.0000');
-      expect(buildCanonicalRecipeString(withString)).toBe('10:50.0000');
+      expect(buildCanonicalRecipeString(withNumber)).toBe('10:50.000');
+      expect(buildCanonicalRecipeString(withBigInt)).toBe('10:50.000');
+      expect(buildCanonicalRecipeString(withString)).toBe('10:50.000');
     });
 
     it('should sort numerically, not lexicographically (e.g. 2 before 10)', () => {
@@ -220,7 +218,7 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       const canonical = buildCanonicalRecipeString(components);
       // If lexicographical: "10:..." < "2:..." which is wrong!
       // Must be numeric: "2:..." before "10:..."
-      expect(canonical).toBe('2:30.0000|10:50.0000');
+      expect(canonical).toBe('2:30.000|10:50.000');
     });
   });
 
@@ -240,8 +238,8 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       const canonicalSplit = buildCanonicalRecipeString(splitDish);
       const canonicalMerged = buildCanonicalRecipeString(mergedDish);
 
-      expect(canonicalSplit).toBe('1:100.0000|2:30.0000');
-      expect(canonicalMerged).toBe('1:100.0000|2:30.0000');
+      expect(canonicalSplit).toBe('1:100.000|2:30.000');
+      expect(canonicalMerged).toBe('1:100.000|2:30.000');
 
       expect(computeRecipeHash(splitDish)).toBe(computeRecipeHash(mergedDish));
     });
@@ -256,7 +254,7 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
         mergeDuplicates: false,
       });
 
-      expect(canonicalUnmerged).toBe('1:50.0000|1:50.0000');
+      expect(canonicalUnmerged).toBe('1:50.000|1:50.000');
     });
   });
 
@@ -268,7 +266,7 @@ describe('RecipeHashUtil (Canonical Recipe SHA-256 & Locale OS Invariance)', () 
       ];
 
       const canonical = buildCanonicalRecipeString(components);
-      expect(canonical).toBe('1:75.5000|2:24.5000');
+      expect(canonical).toBe('1:75.500|2:24.500');
 
       const hash = computeRecipeHash(components);
       expect(hash).toHaveLength(64);

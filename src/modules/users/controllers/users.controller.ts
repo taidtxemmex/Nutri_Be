@@ -75,7 +75,19 @@ export class UsersController {
     return this.usersService.createBatch({ dtoList: dto.users, currentUser });
   }
 
-  @Post(['getInfo', '/api/users/getInfo'])
+  @Get('getInfo')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Lấy thông tin chi tiết người dùng và chuyên môn (GET tương thích userapi.js)',
+  })
+  async getUserInfoGet(
+    @Query('userId') queryUserId: string,
+    @CurrentUser() currentUser: AuthenticatedUser,
+  ) {
+    return this.usersService.getUserInfo({ targetUserId: queryUserId, currentUser });
+  }
+
+  @Post('getInfo')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Lấy thông tin chi tiết người dùng và chuyên môn (Vá lỗ hổng IDOR PII)',
@@ -85,12 +97,14 @@ export class UsersController {
   })
   async getUserInfo(
     @Body() dto: UserInfoRequestDto,
+    @Query('userId') queryUserId: string,
     @CurrentUser() currentUser: AuthenticatedUser,
   ) {
-    return this.usersService.getUserInfo({ targetUserId: dto.userId, currentUser });
+    const targetUserId = dto?.userId || queryUserId;
+    return this.usersService.getUserInfo({ targetUserId, currentUser });
   }
 
-  @Put(['update-info', '/api/users/update-info'])
+  @Put('update-info')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cập nhật thông tin cá nhân và nghề nghiệp (Tương thích FE cũ)' })
   @ApiStandardResponse({ description: 'Cập nhật thông tin thành công' })

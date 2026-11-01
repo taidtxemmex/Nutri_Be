@@ -359,8 +359,7 @@ describe('Sprint 5 Suite 1: NutriFE Parity & Contract Compatibility (Task 5.1)',
       const responses = await Promise.all(requests);
       for (const res of responses) {
         expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('data');
-        expect(Array.isArray(res.body.data)).toBe(true);
+        expect(Array.isArray(res.body)).toBe(true);
       }
     });
 

@@ -38,7 +38,10 @@ import {
   ApiStandardResponse,
   ApiPaginatedResponse,
   CurrentUser,
+  Auth,
+  SkipTransform,
 } from '../../../common/decorators';
+import { UserRole } from '../../../config/enums/role.enum';
 import { ParseBigIntPipe } from '../../../common/pipes/parse-bigint.pipe';
 
 const PATIENT_ID_PARAM = { name: 'id', description: 'ID bệnh nhân' };
@@ -56,8 +59,16 @@ export class PatientsController {
     type: PatientResponseDto,
     description: 'Danh sách bệnh nhân',
   })
-  async findAll(@Query() query: PatientQueryDto, @CurrentUser() user: any) {
-    return this.patientsService.findAll({ query, currentUser: user });
+  async findAll(
+    @Query() query: PatientQueryDto,
+    @Query('limit') rawLimit: string | undefined,
+    @CurrentUser() user: any,
+  ) {
+    const effectiveLimit = rawLimit !== undefined && rawLimit !== '' ? Number(rawLimit) : undefined;
+    return this.patientsService.findAll({
+      query: { ...query, limit: effectiveLimit },
+      currentUser: user,
+    });
   }
 
   @Get('code-preview')
@@ -73,6 +84,7 @@ export class PatientsController {
   }
 
   @Get('import-template')
+  @SkipTransform()
   @ApiOperation({ summary: 'Tải file mẫu Excel import bệnh nhân' })
   async downloadTemplate(@Res() res: Response) {
     const safeFileName = path.basename('Template_import_benh_nhan.xlsx');
@@ -89,6 +101,8 @@ export class PatientsController {
   }
 
   @Post('import')
+  @SkipTransform()
+  @Auth(UserRole.SUPERADMIN, UserRole.ADMIN, UserRole.USERPRO)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Import bệnh nhân từ file Excel (trả về file nếu có lỗi)' })
   @ApiConsumes('multipart/form-data')

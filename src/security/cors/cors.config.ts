@@ -20,8 +20,12 @@ const DEFAULT_PRODUCTION_ORIGINS = [
 const DEVELOPMENT_ORIGINS = [
   'http://localhost:3000',
   'http://localhost:5173',
+  'http://localhost:4173',
+  'http://localhost:8080',
   'http://127.0.0.1:3000',
   'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+  'http://127.0.0.1:8080',
 ];
 
 /**
@@ -41,6 +45,10 @@ export function createCorsOptions(): CorsOptions {
 
   // Tạo tập hợp whitelist không trùng lặp
   const allowedOriginsSet = new Set<string>([...DEFAULT_PRODUCTION_ORIGINS, ...envOrigins]);
+
+  if (process.env.FRONTEND_URL?.trim()) {
+    allowedOriginsSet.add(process.env.FRONTEND_URL.trim());
+  }
 
   if (!isProduction) {
     DEVELOPMENT_ORIGINS.forEach((o) => allowedOriginsSet.add(o));
@@ -81,6 +89,7 @@ export function createCorsOptions(): CorsOptions {
       'Authorization',
       'X-Requested-With',
       'Accept',
+      'Accept-Language',
       'Origin',
       'x-trace-id',
       'x-custom-lang',

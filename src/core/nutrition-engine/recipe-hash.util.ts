@@ -43,17 +43,17 @@ export function normalizeRecipeWeight(
   weight: number | string | Decimal | null | undefined,
 ): string {
   if (weight === null || weight === undefined || weight === '') {
-    return '0.0000';
+    return '0.000';
   }
 
   try {
     const dec = new Decimal(weight).abs();
     if (dec.isNaN()) {
-      return '0.0000';
+      return '0.000';
     }
-    return dec.toFixed(4);
+    return dec.toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toFixed(3);
   } catch {
-    return '0.0000';
+    return '0.000';
   }
 }
 
@@ -66,7 +66,7 @@ export function normalizeRecipeWeight(
  * 2. Components are sorted ascending by numeric `ingredientId`.
  * 3. Duplicate `ingredientId`s are merged by summing their weights using Decimal.js
  *    (preventing split ingredient discrepancies between "10g" and "5g + 5g").
- * 4. Weights are formatted to fixed 4 decimal places with decimal point `.`
+ * 4. Weights are formatted to fixed 3 decimal places with decimal point `.`
  *    (bypassing OS locale-dependent formatting such as French/Vietnamese commas).
  *
  * @param components - Array of recipe components
@@ -139,7 +139,12 @@ export function buildCanonicalRecipeString(
     }
 
     const sortedIds = Array.from(ingredientMap.keys()).sort((a, b) => a - b);
-    return sortedIds.map((id) => `${id}:${ingredientMap.get(id)!.toFixed(4)}`).join('|');
+    return sortedIds
+      .map(
+        (id) =>
+          `${id}:${ingredientMap.get(id)!.toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toFixed(3)}`,
+      )
+      .join('|');
   }
 
   // Non-merging path (preserves individual entries, sorts by ingredientId)
@@ -176,7 +181,9 @@ export function buildCanonicalRecipeString(
   }
 
   validItems.sort((a, b) => a.id - b.id);
-  return validItems.map((item) => `${item.id}:${item.weight.toFixed(4)}`).join('|');
+  return validItems
+    .map((item) => `${item.id}:${item.weight.toDecimalPlaces(3, Decimal.ROUND_HALF_UP).toFixed(3)}`)
+    .join('|');
 }
 
 /**

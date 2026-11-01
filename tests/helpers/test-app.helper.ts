@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: '.env.test', override: true });
+
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
@@ -18,6 +21,7 @@ export class TestAppHelper {
   private jwtService: JwtService;
 
   async init(): Promise<void> {
+    dotenv.config({ path: '.env.test', override: true });
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();

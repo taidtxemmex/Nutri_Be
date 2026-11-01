@@ -517,6 +517,7 @@ describe('Multilingual Validation & System Exceptions E2E Tests (vi, en, zh)', (
       const res = await request(app.getHttpServer()).get('/test-i18n/not-found');
       expect(res.headers['x-trace-id']).toBeDefined();
       expect(res.body).toEqual({
+        status: 404,
         message: expect.any(String),
         error: {
           code: 'RESOURCE_NOT_FOUND',

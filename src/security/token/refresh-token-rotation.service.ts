@@ -255,10 +255,10 @@ export class RefreshTokenRotationService {
   }
 
   /**
-   * Explicitly revoke a refresh token (e.g. on user logout)
+   * Explicitly revoke a refresh token (e.g. on user logout) and return the token record
    */
-  async revokeRefreshToken(rawToken: string): Promise<void> {
-    if (!rawToken) return;
+  async revokeRefreshToken(rawToken: string): Promise<StoredRefreshToken | null> {
+    if (!rawToken) return null;
     const tokenHash = this.hashToken(rawToken);
     const cacheKey = `${REFRESH_TOKEN_KEY_PREFIX}${tokenHash}`;
 
@@ -282,6 +282,30 @@ export class RefreshTokenRotationService {
       record.isRevoked = true;
       await this.updateTokenRecord(cacheKey, record);
     }
+    return record;
+  }
+
+  /**
+   * Look up a refresh token record without modifying it
+   */
+  async getRefreshTokenRecord(rawToken: string): Promise<StoredRefreshToken | null> {
+    if (!rawToken) return null;
+    const tokenHash = this.hashToken(rawToken);
+    const cacheKey = `${REFRESH_TOKEN_KEY_PREFIX}${tokenHash}`;
+
+    if (this.prisma) {
+      try {
+        const cached = await this.prisma.systemCache.findUnique({
+          where: { key: cacheKey },
+        });
+        if (cached?.value) {
+          return JSON.parse(cached.value);
+        }
+      } catch (err: any) {
+        return this.memoryStore.get(cacheKey) || null;
+      }
+    }
+    return this.memoryStore.get(cacheKey) || null;
   }
 
   /**

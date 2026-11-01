@@ -25,12 +25,14 @@ import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { FileUploadResponseDto, EvidenceUploadResponseDto } from '../dto/file-upload-response.dto';
 import { UploadEvidenceDto } from '../dto/upload-evidence.dto';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 import {
   ApiController,
   ApiStandardResponse,
   CurrentUser,
   ApiFile,
   ApiMultiFiles,
+  SkipTransform,
 } from '../../../common/decorators';
 
 @ApiController('Files', 'files')
@@ -52,13 +54,13 @@ export class FilesController {
   @UseInterceptors(
     AnyFilesInterceptor({
       limits: {
-        fileSize: 5 * 1024 * 1024,
-        files: 5,
+        fileSize: 10 * 1024 * 1024,
+        files: 20,
       },
     }),
   )
   @ApiMultiFiles('file', {
-    description: 'Danh sách tệp tin tải lên (JPG, PNG, WebP, GIF, PDF) - Tối đa 5MB/file',
+    description: 'Danh sách tệp tin tải lên (JPG, PNG, WebP, GIF, PDF) - Tối đa 10MB/file',
   })
   @ApiOperation({
     summary: 'Tải lên tập tin đa phương tiện với xác thực Magic Bytes (Yêu cầu đăng nhập)',
@@ -106,7 +108,7 @@ export class FilesController {
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
-        fileSize: 5 * 1024 * 1024,
+        fileSize: 10 * 1024 * 1024,
       },
     }),
   )
@@ -203,6 +205,7 @@ export class FilesController {
       return {
         id: evidence.id.toString(),
         objectKey: uploadRes.objectKey,
+        fileName: uploadRes.fileName || uploadRes.originalFileName,
         originalFileName: uploadRes.originalFileName,
         mimeType: uploadRes.mimeType,
         fileSize: uploadRes.fileSize,
@@ -210,7 +213,7 @@ export class FilesController {
         previewUrl,
         downloadUrl,
         uploadedAt: evidence.ngay_upload,
-      };
+      } as EvidenceUploadResponseDto;
     } catch (err) {
       if (uploadRes?.objectKey) {
         await this.storageService.delete({ objectKey: uploadRes.objectKey }).catch(() => {});
@@ -223,6 +226,7 @@ export class FilesController {
    * Xem trước tập tin (Inline Preview) có xác thực chữ ký HMAC-SHA256
    */
   @Get('preview')
+  @SkipTransform()
   @ApiOperation({
     summary: 'Xem trước tập tin nhạy cảm có chữ ký bảo mật HMAC',
   })
@@ -262,6 +266,7 @@ export class FilesController {
    * Chống HTTP Header Injection (CWE-113) qua Content-Disposition
    */
   @Get('download')
+  @SkipTransform()
   @ApiOperation({
     summary: 'Tải về tập tin an toàn có chữ ký bảo mật HMAC',
   })
@@ -308,12 +313,23 @@ export class FilesController {
   /**
    * Xóa tệp tin an toàn khỏi hệ thống lưu trữ
    */
+  @UseGuards(JwtAuthGuard)
   @Delete(':objectKey(*)')
   @ApiOperation({ summary: 'Xóa tệp tin khỏi hệ thống lưu trữ đĩa cứng' })
   @ApiParam({ name: 'objectKey', description: 'Đường dẫn đối tượng cần xóa' })
   async deleteFile(
     @Param('objectKey') objectKey: string,
+    @CurrentUser() user?: AuthenticatedUser,
   ): Promise<{ success: boolean; message: string }> {
+    const role = (user as any)?.role || (user as any)?.vai_tro;
+    const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN';
+    if (objectKey.startsWith('protected/') && !isAdmin) {
+      throw new ForbiddenException({
+        code: 'AUTH_002',
+        message: 'Bạn không có quyền xóa tệp tin được bảo vệ',
+      });
+    }
+
     const deleted = await this.storageService.delete({ objectKey });
     return {
       success: deleted,

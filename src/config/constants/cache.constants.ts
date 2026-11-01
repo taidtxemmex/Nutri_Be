@@ -17,6 +17,7 @@ export const CACHE_TAG_PATIENTS = 'patients';
 export const CACHE_TAG_PACKAGES = 'packages';
 export const CACHE_TAG_PLANS = 'plans';
 export const CACHE_TAG_SUBSCRIPTIONS = 'subscriptions';
+export const CACHE_TAG_TOKEN_BLACKLIST = 'token_blacklist';
 
 export const CACHE_TTL_LOOKUP_SECONDS = 1800; // 30 phút cho public lookup (dropdown)
 export const CACHE_TTL_EXCEL_TEMPLATE_SECONDS = 1800; // 30 phút cho Excel template cache
@@ -55,3 +56,5 @@ export const buildPackageCacheTag = (id: string | number | bigint): string => `p
 export const buildPlanCacheTag = (id: string | number | bigint): string => `plan:${id}`;
 export const buildSubscriptionCacheTag = (id: string | number | bigint): string =>
   `subscription:${id}`;
+export const buildTokenBlacklistCacheKey = (tokenHash: string): string =>
+  `blacklist:token:${tokenHash}`;

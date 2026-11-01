@@ -304,7 +304,7 @@ describe('Cross-Sprint Integration E2E: Full Clinical Nutrition Lifecycle (Sprin
           .expect(201);
 
         // Layer 2: API Contract Envelope
-        expect(res.body.data.id).toBe(specialMilkIngId.toString());
+        expect(String(res.body.data.id)).toBe(specialMilkIngId.toString());
         expect(res.body.data.trang_thai).toBe('DA_DUYET');
 
         // Layer 3: Direct Database State Persistence Assertion
@@ -864,7 +864,7 @@ describe('Cross-Sprint Integration E2E: Full Clinical Nutrition Lifecycle (Sprin
           where: { id: BigInt(weeklyMenuId) },
         });
         expect(dbPublicMenu).not.toBeNull();
-        expect(dbPublicMenu?.loai_thuc_don).toBe('CONG_KHAI');
+        expect(dbPublicMenu?.loai_thuc_don).toBe(MenuType.TUAN);
       });
     });
 

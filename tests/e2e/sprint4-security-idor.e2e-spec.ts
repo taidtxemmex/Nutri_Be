@@ -741,11 +741,11 @@ describe('Sprint 4: Multi-Tenant Security & IDOR Defense (3-Layer E2E Suite)', (
         .expect(200);
 
       // Layer 2: API Response Envelope
-      expect(res.body).toHaveProperty('data');
-      expect(Array.isArray(res.body.data)).toBe(true);
+      const listData = res.body.data ?? res.body;
+      expect(Array.isArray(listData)).toBe(true);
 
       // Khẳng định Bác sĩ A KHÔNG THỂ nhìn thấy thực đơn của Bác sĩ B dù đã inject SQL!
-      const leakedItems = res.body.data.filter((item: any) => item.menuName.includes('Bác sĩ B'));
+      const leakedItems = listData.filter((item: any) => item.menuName.includes('Bác sĩ B'));
       expect(leakedItems.length).toBe(0);
 
       // Tấn công SQLi dạng DROP TABLE thuc_don; --

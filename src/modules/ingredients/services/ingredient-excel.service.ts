@@ -24,14 +24,17 @@ export interface ColumnMetadata {
   key: string;
   header: string;
   unit?: string;
+  isComputed?: boolean;
 }
 
 export const NUTRIENT_COLUMN_DEFINITIONS: ColumnMetadata[] = [
   { key: 'water', header: 'Water (g)', unit: 'g' },
   { key: 'protein', header: 'Protein (g)', unit: 'g' },
   { key: 'fat', header: 'Fat (g)', unit: 'g' },
+  { key: 'carbohydrate', header: 'Carbohydrate (g)', unit: 'g', isComputed: true },
   { key: 'fiber', header: 'Fiber (g)', unit: 'g' },
   { key: 'ash', header: 'Ash (g)', unit: 'g' },
+  { key: 'energy', header: 'Energy (Kcal)', unit: 'Kcal', isComputed: true },
   { key: 'calci', header: 'Calci (mg)', unit: 'mg' },
   { key: 'phosphorous', header: 'Phosphorous (mg)', unit: 'mg' },
   { key: 'iron', header: 'Iron (mg)', unit: 'mg' },
@@ -53,6 +56,7 @@ export const NUTRIENT_COLUMN_DEFINITIONS: ColumnMetadata[] = [
   { key: 'biotin', header: 'Biotin (µg)', unit: 'µg' },
   { key: 'vitaminB12', header: 'Vitamin B12 (µg)', unit: 'µg' },
   { key: 'retinol', header: 'Retinol (µg)', unit: 'µg' },
+  { key: 'vitaminARae', header: 'Vitamin A - RAE (µg)', unit: 'µg', isComputed: true },
   { key: 'vitaminD', header: 'Vitamin D (µg)', unit: 'µg' },
   { key: 'vitaminE', header: 'Vitamin E (mg)', unit: 'mg' },
   { key: 'vitaminK', header: 'Vitamin K (µg)', unit: 'µg' },
@@ -110,6 +114,16 @@ export const NUTRIENT_COLUMN_DEFINITIONS: ColumnMetadata[] = [
   { key: 'serine', header: 'Serine (mg)', unit: 'mg' },
 ];
 
+export const API_KEY_TO_DB_COLUMN: Record<string, string> = NUTRIENT_COLUMN_DEFINITIONS.filter(
+  (col) => !col.isComputed,
+).reduce(
+  (acc, col) => {
+    acc[col.key] = col.key;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
 export interface ImportResult {
   success: boolean;
   totalImported?: number;
@@ -164,16 +178,17 @@ export class IngredientExcelService {
       .map((c) => c.ten_danh_muc)
       .filter((name): name is string => !!name);
 
-    // Lọc danh sách cột vi chất nếu người dùng chỉ định
-    let nutrientColumns = NUTRIENT_COLUMN_DEFINITIONS;
+    // Lọc danh sách cột vi chất nếu người dùng chỉ định (Loại bỏ các cột tự tính)
+    const importableColumns = NUTRIENT_COLUMN_DEFINITIONS.filter((c) => !c.isComputed);
+    let nutrientColumns = importableColumns;
     if (columns && Array.isArray(columns) && columns.length > 0) {
       const lowerCols = columns.map((c) => c.toLowerCase());
-      nutrientColumns = NUTRIENT_COLUMN_DEFINITIONS.filter(
+      nutrientColumns = importableColumns.filter(
         (col) =>
           lowerCols.includes(col.key.toLowerCase()) || lowerCols.includes(col.header.toLowerCase()),
       );
       if (nutrientColumns.length === 0) {
-        nutrientColumns = NUTRIENT_COLUMN_DEFINITIONS;
+        nutrientColumns = importableColumns;
       }
     }
 
@@ -316,16 +331,21 @@ export class IngredientExcelService {
       }
     }
 
-    // 1. Lọc danh sách cột xuất động
+    // 1. Lọc danh sách cột xuất động (Giữ đúng thứ tự FE gửi lên nếu có)
     let nutrientColumns = NUTRIENT_COLUMN_DEFINITIONS;
     if (dto.columns && Array.isArray(dto.columns) && dto.columns.length > 0) {
-      const lowerCols = dto.columns.map((c) => c.toLowerCase());
-      nutrientColumns = NUTRIENT_COLUMN_DEFINITIONS.filter(
-        (col) =>
-          lowerCols.includes(col.key.toLowerCase()) || lowerCols.includes(col.header.toLowerCase()),
-      );
-      if (nutrientColumns.length === 0) {
-        nutrientColumns = NUTRIENT_COLUMN_DEFINITIONS;
+      const resolved: ColumnMetadata[] = [];
+      for (const reqCol of dto.columns) {
+        const lowerReq = String(reqCol).toLowerCase().trim();
+        const found = NUTRIENT_COLUMN_DEFINITIONS.find(
+          (col) => col.key.toLowerCase() === lowerReq || col.header.toLowerCase() === lowerReq,
+        );
+        if (found && !resolved.some((r) => r.key === found.key)) {
+          resolved.push(found);
+        }
+      }
+      if (resolved.length > 0) {
+        nutrientColumns = resolved;
       }
     }
 
@@ -361,11 +381,9 @@ export class IngredientExcelService {
     const streamer = new GenericIngredientStreamer(multiOut);
 
     const headers: ExcelColumnDefinition[] = [
-      { header: 'STT', key: 'stt', width: 8 },
       { header: 'Tên nguyên liệu', key: 'name', width: 32 },
       { header: 'Nhóm', key: 'category', width: 25 },
       { header: 'Loại protein', key: 'proteinType', width: 18 },
-      { header: 'Edible (%)', key: 'edible', width: 15 },
       ...nutrientColumns.map((c) => ({
         header: c.header,
         key: c.key,
@@ -380,7 +398,7 @@ export class IngredientExcelService {
     });
 
     // 3. Query Cursor Batching 200 items với select tường minh (Rule 11 & Rule 19)
-    const where: any = { deleted_at: null };
+    const where: any = { deleted_at: null, trang_thai: 'DA_DUYET' };
     if (dto.keyword && dto.keyword.trim()) {
       where.ten_nguyen_lieu = { contains: dto.keyword.trim() };
     }
@@ -396,26 +414,49 @@ export class IngredientExcelService {
       ten_nguyen_lieu: true,
       danh_muc: true,
       loai_protein: true,
-      edible: true,
       danh_muc_nguyen_lieu_danh_mucTodanh_muc: {
         select: { ten_danh_muc: true },
       },
     };
     for (const col of nutrientColumns) {
-      select[col.key] = true;
+      if (!col.isComputed) {
+        select[col.key] = true;
+      } else if (col.key === 'carbohydrate' || col.key === 'energy') {
+        select.water = true;
+        select.protein = true;
+        select.fat = true;
+        select.ash = true;
+      } else if (col.key === 'vitaminARae') {
+        select.retinol = true;
+        select.betaCarotene = true;
+        select.alphaCarotene = true;
+        select.betaCryptoxanthin = true;
+      }
     }
 
-    let stt = 1;
     await streamPrismaInBatches<any>(this.prisma, {
       model: 'nguyen_lieu',
       where,
       select,
-      orderBy: { id: 'asc' },
+      orderBy: { ten_nguyen_lieu: 'asc' },
       batchSize: 200,
       onBatch: async (batch) => {
         for (const item of batch) {
+          const w = Number(item.water) || 0;
+          const p = Number(item.protein) || 0;
+          const f = Number(item.fat) || 0;
+          const a = Number(item.ash) || 0;
+          const carb =
+            w === 0 && p === 0 && f === 0 && a === 0 ? 0 : Math.max(0, 100 - (w + p + f + a));
+          const energy = p * 4 + f * 9 + carb * 4;
+          const retinol = Number(item.retinol) || 0;
+          const betaCarotene = Number(item.betaCarotene) || 0;
+          const alphaCarotene = Number(item.alphaCarotene) || 0;
+          const betaCryptoxanthin = Number(item.betaCryptoxanthin) || 0;
+          const vitaminARae =
+            retinol + betaCarotene / 12 + alphaCarotene / 24 + betaCryptoxanthin / 24;
+
           const rowData = [
-            stt++,
             item.ten_nguyen_lieu,
             item.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc || '',
             item.loai_protein === 'DONG_VAT'
@@ -423,8 +464,16 @@ export class IngredientExcelService {
               : item.loai_protein === 'THUC_VAT'
                 ? 'Thực vật'
                 : item.loai_protein || '',
-            item.edible ?? 100,
             ...nutrientColumns.map((col) => {
+              if (col.key === 'carbohydrate') {
+                return Math.round(carb * 100) / 100;
+              }
+              if (col.key === 'energy') {
+                return Math.round(energy * 100) / 100;
+              }
+              if (col.key === 'vitaminARae') {
+                return Math.round(vitaminARae * 100) / 100;
+              }
               const val = item[col.key];
               return val !== null && val !== undefined ? Number(val) : '';
             }),
@@ -554,7 +603,12 @@ export class IngredientExcelService {
                 : cell?.value
                   ? String(cell.value).trim()
                   : '';
-              if (headerText) {
+              const lowerHeader = headerText.toLowerCase();
+              if (
+                headerText &&
+                lowerHeader !== 'kết quả import' &&
+                lowerHeader !== 'ket_qua_import'
+              ) {
                 currentHeaderMap.set(headerText, c);
                 currentHeaders.push(headerText);
               }
@@ -583,8 +637,8 @@ export class IngredientExcelService {
               'Edible',
             ]);
 
-            // Nếu sheet này chứa đủ 4 cột bắt buộc -> chọn làm targetWorksheet
-            if (m && cat && p && ed) {
+            // Nếu sheet này chứa đủ 3 cột bắt buộc (Tên, Nhóm, Loại protein) -> chọn làm targetWorksheet
+            if (m && cat && p) {
               isCurrentSheetTarget = true;
               targetWorksheet = worksheetReader;
               headerMap = currentHeaderMap;
@@ -687,17 +741,23 @@ export class IngredientExcelService {
             }
           }
 
-          // D. Validate Edible (%)
-          const numEdible = ExcelStreamReader.readCellNumber(row.getCell(colEdible!));
-          if (numEdible === null) {
-            errors.push('Edible (%) là bắt buộc và phải là số hợp lệ');
-          } else if (numEdible < 0 || numEdible > 100) {
-            errors.push('Edible (%) phải nằm trong khoảng từ 0 đến 100');
+          // D. Validate Edible (%) (nếu có cột Edible thì validate, nếu không có thì mặc định 100)
+          let numEdible = 100;
+          if (colEdible) {
+            const parsedEdible = ExcelStreamReader.readCellNumber(row.getCell(colEdible));
+            if (parsedEdible === null) {
+              errors.push('Edible (%) là bắt buộc và phải là số hợp lệ');
+            } else if (parsedEdible < 0 || parsedEdible > 100) {
+              errors.push('Edible (%) phải nằm trong khoảng từ 0 đến 100');
+            } else {
+              numEdible = parsedEdible;
+            }
           }
 
-          // E. Validate 86 vi chất
+          // E. Validate 77 vi chất cơ sở (bỏ qua cột tính toán tự động)
           const nutrientValues: Record<string, number | null> = {};
           for (const colDef of NUTRIENT_COLUMN_DEFINITIONS) {
+            if (colDef.isComputed) continue;
             const colIdx = this.findHeaderColumn(headerMap, [colDef.header, colDef.key]);
             if (colIdx) {
               const val = row.getCell(colIdx);

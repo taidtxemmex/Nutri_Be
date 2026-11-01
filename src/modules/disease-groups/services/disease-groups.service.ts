@@ -45,7 +45,11 @@ export class DiseaseGroupsService {
    * Tích hợp Perpetual Cache (Rule 23)
    */
   async findAll({ query }: FindDiseaseGroupsParamsDto = {}): Promise<PaginatedDiseaseGroupsResult> {
-    const { page, limit, skip } = normalizePagination(query);
+    const { page, limit, skip } = normalizePagination({
+      query,
+      defaultLimit: 100,
+      maxLimit: 1000,
+    });
 
     const cacheKey = this.cacheService?.generateKey({
       prefix: 'disease-groups:list',
@@ -68,7 +72,7 @@ export class DiseaseGroupsService {
       const orderBy: any = {};
       const sortField =
         query?.sortBy === 'code' ? 'ma_nhom' : query?.sortBy === 'name' ? 'ten_nhom' : 'id';
-      orderBy[sortField] = query?.sortOrder?.toLowerCase() === 'asc' ? 'asc' : 'desc';
+      orderBy[sortField] = query?.sortOrder?.toLowerCase() === 'desc' ? 'desc' : 'asc';
 
       const [total, records] = await Promise.all([
         this.prisma.nhom_benh.count({ where }),

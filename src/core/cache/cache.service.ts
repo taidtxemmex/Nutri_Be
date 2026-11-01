@@ -96,16 +96,7 @@ export class CacheService implements OnModuleDestroy {
       return `cache:${prefix}:all`;
     }
 
-    const cleanParams: Record<string, any> = {};
-    const trackingPrefixes = ['utm_', 'fbclid', '_ga', 'timestamp', 'random', '_t', '_'];
-
-    for (const [key, value] of Object.entries(params)) {
-      if (value === undefined || value === null || value === '') continue;
-      const lowerKey = key.toLowerCase();
-      if (trackingPrefixes.some((p) => lowerKey.startsWith(p))) continue;
-      // Chuẩn hóa chuỗi (trim và lowercase nếu là chuỗi tìm kiếm)
-      cleanParams[key] = typeof value === 'string' ? value.trim() : value;
-    }
+    const cleanParams = this.normalizeQueryParams(params);
 
     const sortedKeys = Object.keys(cleanParams).sort();
     const sortedObj: Record<string, any> = {};
@@ -116,6 +107,30 @@ export class CacheService implements OnModuleDestroy {
     const serialized = JSON.stringify(sortedObj);
     const hash = crypto.createHash('sha256').update(serialized).digest('hex').substring(0, 16);
     return `cache:${prefix}:${hash}`;
+  }
+
+  /**
+   * Chuẩn hóa query params cho cache key: chỉ loại bỏ '_' và '_t' hoặc các prefix tracking
+   */
+  normalizeQueryParams(params: Record<string, any>): Record<string, any> {
+    const cleanParams: Record<string, any> = {};
+    const trackingPrefixes = ['utm_', 'fbclid', '_ga', 'timestamp', 'random', 'cachebust'];
+
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined || value === null || value === '') continue;
+      const lowerKey = key.toLowerCase();
+      if (
+        lowerKey === '_' ||
+        lowerKey === '_t' ||
+        trackingPrefixes.some((p) => lowerKey.startsWith(p))
+      ) {
+        continue;
+      }
+      // Chuẩn hóa chuỗi (trim và lowercase nếu là chuỗi tìm kiếm)
+      cleanParams[key] = typeof value === 'string' ? value.trim() : value;
+    }
+
+    return cleanParams;
   }
 
   /**
@@ -397,7 +412,9 @@ export class CacheService implements OnModuleDestroy {
     }
 
     this.debounceTimer = setTimeout(() => {
-      this.flushPendingTagsToDb();
+      this.flushPendingTagsToDb().catch((err) => {
+        this.logger.error(`Lỗi flush DB cache: ${err?.message || err}`);
+      });
     }, CACHE_DEBOUNCE_WINDOW_MS);
   }
 

@@ -14,7 +14,7 @@ import {
   MaxLength,
   ArrayMaxSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { MenuType, TargetType } from '../../../config/enums/domain.enum';
 
 export class MenuDishDetailDto {
@@ -23,9 +23,12 @@ export class MenuDishDetailDto {
   ingredientId: string | number;
 
   @ApiProperty({ description: 'Khối lượng sống sạch (g)' })
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber()
   @Min(0, { message: 'Khối lượng sống sạch phải lớn hơn hoặc bằng 0' })
-  @Max(10000, { message: 'Khối lượng sống sạch không được vượt quá 10000 gam' })
+  @Max(1000000, { message: 'Khối lượng sống sạch không được vượt quá 1000000 gam' })
   netWeight: number;
 }
 
@@ -42,6 +45,9 @@ export class MenuDishDto {
 
   @ApiPropertyOptional({ description: 'Hệ số sống chín / tỉ lệ hao hụt', default: 1.0 })
   @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber()
   @Min(0, { message: 'Hệ số sống chín phải lớn hơn hoặc bằng 0' })
   @Max(100, { message: 'Hệ số sống chín không được vượt quá 100' })
@@ -70,11 +76,11 @@ export class MenuMealDto {
   @MaxLength(255, { message: 'Tên bữa ăn không được vượt quá 255 ký tự' })
   mealName?: string;
 
-  @ApiProperty({ description: 'Giờ ăn định dạng HH:mm', example: '07:00' })
+  @ApiPropertyOptional({ description: 'Giờ ăn định dạng HH:mm', example: '07:00' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
   @MaxLength(50, { message: 'Giờ ăn không được vượt quá 50 ký tự' })
-  time: string;
+  time?: string;
 
   @ApiPropertyOptional({ description: 'Trạng thái bữa ăn', default: 'RIENG_TU' })
   @IsOptional()
@@ -101,6 +107,9 @@ export class MenuMealDto {
 
 export class MenuDayDto {
   @ApiProperty({ description: 'Thứ trong tuần (1..7 hoặc 2..8 cho Thứ 2 -> CN)', example: 2 })
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'Thứ trong tuần phải là số nguyên' })
   @Min(1)
   @Max(8)
@@ -119,6 +128,9 @@ export class MenuDayDto {
 
 export class MenuWeekDto {
   @ApiProperty({ description: 'Số thứ tự tuần (1..4)', example: 1 })
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'Số thứ tự tuần phải là số nguyên' })
   @Min(1)
   @Max(52)
@@ -169,6 +181,9 @@ export class CreateMenuDto {
 
   @ApiPropertyOptional({ description: 'ID nhóm bệnh mở rộng (nếu là thực đơn nhóm bệnh)' })
   @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'ID nhóm bệnh phải là số nguyên' })
   @Min(1, { message: 'ID nhóm bệnh phải lớn hơn 0' })
   diseaseGroupId?: number;

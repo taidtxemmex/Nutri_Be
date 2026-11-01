@@ -64,7 +64,6 @@ export class CreateExtendedDiseaseGroupDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(36, { message: 'userId không được vượt quá 36 ký tự' })
   userId?: string;
 
   getExtendedCode(): string {

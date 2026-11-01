@@ -437,7 +437,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .expect(200);
 
       // Layer 2: API Standard Response Envelope
-      expect(res.body).toHaveProperty('status', 200);
+      expect(res.body).toHaveProperty('data');
       expect(res.body.data).toHaveProperty('id');
       expect(res.body.data.mealName).toBe('Bữa trưa hồi phục thể lực');
       expect(res.body.data.time).toBe('12:00');
@@ -612,7 +612,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
         .expect(200);
 
       // Layer 2: API Standard Response Envelope
-      expect(res.body).toHaveProperty('status', 200);
+      expect(res.body).toHaveProperty('data');
       expect(res.body.data).toHaveProperty('id');
       expect(res.body.data.name).toBe('Bò xào cần tây hành tây');
       expect(res.body.data.status).toBe(DishStatus.RIENG_TU);
@@ -931,6 +931,14 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
       expect(dbClonedDish?.mon_goc_id).toBe(BigInt(originalDishId));
       expect(dbClonedDish?.recipe_hash).toBe(originalHash);
       expect(dbClonedDish?.chi_tiet_mon_an.length).toBe(2);
+
+      // 3. Khi không gửi newName thì trả 201 Created với hậu tố (Bản sao)
+      const resDefaultClone = await request(helper.getHttpServer())
+        .post(`/api/v1/dish/${originalDishId}/clone`)
+        .set('Authorization', `Bearer ${otherUserToken}`)
+        .send({})
+        .expect(201);
+      expect(resDefaultClone.body.data.name).toContain('(Bản sao)');
     });
 
     it('3.8 Tìm kiếm nhanh autocomplete (GET /api/dish/autocomplete)', async () => {
@@ -1008,7 +1016,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
 
       // User B thành công thêm món của User A vào meal của mình
       expect(mealRes.status).toBe(200);
-      expect(mealRes.body.data.dishes[0].id).toBe(secretDishId);
+      expect(String(mealRes.body.data.dishes[0].id)).toBe(String(secretDishId));
 
       // 3. User B xem chi tiết meal -> giải mã toàn bộ dinh dưỡng của món User A
       const getMealRes = await request(helper.getHttpServer())
@@ -1049,7 +1057,7 @@ describe('Sprint 3: Dishes, Meals & Cooking Coefficients (3-Layer E2E Suite)', (
       expect(res.body).toHaveProperty('data');
       expect(res.body.data).toHaveProperty('id');
       expect(res.body.data.details).toHaveLength(1);
-      expect(res.body.data.details[0].ingredientId).toBe(beefIngId.toString());
+      expect(String(res.body.data.details[0].ingredientId)).toBe(beefIngId.toString());
       expect(res.body.data.details[0].netWeight).toBe(100);
 
       const dishId = res.body.data.id;

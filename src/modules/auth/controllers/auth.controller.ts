@@ -1,5 +1,5 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
+import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Headers } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { AuthRateLimitGuard } from '../../../security/rate-limit/auth-rate-limit.guard';
 import {
@@ -14,7 +14,6 @@ import {
 } from '../dto';
 import {
   Public,
-  Auth,
   CurrentUser,
   ClientIp,
   UserAgent,
@@ -88,7 +87,8 @@ export class AuthController {
     return this.authService.refreshToken({ dto, ip, userAgent });
   }
 
-  @Auth()
+  @Public()
+  @ApiBearerAuth('JWT-auth')
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Đăng xuất khỏi hệ thống và hủy phiên làm việc' })
@@ -107,11 +107,12 @@ export class AuthController {
     required: false,
   })
   async logout(
-    @CurrentUser() user: AuthenticatedUser,
+    @Headers('authorization') authHeader?: string,
     @Body('refreshToken') refreshToken?: string,
     @Body('sessionId') sessionId?: string,
+    @CurrentUser() user?: AuthenticatedUser,
   ) {
-    return this.authService.logout({ user, refreshToken, sessionId });
+    return this.authService.logout({ user, authHeader, refreshToken, sessionId });
   }
 
   @Public()

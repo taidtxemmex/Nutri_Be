@@ -51,7 +51,7 @@ describe('Patients Master E2E & IDOR / 3-Layer Persistence Validation', () => {
 
     const docA = await helper.createTestUser({
       username: `doc_a_${uniqueSuffix}`,
-      role: UserRole.USER,
+      role: UserRole.USERPRO,
       password: 'P@ssw0rd123!',
       fullName: 'Bác Sĩ Nguyễn Văn A',
     });
@@ -166,6 +166,32 @@ describe('Patients Master E2E & IDOR / 3-Layer Persistence Validation', () => {
       expect(dbUpdated?.ho_ten).toBe('Vũ Thị Mai Hoa');
       expect(Number(dbUpdated?.can_nang)).toBe(56.5);
       expect(Number(dbUpdated?.he_so_hoat_dong)).toBe(1.3);
+    });
+
+    it('1.3 Chặn tạo bệnh nhân với chiều cao <= 0 hoặc cân nặng <= 0 -> 400 Bad Request', async () => {
+      // Cân nặng = 0
+      await request(helper.getHttpServer())
+        .post('/api/patients')
+        .set('Authorization', `Bearer ${doctorAToken}`)
+        .send({
+          fullName: 'Bệnh nhân Cân Nặng 0',
+          gender: 'NAM',
+          weight: 0,
+          height: 170,
+        })
+        .expect(400);
+
+      // Chiều cao = 0
+      await request(helper.getHttpServer())
+        .post('/api/patients')
+        .set('Authorization', `Bearer ${doctorAToken}`)
+        .send({
+          fullName: 'Bệnh nhân Chiều Cao 0',
+          gender: 'NAM',
+          weight: 60,
+          height: 0,
+        })
+        .expect(400);
     });
   });
 
@@ -309,10 +335,10 @@ describe('Patients Master E2E & IDOR / 3-Layer Persistence Validation', () => {
         .set('Authorization', `Bearer ${doctorAToken}`)
         .expect(200);
 
-      expect(res.body.data.length).toBe(2);
-      expect(res.body.meta.totalItems).toBe(2);
-      expect(res.body.data[0].fullName).toContain('Hoàng');
-      expect(res.body.data[1].fullName).toContain('Hoàng');
+      const items = Array.isArray(res.body) ? res.body : res.body.data;
+      expect(items.length).toBe(2);
+      expect(items[0].fullName).toContain('Hoàng');
+      expect(items[1].fullName).toContain('Hoàng');
     });
   });
 

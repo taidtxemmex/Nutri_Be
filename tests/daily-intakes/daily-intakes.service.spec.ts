@@ -113,7 +113,7 @@ describe('DailyIntakesService', () => {
       });
 
       expect(res.id).toBe('10');
-      expect(res.totalDayNutrients.energy).toBeCloseTo(344, 0);
+      expect(res.totalDayNutrients.energy).toBeCloseTo(345.9, 1);
       expect(mockCache.invalidateTag).toHaveBeenCalledWith('daily-intakes');
 
       // Lần 2: Trùng ngày -> ném lỗi

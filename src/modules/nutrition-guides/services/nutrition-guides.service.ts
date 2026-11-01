@@ -21,12 +21,21 @@ export class NutritionGuidesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private mapToDto(entity: any): NutritionGuideResponseDto {
+    let dietaryRequirements = entity.co_cau_khau_phan ?? undefined;
+    if (typeof dietaryRequirements === 'string') {
+      try {
+        dietaryRequirements = JSON.parse(dietaryRequirements);
+      } catch {
+        dietaryRequirements = {};
+      }
+    }
+
     return {
       id: Number(entity.id),
       diseaseName: entity.ten_benh,
       code: entity.ma_ky_hieu,
       nutritionPrinciple: entity.nguyen_tac ?? undefined,
-      dietaryRequirements: entity.co_cau_khau_phan ?? undefined,
+      dietaryRequirements,
       note: entity.luu_y ?? undefined,
     };
   }
@@ -34,6 +43,7 @@ export class NutritionGuidesService {
   async getAll(): Promise<NutritionGuideResponseDto[]> {
     const list = await this.prisma.huong_dan_dinh_duong.findMany({
       orderBy: { id: 'asc' },
+      take: 500,
     });
     return list.map((item) => this.mapToDto(item));
   }
@@ -51,8 +61,16 @@ export class NutritionGuidesService {
   }
 
   async create({ dto, userId }: CreateNutritionGuideParamsDto): Promise<NutritionGuideResponseDto> {
+    const rawDto = dto as Record<string, any>;
+    const code = dto.code ?? rawDto.maKyHieu;
+    const diseaseName = dto.diseaseName ?? rawDto.tenBenh;
+    const nutritionPrinciple =
+      dto.nutritionPrinciple ?? rawDto.nguyenTac ?? rawDto.nguyenTacDinhDuong;
+    const dietaryRequirements = dto.dietaryRequirements ?? rawDto.coCauKhauPhan;
+    const note = dto.note ?? rawDto.luuY ?? rawDto.moTa ?? rawDto.description;
+
     const existing = await this.prisma.huong_dan_dinh_duong.findUnique({
-      where: { ma_ky_hieu: dto.code },
+      where: { ma_ky_hieu: code },
     });
 
     if (existing) {
@@ -61,13 +79,13 @@ export class NutritionGuidesService {
 
     const created = await this.prisma.huong_dan_dinh_duong.create({
       data: {
-        ma_ky_hieu: dto.code,
-        ten_benh: dto.diseaseName,
-        nguyen_tac: dto.nutritionPrinciple ?? null,
-        co_cau_khau_phan: dto.dietaryRequirements
-          ? JSON.parse(JSON.stringify(dto.dietaryRequirements))
+        ma_ky_hieu: code,
+        ten_benh: diseaseName,
+        nguyen_tac: nutritionPrinciple ?? null,
+        co_cau_khau_phan: dietaryRequirements
+          ? JSON.parse(JSON.stringify(dietaryRequirements))
           : null,
-        luu_y: dto.note ?? null,
+        luu_y: note ?? null,
         nguoi_dung_id: userId ?? null,
       },
     });
@@ -84,9 +102,17 @@ export class NutritionGuidesService {
       throw new NotFoundException('error.nutrition_guide.not_found');
     }
 
-    if (dto.code && dto.code !== existing.ma_ky_hieu) {
+    const rawDto = dto as Record<string, any>;
+    const code = dto.code ?? rawDto.maKyHieu;
+    const diseaseName = dto.diseaseName ?? rawDto.tenBenh;
+    const nutritionPrinciple =
+      dto.nutritionPrinciple ?? rawDto.nguyenTac ?? rawDto.nguyenTacDinhDuong;
+    const dietaryRequirements = dto.dietaryRequirements ?? rawDto.coCauKhauPhan;
+    const note = dto.note ?? rawDto.luuY ?? rawDto.moTa ?? rawDto.description;
+
+    if (code && code !== existing.ma_ky_hieu) {
       const codeCheck = await this.prisma.huong_dan_dinh_duong.findUnique({
-        where: { ma_ky_hieu: dto.code },
+        where: { ma_ky_hieu: code },
       });
       if (codeCheck) {
         throw new ConflictException('Mã ký hiệu hướng dẫn đã tồn tại');
@@ -96,17 +122,17 @@ export class NutritionGuidesService {
     const updated = await this.prisma.huong_dan_dinh_duong.update({
       where: { id: BigInt(id) },
       data: {
-        ...(dto.code ? { ma_ky_hieu: dto.code } : {}),
-        ...(dto.diseaseName ? { ten_benh: dto.diseaseName } : {}),
-        ...(dto.nutritionPrinciple !== undefined ? { nguyen_tac: dto.nutritionPrinciple } : {}),
-        ...(dto.dietaryRequirements !== undefined
+        ...(code ? { ma_ky_hieu: code } : {}),
+        ...(diseaseName ? { ten_benh: diseaseName } : {}),
+        ...(nutritionPrinciple !== undefined ? { nguyen_tac: nutritionPrinciple } : {}),
+        ...(dietaryRequirements !== undefined
           ? {
-              co_cau_khau_phan: dto.dietaryRequirements
-                ? JSON.parse(JSON.stringify(dto.dietaryRequirements))
+              co_cau_khau_phan: dietaryRequirements
+                ? JSON.parse(JSON.stringify(dietaryRequirements))
                 : null,
             }
           : {}),
-        ...(dto.note !== undefined ? { luu_y: dto.note } : {}),
+        ...(note !== undefined ? { luu_y: note } : {}),
       },
     });
 

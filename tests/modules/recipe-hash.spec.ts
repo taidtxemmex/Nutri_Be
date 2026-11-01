@@ -22,21 +22,21 @@ describe('Task 3.1: Canonical RecipeHash SHA-256 & OS Locale Invariance', () => 
 
     expect(hashAB).toBe(hashBA);
     expect(hashAB).toHaveLength(64);
-    expect(buildCanonicalRecipeString(dishAB)).toBe('1:100.0000|2:50.0000');
+    expect(buildCanonicalRecipeString(dishAB)).toBe('1:100.000|2:50.000');
   });
 
   it('Locale Invariance: Numbers formatted with dot (.) regardless of French/Vietnamese comma OS locale', () => {
     const rawNumbers = [10.5, 99.9999, 0.1234, 1234.5678];
     for (const num of rawNumbers) {
       const normalized = normalizeRecipeWeight(num);
-      expect(normalized).toMatch(/^\d+\.\d{4}$/);
+      expect(normalized).toMatch(/^\d+\.\d{3}$/);
       expect(normalized).not.toContain(',');
     }
   });
 
-  it('Float Precision: 10.00001 and 10.00004 yield consistent toFixed(4) output', () => {
-    const hash1 = computeRecipeHash([{ ingredientId: 1, weight: 10.00001 }]);
-    const hash2 = computeRecipeHash([{ ingredientId: 1, weight: 10.00004 }]);
+  it('Float Precision: 10.0001 and 10.0004 yield consistent toFixed(3) output', () => {
+    const hash1 = computeRecipeHash([{ ingredientId: 1, weight: 10.0001 }]);
+    const hash2 = computeRecipeHash([{ ingredientId: 1, weight: 10.0004 }]);
     expect(hash1).toBe(hash2);
   });
 

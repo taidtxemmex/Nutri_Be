@@ -12,21 +12,24 @@ import {
   IsInt,
   MaxLength,
   IsDateString,
+  Matches,
   ArrayMinSize,
   ArrayMaxSize,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { IntakeInputType } from '../../../config/enums/domain.enum';
 
 export class DailyIntakeIngredientInputDto {
   @ApiProperty({ description: 'ID nguyên liệu' })
   @IsNotEmpty({ message: 'ID nguyên liệu không được để trống' })
+  @Type(() => Number)
   ingredientId: string | number;
 
   @ApiProperty({ description: 'Khối lượng sống sạch / thô thực tế (g)', example: 150 })
+  @Type(() => Number)
   @IsNumber({}, { message: 'Khối lượng phải là số' })
   @Min(0, { message: 'Khối lượng không được âm' })
-  @Max(10000, { message: 'Khối lượng không được vượt quá 10000 gam' })
+  @Max(1000000, { message: 'Khối lượng không được vượt quá 1000000 gam' })
   rawWeight: number;
 }
 
@@ -35,9 +38,10 @@ export class DailyIntakeMealInputDto {
     description: 'Thứ tự bữa ăn trong ngày (1: Sáng, 2: Trưa, 3: Chiều, ...)',
     example: 1,
   })
+  @Type(() => Number)
   @IsInt({ message: 'Thứ tự bữa ăn phải là số nguyên' })
   @Min(1, { message: 'Thứ tự bữa ăn tối thiểu là 1' })
-  @Max(20, { message: 'Thứ tự bữa ăn tối đa là 20' })
+  @Max(1000, { message: 'Thứ tự bữa ăn tối đa là 1000' })
   mealOrder: number;
 
   @ApiPropertyOptional({ description: 'Tên bữa ăn', example: 'Bữa Sáng' })
@@ -49,7 +53,7 @@ export class DailyIntakeMealInputDto {
   @ApiPropertyOptional({ description: 'Giờ ăn định dạng HH:mm', example: '07:30' })
   @IsOptional()
   @IsString({ message: 'Giờ ăn phải là chuỗi' })
-  @MaxLength(20, { message: 'Giờ ăn không được vượt quá 20 ký tự' })
+  @MaxLength(50, { message: 'Giờ ăn không được vượt quá 50 ký tự' })
   mealTime?: string;
 
   @ApiProperty({
@@ -66,6 +70,7 @@ export class DailyIntakeMealInputDto {
 export class CreateDailyIntakeDto {
   @ApiProperty({ description: 'ID bệnh nhân', example: '1' })
   @IsNotEmpty({ message: 'ID bệnh nhân không được để trống' })
+  @Type(() => Number)
   patientId: string | number;
 
   @ApiProperty({ description: 'Ngày ăn định dạng YYYY-MM-DD', example: '2026-02-01' })
@@ -85,7 +90,7 @@ export class CreateDailyIntakeDto {
   @ApiPropertyOptional({ description: 'Ghi chú lâm sàng của bác sĩ' })
   @IsOptional()
   @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(255, { message: 'Ghi chú tối đa 255 ký tự' })
+  @MaxLength(2000, { message: 'Ghi chú tối đa 2000 ký tự' })
   note?: string;
 
   @ApiProperty({
@@ -101,10 +106,26 @@ export class CreateDailyIntakeDto {
 }
 
 export class UpdateDailyIntakeDto {
+  @ApiPropertyOptional({ description: 'Ngày ăn định dạng YYYY-MM-DD', example: '2026-02-01' })
+  @IsOptional()
+  @IsString({ message: 'Ngày ăn phải là chuỗi' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ngày ăn phải có định dạng YYYY-MM-DD' })
+  intakeDate?: string;
+
+  @ApiPropertyOptional({ description: 'ID bệnh nhân', example: 1 })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
+  @Type(() => Number)
+  @IsInt({ message: 'ID bệnh nhân phải là số nguyên' })
+  @Min(1, { message: 'ID bệnh nhân tối thiểu là 1' })
+  patientId?: number;
+
   @ApiPropertyOptional({ description: 'Ghi chú lâm sàng' })
   @IsOptional()
   @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(255, { message: 'Ghi chú tối đa 255 ký tự' })
+  @MaxLength(2000, { message: 'Ghi chú tối đa 2000 ký tự' })
   note?: string;
 
   @ApiPropertyOptional({

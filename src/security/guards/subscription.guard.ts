@@ -58,13 +58,21 @@ export class SubscriptionGuard implements CanActivate {
     let userRole = String(user.vai_tro || user.role || '').toUpperCase();
     let proExpiredAt: Date | string | null | undefined = user.pro_expired_at;
 
-    // 1. Nếu user là SUPERADMIN hoặc ADMIN: Cho phép truy cập (Bypass)
-    if (
-      userRole === UserRole.SUPERADMIN ||
-      userRole === UserRole.ADMIN ||
-      userRole === 'SUPERADMIN' ||
-      userRole === 'ADMIN'
-    ) {
+    // 1. Nếu user là Admin hoặc nhân sự y tế chuyên môn: Cho phép truy cập (Bypass)
+    const staffRoles = [
+      UserRole.SUPERADMIN,
+      UserRole.ADMIN,
+      UserRole.BAC_SI,
+      UserRole.DOCTOR,
+      UserRole.EXPERT,
+      'SUPERADMIN',
+      'ADMIN',
+      'BAC_SI',
+      'DOCTOR',
+      'EXPERT',
+    ];
+
+    if (staffRoles.includes(userRole)) {
       return true;
     }
 
@@ -79,13 +87,8 @@ export class SubscriptionGuard implements CanActivate {
         userRole = String(dbUser.vai_tro).toUpperCase();
         proExpiredAt = dbUser.pro_expired_at;
 
-        // Bypass nếu là ADMIN / SUPERADMIN từ DB
-        if (
-          userRole === UserRole.SUPERADMIN ||
-          userRole === UserRole.ADMIN ||
-          userRole === 'SUPERADMIN' ||
-          userRole === 'ADMIN'
-        ) {
+        // Bypass nếu là Admin hoặc nhân sự y tế từ DB
+        if (staffRoles.includes(userRole)) {
           return true;
         }
       }

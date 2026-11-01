@@ -17,7 +17,6 @@ import {
 import { ApiOperation, ApiParam, ApiConsumes } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response, Request } from 'express';
-import * as fs from 'fs';
 import * as path from 'path';
 import { setExcelResponseHeaders } from '../../../core/excel-engine';
 import { ExtendedDiseaseGroupsService } from '../services/extended-disease-groups.service';
@@ -50,7 +49,14 @@ export class ExtendedDiseaseGroupsController {
     type: ExtendedDiseaseGroupResponseDto,
     description: 'Danh sách nhóm bệnh mở rộng',
   })
-  async findAll(@CurrentUserId() userId: string, @Query() query: ExtendedDiseaseGroupQueryDto) {
+  async findAll(
+    @CurrentUserId() userId: string,
+    @Query() query: ExtendedDiseaseGroupQueryDto,
+    @Req() req?: Request,
+  ) {
+    if (req?.query && req.query.limit === undefined && req.query.size === undefined) {
+      query.limit = undefined;
+    }
     return this.service.findAll({ userId, query });
   }
 
@@ -59,16 +65,10 @@ export class ExtendedDiseaseGroupsController {
   @ApiOperation({ summary: 'Tải file Excel mẫu để import nhóm bệnh mở rộng' })
   async downloadTemplate(@Res() res: Response) {
     const safeFileName = path.basename('Template_import_nhom_benh_mo_rong.xlsx');
-    const filePath = path.resolve(process.cwd(), 'public/uploads/public/templates', safeFileName);
 
     setExcelResponseHeaders({ res, filename: safeFileName });
 
-    if (fs.existsSync(filePath)) {
-      return fs.createReadStream(filePath).pipe(res);
-    }
-
     const buffer = await this.importService.getTemplate();
-    fs.promises.writeFile(filePath, buffer).catch(() => {});
     return res.send(buffer);
   }
 

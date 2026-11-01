@@ -1,6 +1,6 @@
 import { IsInt, IsNumber, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Transform, Type } from 'class-transformer';
+import { Transform } from 'class-transformer';
 
 export class UpdatePlanDto {
   @ApiPropertyOptional({ example: 1, description: 'ID gói cước' })
@@ -36,7 +36,9 @@ export class UpdatePlanDto {
 
   @ApiPropertyOptional({ example: 30, description: 'Số ngày sử dụng' })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'Số ngày sử dụng phải là số nguyên' })
   @Min(1, { message: 'Số ngày sử dụng phải lớn hơn 0' })
   @Max(3650, { message: 'Số ngày sử dụng tối đa 3650 ngày (10 năm)' })
@@ -44,7 +46,9 @@ export class UpdatePlanDto {
 
   @ApiPropertyOptional({ example: 30, description: 'Số ngày sử dụng (alias usageDays)' })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsInt({ message: 'Số ngày sử dụng phải là số nguyên' })
   @Min(1, { message: 'Số ngày sử dụng phải lớn hơn 0' })
   @Max(3650, { message: 'Số ngày sử dụng tối đa 3650 ngày (10 năm)' })
@@ -52,7 +56,9 @@ export class UpdatePlanDto {
 
   @ApiPropertyOptional({ example: 199000, description: 'Giá tiền (VND)' })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber({}, { message: 'Giá tiền phải là số' })
   @Min(0, { message: 'Giá tiền không được âm' })
   @Max(1000000000, { message: 'Giá tiền không được vượt quá 1,000,000,000 VND' })
@@ -60,7 +66,9 @@ export class UpdatePlanDto {
 
   @ApiPropertyOptional({ example: 199000, description: 'Giá tiền (alias price)' })
   @IsOptional()
-  @Type(() => Number)
+  @Transform(({ value }) =>
+    value === '' || value === null || value === undefined ? undefined : Number(value),
+  )
   @IsNumber({}, { message: 'Giá tiền phải là số' })
   @Min(0, { message: 'Giá tiền không được âm' })
   @Max(1000000000, { message: 'Giá tiền không được vượt quá 1,000,000,000 VND' })
@@ -96,26 +104,26 @@ export class UpdatePlanDto {
 
   getPackageName(): string | undefined {
     const raw = this.ten_goi ?? this.name ?? this.packageName;
-    return raw !== undefined ? raw.trim() : undefined;
+    return typeof raw === 'string' ? raw.trim() : undefined;
   }
 
   getUsageDays(): number | undefined {
     const val = this.so_ngay_su_dung ?? this.usageDays;
-    return val !== undefined ? Number(val) : undefined;
+    return val !== undefined && val !== null ? Number(val) : undefined;
   }
 
   getPrice(): number | undefined {
     const val = this.gia_tien ?? this.price;
-    return val !== undefined ? Number(val) : undefined;
+    return val !== undefined && val !== null ? Number(val) : undefined;
   }
 
   getDescription(): string | undefined {
     const raw = this.mo_ta ?? this.description;
-    return raw !== undefined ? raw.trim() : undefined;
+    return typeof raw === 'string' ? raw.trim() : undefined;
   }
 
   getStatus(): string | undefined {
     const raw = this.trang_thai ?? this.status;
-    return raw !== undefined ? raw.trim().toUpperCase() : undefined;
+    return typeof raw === 'string' ? raw.trim().toUpperCase() : undefined;
   }
 }

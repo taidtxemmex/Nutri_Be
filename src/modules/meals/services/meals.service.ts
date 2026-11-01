@@ -21,18 +21,32 @@ export class MealsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly cacheService: CacheService,
-    private readonly nutritionCalculator: NutritionCalculatorService,
+    private readonly nutritionCalculator: NutritionCalculatorService = new NutritionCalculatorService(),
   ) {}
 
   private isAdmin(user?: { role?: string }): boolean {
     return isAdminRole(user);
   }
 
+  private deduplicateDishes<T extends { dishId: number | string; coefficient?: number }>(
+    dishes: T[],
+  ): T[] {
+    const map = new Map<string, T>();
+    for (const d of dishes) {
+      if (d && d.dishId != null) {
+        map.set(String(d.dishId), d);
+      }
+    }
+    return Array.from(map.values());
+  }
+
   private mapMealEntityToResponse(meal: any): MealResponseDto {
+    const rawMealDetails = meal.chi_tiet_bua_an || meal.bua_an_mon_an || meal.mealDetails || [];
+
     const mealInput: MealInput = {
       id: meal.id,
       mealName: meal.ten_bua_an,
-      chi_tiet_bua_an: (meal.chi_tiet_bua_an || []).map((detail: any) => ({
+      chi_tiet_bua_an: rawMealDetails.map((detail: any) => ({
         dishId: detail.mon_an_id,
         he_so_song_chin: detail.he_so_song_chin,
         mon_an: {
@@ -49,26 +63,50 @@ export class MealsService {
     };
 
     const calculationResult = this.nutritionCalculator.calculateMealNutrition(mealInput);
+    const totalMealEnergy = Number(calculationResult.nutrients?.energy || 0);
 
-    const dishResponses: MealDishResponseDto[] = (meal.chi_tiet_bua_an || []).map(
+    const dishResponses: MealDishResponseDto[] = rawMealDetails.map(
       (detail: any, index: number) => {
         const dishCalc = calculationResult.dishes[index];
         const coef = detail.he_so_song_chin != null ? Number(detail.he_so_song_chin) : 1.0;
+        const dishDetails = detail.mon_an?.chi_tiet_mon_an || [];
+        const totalNetWeight = dishDetails.reduce(
+          (sum: number, cd: any) => sum + Number(cd.khoi_luong_song_sach ?? cd.netWeight ?? 0),
+          0,
+        );
+        const computedDishWeight =
+          totalNetWeight > 0
+            ? Math.round(totalNetWeight * coef * 100) / 100
+            : dishCalc
+              ? dishCalc.cookedWeightGrams
+              : 0;
+
+        const dishNutrients: Record<string, number> = dishCalc ? { ...dishCalc.nutrients } : {};
+        const dishEnergy = Number(dishNutrients.energy || 0);
+        dishNutrients.energyRatio =
+          totalMealEnergy > 0 ? Math.round((dishEnergy / totalMealEnergy) * 10000) / 100 : 0;
 
         return {
           id: detail.mon_an?.id ? detail.mon_an.id.toString() : detail.mon_an_id.toString(),
           name: detail.mon_an?.ten_mon || '',
-          dishWeight: dishCalc ? dishCalc.cookedWeightGrams : 0,
+          dishWeight: computedDishWeight,
           coefficient: coef,
-          nutrients: dishCalc ? dishCalc.nutrients : {},
+          nutrients: dishNutrients,
         };
       },
     );
+
+    const rawTime = String(meal.gio_an || '');
+    const timeParts = rawTime.includes('-') ? rawTime.split('-') : [rawTime, ''];
+    const startTime = (timeParts[0] || '').trim();
+    const endTime = (timeParts[1] || '').trim();
 
     return {
       id: meal.id.toString(),
       mealName: meal.ten_bua_an || null,
       time: meal.gio_an,
+      startTime,
+      endTime,
       status: meal.trang_thai || null,
       isPublic: Boolean(meal.la_cong_khai),
       totalMealNutrients: calculationResult.nutrients,
@@ -78,7 +116,7 @@ export class MealsService {
 
   async create({ dto, currentUser }: CreateMealParamsDto): Promise<MealResponseDto> {
     // 1. Kiểm tra sự tồn tại của tất cả các món ăn
-    const dishesList = dto.dishes || [];
+    const dishesList = this.deduplicateDishes(dto.dishes || []);
     for (const d of dishesList) {
       const dish = await this.prisma.mon_an.findFirst({
         where: { id: BigInt(d.dishId), deleted_at: null },
@@ -92,13 +130,27 @@ export class MealsService {
       }
     }
 
+    const resolvedMealName = dto.mealName ?? (dto as any).name ?? null;
+    const resolvedTime =
+      dto.time ??
+      ((dto as any).startTime && (dto as any).endTime
+        ? `${(dto as any).startTime}-${(dto as any).endTime}`
+        : (dto as any).startTime || (dto as any).endTime);
+
+    if (!resolvedTime) {
+      throw new HttpException(
+        { code: 'MEAL_002', message: 'Khung giờ ăn không được để trống' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     // 2. Tạo bữa ăn trong transaction
     const createdMeal = await this.prisma.$transaction(async (tx) => {
       const meal = await tx.bua_an.create({
         data: {
           nguoi_dung_id: currentUser.id,
-          ten_bua_an: dto.mealName || null,
-          gio_an: dto.time,
+          ten_bua_an: resolvedMealName,
+          gio_an: resolvedTime,
           trang_thai: dto.status || 'RIENG_TU',
           la_cong_khai: Boolean(dto.isPublic),
         },
@@ -122,7 +174,13 @@ export class MealsService {
               mon_an: {
                 include: {
                   chi_tiet_mon_an: {
-                    include: { nguyen_lieu: true },
+                    include: {
+                      nguyen_lieu: {
+                        include: {
+                          he_so_song_chin: true,
+                        },
+                      },
+                    },
                   },
                 },
               },
@@ -136,8 +194,11 @@ export class MealsService {
     return this.mapMealEntityToResponse(createdMeal);
   }
 
-  async findAll({ currentUser }: FindAllMealsParamsDto = {}): Promise<MealResponseDto[]> {
+  async findAll({ currentUser, limit }: FindAllMealsParamsDto & { limit?: number } = {}): Promise<
+    MealResponseDto[]
+  > {
     const isAdminUser = this.isAdmin(currentUser);
+    const resolvedLimit = Math.min(1000, Math.max(1, Number(limit) || 1000));
 
     const whereClause: any = isAdminUser
       ? {}
@@ -161,7 +222,13 @@ export class MealsService {
             mon_an: {
               include: {
                 chi_tiet_mon_an: {
-                  include: { nguyen_lieu: true },
+                  include: {
+                    nguyen_lieu: {
+                      include: {
+                        he_so_song_chin: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -169,7 +236,7 @@ export class MealsService {
         },
       },
       orderBy: { id: 'desc' },
-      take: 100,
+      take: resolvedLimit,
     });
 
     return meals.map((meal) => this.mapMealEntityToResponse(meal));
@@ -184,7 +251,13 @@ export class MealsService {
             mon_an: {
               include: {
                 chi_tiet_mon_an: {
-                  include: { nguyen_lieu: true },
+                  include: {
+                    nguyen_lieu: {
+                      include: {
+                        he_so_song_chin: true,
+                      },
+                    },
+                  },
                 },
               },
             },
@@ -246,7 +319,7 @@ export class MealsService {
       }
     }
 
-    const newDishes = dto.dishes;
+    const newDishes = dto.dishes !== undefined ? this.deduplicateDishes(dto.dishes) : undefined;
 
     if (newDishes && newDishes.length > 0) {
       for (const d of newDishes) {
@@ -263,12 +336,28 @@ export class MealsService {
       }
     }
 
+    const resolvedMealName =
+      dto.mealName !== undefined
+        ? dto.mealName
+        : (dto as any).name !== undefined
+          ? (dto as any).name
+          : undefined;
+    const start = (dto as any).startTime ? String((dto as any).startTime).trim() : '';
+    const end = (dto as any).endTime ? String((dto as any).endTime).trim() : '';
+    const timeFromStartEnd = start && end ? `${start}-${end}` : start || end || undefined;
+    const resolvedTime =
+      timeFromStartEnd !== undefined
+        ? timeFromStartEnd
+        : dto.time !== undefined
+          ? dto.time
+          : undefined;
+
     const updatedMeal = await this.prisma.$transaction(async (tx) => {
       await tx.bua_an.update({
         where: { id: BigInt(id) },
         data: {
-          ten_bua_an: dto.mealName !== undefined ? dto.mealName : undefined,
-          gio_an: dto.time !== undefined ? dto.time : undefined,
+          ten_bua_an: resolvedMealName,
+          gio_an: resolvedTime,
           trang_thai: dto.status !== undefined ? dto.status : undefined,
           la_cong_khai: dto.isPublic !== undefined ? Boolean(dto.isPublic) : undefined,
         },
@@ -285,7 +374,7 @@ export class MealsService {
               const coef =
                 entry.coefficient != null && entry.coefficient > 0
                   ? entry.coefficient
-                  : (oldCoefMap.get(entry.dishId) ?? 1.0);
+                  : (oldCoefMap.get(Number(entry.dishId)) ?? 1.0);
 
               return {
                 bua_an_id: BigInt(id),
@@ -305,7 +394,13 @@ export class MealsService {
               mon_an: {
                 include: {
                   chi_tiet_mon_an: {
-                    include: { nguyen_lieu: true },
+                    include: {
+                      nguyen_lieu: {
+                        include: {
+                          he_so_song_chin: true,
+                        },
+                      },
+                    },
                   },
                 },
               },

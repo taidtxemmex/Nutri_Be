@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../database/prisma.service';
 import { MysqlQueueService } from './mysql-queue.service';
 import { InMemoryMailerService } from './in-memory-mailer.service';
+import { EmailTemplateService } from './email-template.service';
 import { Job } from './queue.interface';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
     private readonly queueService: MysqlQueueService,
     @Optional() private readonly inMemoryMailer?: InMemoryMailerService,
     @Optional() private readonly configService?: ConfigService,
+    @Optional() private readonly emailTemplateService?: EmailTemplateService,
   ) {
     if (this.configService) {
       const interval = this.configService.get<string | number>('QUEUE_POLL_INTERVAL_MS');
@@ -40,7 +42,58 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
         this.queueService.process({
           queueName: 'mail:send',
           handler: async (payload: any) => {
-            await this.inMemoryMailer!.sendMail(payload);
+            const mailData = { ...payload };
+            if (!mailData.html && this.emailTemplateService) {
+              const inner = payload.payload || payload;
+              if (inner.lyDoTuChoi) {
+                const rendered = this.emailTemplateService.renderPaymentRequestRejected({
+                  fullName: inner.fullName || inner.username || 'Quý khách',
+                  transactionId: inner.maGiaoDich || '',
+                  packageName: inner.tenGoi || 'Gói dịch vụ',
+                  reason: inner.lyDoTuChoi,
+                });
+                mailData.html = rendered.html;
+                mailData.subject = mailData.subject || rendered.subject;
+                mailData.body = rendered.text;
+              } else if (
+                inner.usageDays ||
+                (mailData.subject && mailData.subject.includes('Kích hoạt'))
+              ) {
+                const rendered = this.emailTemplateService.renderPaymentRequestApproved({
+                  fullName: inner.fullName || inner.username || 'Quý khách',
+                  transactionId: inner.maGiaoDich || '',
+                  packageName: inner.tenGoi || 'Gói dịch vụ',
+                  usageDays: inner.usageDays || 30,
+                });
+                mailData.html = rendered.html;
+                mailData.subject = mailData.subject || rendered.subject;
+                mailData.body = rendered.text;
+              } else if (
+                inner.soTien ||
+                (mailData.subject && mailData.subject.includes('Xác nhận'))
+              ) {
+                const rendered = this.emailTemplateService.renderPaymentRequestCreated({
+                  fullName: inner.fullName || inner.username || 'Quý khách',
+                  transactionId: inner.maGiaoDich || '',
+                  packageName: inner.tenGoi || 'Gói dịch vụ',
+                  amount: inner.soTien || 0,
+                });
+                mailData.html = rendered.html;
+                mailData.subject = mailData.subject || rendered.subject;
+                mailData.body = rendered.text;
+              } else if (mailData.subject && mailData.subject.includes('Yêu cầu đăng ký gói mới')) {
+                const rendered = this.emailTemplateService.renderNotifySuperAdminNewPaymentRequest({
+                  fullName: inner.fullName || inner.username || 'Người dùng',
+                  transactionId: inner.maGiaoDich || '',
+                  packageName: inner.tenGoi || 'Gói dịch vụ',
+                  amount: inner.soTien || 0,
+                });
+                mailData.html = rendered.html;
+                mailData.subject = mailData.subject || rendered.subject;
+                mailData.body = rendered.text;
+              }
+            }
+            await this.inMemoryMailer!.sendMail(mailData);
           },
         });
       }
@@ -57,18 +110,58 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
           queueName: 'email',
           handler: async (payload: any) => {
             const to = payload.to || payload.email || 'user@nutri.vn';
-            const subject =
-              payload.subject ||
-              (payload.type === 'VERIFY_EMAIL'
-                ? 'Xác thực tài khoản Nutri'
-                : payload.type === 'RESET_PASSWORD'
-                  ? 'Đặt lại mật khẩu Nutri'
-                  : 'Thông báo từ hệ thống Nutri');
+            let subject = payload.subject;
+            let html = payload.html;
+            let body = payload.body;
+
+            if (!html && this.emailTemplateService) {
+              const frontendUrl =
+                this.configService?.get<string>('FRONTEND_URL') ||
+                this.configService?.get<string>('app.frontend-url') ||
+                'http://localhost:5173';
+
+              if (payload.type === 'VERIFY_EMAIL') {
+                const verifyLink =
+                  payload.verifyLink || `${frontendUrl}/verify-email?token=${payload.token || ''}`;
+                const rendered = this.emailTemplateService.renderRegistrationVerification({
+                  fullName: payload.fullName || payload.username || 'Quý khách',
+                  verifyLink,
+                  expiresInMinutes: 15,
+                });
+                subject = subject || rendered.subject;
+                html = rendered.html;
+                body = rendered.text;
+              } else if (payload.type === 'RESET_PASSWORD') {
+                const resetLink =
+                  payload.resetLink || `${frontendUrl}/reset-password?token=${payload.token || ''}`;
+                const rendered = this.emailTemplateService.renderResetPassword({
+                  fullName: payload.fullName || payload.username || 'Quý khách',
+                  resetLink,
+                  token: payload.token,
+                  expiresInMinutes: 15,
+                });
+                subject = subject || rendered.subject;
+                html = rendered.html;
+                body = rendered.text;
+              }
+            }
+
+            if (!subject) {
+              subject =
+                payload.type === 'VERIFY_EMAIL'
+                  ? 'Xác thực tài khoản Nutri'
+                  : payload.type === 'RESET_PASSWORD'
+                    ? 'Đặt lại mật khẩu Nutri'
+                    : 'Thông báo từ hệ thống Nutri';
+            }
+
             await this.inMemoryMailer!.sendMail({
               to,
               subject,
               payload,
-              body: `Type: ${payload.type || 'NOTIFICATION'}, Token: ${payload.token || ''}`,
+              html,
+              body:
+                body || `Type: ${payload.type || 'NOTIFICATION'}, Token: ${payload.token || ''}`,
             });
           },
         });

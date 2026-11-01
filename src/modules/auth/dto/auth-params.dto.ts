@@ -29,9 +29,12 @@ export class RefreshTokenParamDto {
 }
 
 export class LogoutParamDto {
-  user: AuthenticatedUser;
+  user?: AuthenticatedUser;
+  userId?: string;
   refreshToken?: string;
   sessionId?: string;
+  authHeader?: string;
+  accessToken?: string;
 }
 
 export class GoogleLoginParamDto {

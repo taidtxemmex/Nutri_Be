@@ -358,8 +358,9 @@ export class IntakeCalculationEngine {
       decimalMap[code] = valPer100g.times(factor).times(retentionFactor);
     }
 
-    // 2. Tính Carbohydrate khả dụng chuẩn FAO:
-    // Available Carb = max(0, 100 - (Water + Protein + Fat + Ash + Fiber))
+    // 2. Tính Carbohydrate theo công thức chuẩn Java Legacy (NutritionCalculator.java:101):
+    // Carbohydrate = 100 - (water + protein + fat + ash) (KHÔNG trừ fiber/celluloza)
+    // Nếu cả 4 chất (water, protein, fat, ash) đều bằng 0 thì carbohydrate = 0 và energy = 0
     const waterPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'water' });
     const proteinPer100 = NutritionEngine.extractNutrientValue({
       source: ingredient,
@@ -367,27 +368,30 @@ export class IntakeCalculationEngine {
     });
     const fatPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'fat' });
     const ashPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'ash' });
-    const fiberPer100 = NutritionEngine.extractNutrientValue({ source: ingredient, code: 'fiber' });
 
-    const carbPer100 = NutritionEngine.calculateCarbohydrate({
-      water: waterPer100,
-      protein: proteinPer100,
-      fat: fatPer100,
-      ash: ashPer100,
-      fiber: fiberPer100,
-    });
+    const allFourZero =
+      waterPer100.isZero() && proteinPer100.isZero() && fatPer100.isZero() && ashPer100.isZero();
+
+    const carbPer100 = allFourZero
+      ? this.ZERO
+      : Decimal.max(
+          this.ZERO,
+          this.ONE_HUNDRED.minus(waterPer100.plus(proteinPer100).plus(fatPer100).plus(ashPer100)),
+        );
     decimalMap.carbohydrate = carbPer100.times(factor).times(retentionFactor);
 
     // 3. Tính Năng lượng Atwater chuẩn hóa:
-    // Energy (kcal) = (4 * Protein) + (9 * Fat) + (4 * AvailableCarb)
+    // Energy (kcal) = (4 * Protein) + (9 * Fat) + (4 * Carb)
     const actualProtein = decimalMap.protein || this.ZERO;
     const actualFat = decimalMap.fat || this.ZERO;
     const actualCarb = decimalMap.carbohydrate || this.ZERO;
 
-    decimalMap.energy = actualProtein
-      .times(ATWATER_FACTORS.PROTEIN)
-      .plus(actualFat.times(ATWATER_FACTORS.FAT))
-      .plus(actualCarb.times(ATWATER_FACTORS.CARBOHYDRATE));
+    decimalMap.energy = allFourZero
+      ? this.ZERO
+      : actualProtein
+          .times(ATWATER_FACTORS.PROTEIN)
+          .plus(actualFat.times(ATWATER_FACTORS.FAT))
+          .plus(actualCarb.times(ATWATER_FACTORS.CARBOHYDRATE));
 
     // 4. Tính Vitamin A RAE (Retinol Activity Equivalent) theo FAO/WHO:
     // RAE = Retinol + (Beta-Carotene / 12) + (Alpha-Carotene / 24) + (Beta-Cryptoxanthin / 24)

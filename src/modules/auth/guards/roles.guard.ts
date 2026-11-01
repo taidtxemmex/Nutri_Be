@@ -79,27 +79,43 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    // 3. Clinical/Doctor alias mapping: BAC_SI <-> DOCTOR <-> EXPERT <-> USERPRO
-    const doctorAliases = [UserRole.EXPERT, UserRole.DOCTOR, UserRole.BAC_SI, UserRole.USERPRO];
-    const requiresDoctor = normalizedRequired.some(
-      (r) =>
-        doctorAliases.includes(r as UserRole) || r === 'BAC_SI' || r === 'DOCTOR' || r === 'EXPERT',
-    );
+    // 3. Basic User role: If endpoint accepts basic USER / BENH_NHAN, any authenticated role has access
+    const basicUserRoles = [UserRole.USER, UserRole.BENH_NHAN, 'USER', 'BENH_NHAN'];
+    const requiresBasicUser = normalizedRequired.some((r) => basicUserRoles.includes(r));
+    if (requiresBasicUser) {
+      return true;
+    }
+
+    // 4. VIP / Pro Gating: If endpoint requires USERPRO, only USERPRO, Doctors/Experts or Admins can access
+    const vipEligibleRoles = [
+      UserRole.USERPRO,
+      UserRole.EXPERT,
+      UserRole.DOCTOR,
+      UserRole.BAC_SI,
+      'USERPRO',
+      'EXPERT',
+      'DOCTOR',
+      'BAC_SI',
+    ];
     if (
-      requiresDoctor &&
-      (doctorAliases.includes(userRole as UserRole) || userRole === UserRole.ADMIN)
+      (normalizedRequired.includes(UserRole.USERPRO) || normalizedRequired.includes('USERPRO')) &&
+      (vipEligibleRoles.includes(userRole) || userRole === UserRole.ADMIN)
     ) {
       return true;
     }
 
-    // 4. Patient/User alias mapping: BENH_NHAN <-> USER <-> USERPRO
-    const patientAliases = [UserRole.USER, UserRole.BENH_NHAN, UserRole.USERPRO];
-    const requiresPatient = normalizedRequired.some(
-      (r) => patientAliases.includes(r as UserRole) || r === 'BENH_NHAN' || r === 'USER',
-    );
+    // 5. Clinical / Doctor role alias: BAC_SI <-> DOCTOR <-> EXPERT
+    const clinicalRoles = [
+      UserRole.EXPERT,
+      UserRole.DOCTOR,
+      UserRole.BAC_SI,
+      'BAC_SI',
+      'DOCTOR',
+      'EXPERT',
+    ];
+    const requiresDoctor = normalizedRequired.some((r) => clinicalRoles.includes(r));
     return Boolean(
-      requiresPatient &&
-      (patientAliases.includes(userRole as UserRole) || userRole === UserRole.ADMIN),
+      requiresDoctor && (clinicalRoles.includes(userRole) || userRole === UserRole.ADMIN),
     );
   }
 }
