@@ -80,9 +80,9 @@ export class SmtpMailerService extends InMemoryMailerService implements MailerSe
         this.smtpLogger.log(
           `[SmtpMailerService] ✅ Nodemailer SMTP Transporter đã được khởi tạo thành công (${this.host}:${this.port}, secure: ${this.secure}, user: ${this.user}).`,
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         this.smtpLogger.error(
-          `[SmtpMailerService] ❌ Lỗi khi khởi tạo Nodemailer Transporter: ${error?.message}. Fallback sang InMemoryMailerService.`,
+          `[SmtpMailerService] ❌ Lỗi khi khởi tạo Nodemailer Transporter: ${(error as Error)?.message}. Fallback sang InMemoryMailerService.`,
         );
         this.transporter = null;
       }
@@ -131,10 +131,10 @@ export class SmtpMailerService extends InMemoryMailerService implements MailerSe
         `[SmtpMailerService] ✅ Kiểm tra kết nối SMTP Server (${this.host}:${this.port}) thành công!`,
       );
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.smtpLogger.error(
-        `[SmtpMailerService] ❌ Kiểm tra kết nối SMTP Server (${this.host}:${this.port}) thất bại: ${error?.message}`,
-        error?.stack,
+        `[SmtpMailerService] ❌ Kiểm tra kết nối SMTP Server (${this.host}:${this.port}) thất bại: ${(error as Error)?.message}`,
+        (error as Error)?.stack,
       );
       return false;
     }
@@ -189,10 +189,10 @@ export class SmtpMailerService extends InMemoryMailerService implements MailerSe
       this.smtpLogger.log(
         `[SmtpMailerService] ✉️ Đã gửi email SMTP thật thành công tới: ${to} | Subject: "${subject}" | MessageId: ${info.messageId}`,
       );
-    } catch (error: any) {
+    } catch (error: unknown) {
       this.smtpLogger.error(
-        `[SmtpMailerService] ❌ Lỗi khi gửi email SMTP thật tới ${to}: ${error?.message}`,
-        error?.stack,
+        `[SmtpMailerService] ❌ Lỗi khi gửi email SMTP thật tới ${to}: ${(error as Error)?.message}`,
+        (error as Error)?.stack,
       );
       throw error;
     }

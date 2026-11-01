@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
+import { Prisma, nguoi_de_xuat } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { IdorDefenseService } from '../../../security/idor/idor-defense.service';
@@ -42,25 +43,24 @@ import {
 } from '../dto';
 import { UserInfoViewResponse } from '../interfaces/user-info-view.interface';
 
-export interface PaginatedUsersResult {
-  items: Array<{
-    id: string;
-    keycloakUserId: string;
-    username: string;
-    fullName: string;
-    email: string;
-    phone: string;
-    address: string;
-    gender: string;
-    dob: string;
-    role: string;
-    active: boolean;
-    createdAt: string;
-  }>;
-  total: number;
-  page: number;
-  limit: number;
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
+
+export interface UserListItem {
+  id: string;
+  keycloakUserId: string;
+  username: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  gender: string;
+  dob: string;
+  role: string;
+  active: boolean;
+  createdAt: string;
 }
+
+export type PaginatedUsersResult = PaginatedResult<UserListItem>;
 
 export interface UserDetailResult {
   id: string;
@@ -83,6 +83,32 @@ export interface UserDetailResult {
     don_vi_cong_tac: string | null;
     vi_tri_cong_tac: string | null;
     linh_vuc_cong_tac: string | null;
+  } | null;
+}
+
+export interface FoundUserResult {
+  id: string;
+  ten_dang_nhap?: string;
+  vai_tro?: string;
+  active?: boolean | null;
+  deleted_at?: Date | null;
+  created_at?: Date | null;
+  profile_completed?: boolean | null;
+  keycloak_user_id?: string | null;
+  ho_so_ca_nhan?: {
+    ho_ten?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    dia_chi?: string | null;
+    gioi_tinh?: string | null;
+    ngay_sinh?: Date | string | null;
+  } | null;
+  nguoi_de_xuat?: {
+    trinh_do_hoc_van?: string | null;
+    nghe_nghiep?: string | null;
+    don_vi_cong_tac?: string | null;
+    vi_tri_cong_tac?: string | null;
+    linh_vuc_cong_tac?: string | null;
   } | null;
 }
 
@@ -122,7 +148,7 @@ export class UsersService {
       }
     }
 
-    const where: any = {
+    const where: Prisma.nguoi_dungWhereInput = {
       deleted_at: null,
     };
 
@@ -211,7 +237,27 @@ export class UsersService {
   /**
    * Kiểm tra hồ sơ đã hoàn thiện đủ 7 trường bắt buộc theo chuẩn Java UserServiceImpl.isProfileComplete
    */
-  private isProfileComplete(profile?: any, proposer?: any): boolean {
+  private isProfileComplete(
+    profile?: {
+      ho_ten?: string | null;
+      fullName?: string | null;
+      ngay_sinh?: unknown;
+      gioi_tinh?: string | null;
+      gender?: string | null;
+      phone?: string | null;
+      so_dien_thoai?: string | null;
+      phoneNumber?: string | null;
+      email?: string | null;
+    } | null,
+    proposer?: {
+      don_vi_cong_tac?: string | null;
+      unit?: string | null;
+      workUnit?: string | null;
+      vi_tri_cong_tac?: string | null;
+      chuc_vu?: string | null;
+      position?: string | null;
+    } | null,
+  ): boolean {
     if (!profile || !proposer) return false;
     const hasHoTen = this.isNonEmptyString(profile.ho_ten ?? profile.fullName);
     const hasNgaySinh = profile.ngay_sinh != null && profile.ngay_sinh !== '';
@@ -233,10 +279,21 @@ export class UsersService {
   /**
    * Tra cứu người dùng theo id hoặc keycloak_user_id (hỗ trợ tài khoản từ Java cũ có id != keycloak_user_id)
    */
-  private async findUserByIdOrKeycloakId<T = any>(
+  private async findUserByIdOrKeycloakId<T = FoundUserResult>(
     targetId: string,
-    select: Record<string, any>,
-    client: any = this.prisma,
+    select: Prisma.nguoi_dungSelect,
+    client: {
+      nguoi_dung?: {
+        findFirst?: (args: {
+          where: Prisma.nguoi_dungWhereInput;
+          select: Prisma.nguoi_dungSelect;
+        }) => Promise<unknown>;
+        findUnique?: (args: {
+          where: Prisma.nguoi_dungWhereUniqueInput;
+          select: Prisma.nguoi_dungSelect;
+        }) => Promise<unknown>;
+      };
+    } = this.prisma,
   ): Promise<T | null> {
     if (typeof client.nguoi_dung?.findFirst === 'function') {
       const found = await client.nguoi_dung.findFirst({
@@ -353,9 +410,7 @@ export class UsersService {
     currentUser,
   }: GetUserInfoParamsDto): Promise<UserInfoViewResponse> {
     const normalizedTargetForIdor =
-      targetUserId &&
-      (currentUser as any)?.keycloakUserId &&
-      targetUserId === (currentUser as any).keycloakUserId
+      targetUserId && currentUser.keycloakUserId && targetUserId === currentUser.keycloakUserId
         ? currentUser.id
         : targetUserId;
 
@@ -460,9 +515,7 @@ export class UsersService {
   }: UpdateUserInfoParamsDto): Promise<{ success: boolean; message: string }> {
     const rawTargetId = dto.userId || dto.keycloakUserId || currentUser.id;
     const normalizedTargetForIdor =
-      rawTargetId &&
-      (currentUser as any)?.keycloakUserId &&
-      rawTargetId === (currentUser as any).keycloakUserId
+      rawTargetId && currentUser.keycloakUserId && rawTargetId === currentUser.keycloakUserId
         ? currentUser.id
         : rawTargetId;
 
@@ -502,7 +555,7 @@ export class UsersService {
     const actualUserId = user.id;
     const dobValue = dto.dob || dto.birthDate;
     const dobDate = dobValue ? new Date(dobValue) : undefined;
-    const unitValue = dto.unit ?? (dto as any).workUnit;
+    const unitValue = dto.unit ?? dto.workUnit;
 
     await this.prisma.$transaction(async (tx) => {
       // 1. Cập nhật hồ sơ cá nhân
@@ -528,7 +581,7 @@ export class UsersService {
       });
 
       // 2. Cập nhật thông tin chuyên môn nếu có
-      let upsertedProposer: any = null;
+      let upsertedProposer: nguoi_de_xuat | null = null;
       if (
         dto.education !== undefined ||
         dto.major !== undefined ||

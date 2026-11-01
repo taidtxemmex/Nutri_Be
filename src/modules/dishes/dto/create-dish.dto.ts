@@ -21,19 +21,19 @@ export class DishIngredientInputDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? value : Number(value),
   )
-  @IsInt({ message: 'ID nguyên liệu phải là số nguyên' })
-  @Min(1, { message: 'ID nguyên liệu phải lớn hơn 0' })
-  @IsNotEmpty({ message: 'ID nguyên liệu không được để trống' })
+  @IsInt({ message: 'validation.dishes.ingredient_id_int' })
+  @Min(1, { message: 'validation.dishes.ingredient_id_min' })
+  @IsNotEmpty({ message: 'validation.dishes.ingredient_id_required' })
   ingredientId!: number;
 
   @ApiProperty({ description: 'Khối lượng sống sạch (gam)', example: 100.0 })
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? value : Number(value),
   )
-  @IsNumber({}, { message: 'Khối lượng phải là số' })
-  @Min(0, { message: 'Khối lượng sống sạch phải lớn hơn hoặc bằng 0' })
-  @Max(1000000, { message: 'Khối lượng sống sạch không được vượt quá 1000000 gam' })
-  @IsNotEmpty({ message: 'Khối lượng không được để trống' })
+  @IsNumber({}, { message: 'validation.dishes.weight_number' })
+  @Min(0, { message: 'validation.dishes.weight_min' })
+  @Max(1000000, { message: 'validation.dishes.weight_max' })
+  @IsNotEmpty({ message: 'validation.dishes.weight_required' })
   netWeight!: number;
 }
 
@@ -43,10 +43,28 @@ export class CreateDishDto {
   id?: number | string;
 
   @ApiProperty({ description: 'Tên món ăn', example: 'Cơm rang dưa bò' })
-  @IsString({ message: 'Tên món ăn phải là chuỗi' })
-  @MaxLength(255, { message: 'Tên món ăn không được vượt quá 255 ký tự' })
-  @IsNotEmpty({ message: 'Tên món ăn không được để trống' })
+  @IsString({ message: 'validation.dishes.name_string' })
+  @MaxLength(255, { message: 'validation.dishes.name_max' })
+  @IsNotEmpty({ message: 'validation.dishes.name_required' })
   name!: string;
+
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh món ăn (relative path, không chứa domain)',
+    example: '/uploads/public/dishes/2026/11/abc-dish.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.dishes.image_url_string' })
+  @MaxLength(500, { message: 'validation.dishes.image_url_max' })
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/dishes/2026/11/abc-dish.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.dishes.image_url_string' })
+  @MaxLength(500, { message: 'validation.dishes.image_url_max' })
+  image_url?: string;
 
   @ApiPropertyOptional({ description: 'Trạng thái món ăn' })
   @IsOptional()
@@ -67,11 +85,11 @@ export class CreateDishDto {
   coefficient?: number;
 
   @ApiProperty({ description: 'Danh sách nguyên liệu thành phần', type: [DishIngredientInputDto] })
-  @IsArray({ message: 'Danh sách nguyên liệu phải là mảng' })
-  @ArrayMinSize(1, { message: 'Danh sách nguyên liệu phải có ít nhất 1 mục' })
-  @ArrayMaxSize(100, { message: 'Danh sách nguyên liệu không được vượt quá 100 mục' })
+  @IsArray({ message: 'validation.dishes.details_array' })
+  @ArrayMinSize(1, { message: 'validation.dishes.ingredients_min_1' })
+  @ArrayMaxSize(100, { message: 'validation.dishes.ingredients_max_100' })
   @ValidateNested({ each: true })
   @Type(() => DishIngredientInputDto)
-  @IsNotEmpty({ message: 'Danh sách nguyên liệu không được để trống' })
+  @IsNotEmpty({ message: 'validation.dishes.details_required' })
   details!: DishIngredientInputDto[];
 }

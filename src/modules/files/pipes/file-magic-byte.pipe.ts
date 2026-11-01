@@ -12,6 +12,11 @@ export interface DetectedFileType {
   ext: string;
 }
 
+export interface DetectedMulterFile extends Express.Multer.File {
+  detectedMimeType?: AllowedMimeType;
+  detectedExtension?: string;
+}
+
 @Injectable()
 export class FileMagicBytePipe implements PipeTransform<
   Express.Multer.File | Express.Multer.File[],
@@ -133,8 +138,9 @@ export class FileMagicBytePipe implements PipeTransform<
 
     // 7. Chuẩn hóa và ghi đè MIME Type thực sự (Không tin tưởng header client)
     file.mimetype = detected.mime;
-    (file as any).detectedMimeType = detected.mime;
-    (file as any).detectedExtension = rawExt;
+    const detectedFile = file as DetectedMulterFile;
+    detectedFile.detectedMimeType = detected.mime;
+    detectedFile.detectedExtension = rawExt;
 
     return file;
   }

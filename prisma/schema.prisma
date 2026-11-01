@@ -252,6 +252,7 @@ model de_xuat_nguyen_lieu {
   edible                                                    Float?
   nguyen_lieu_id                                            BigInt?
   ten_nguyen_lieu                                           String                            @db.VarChar(255)
+  image_url                                                 String?                           @db.VarChar(500)
   loai_protein                                              String?                           @db.VarChar(50)
   ghi_chu                                                   String?                           @db.Text
   gia_tri_dinh_duong_json                                   String                            @db.Text
@@ -362,6 +363,7 @@ model ho_so_ca_nhan {
   dia_chi       String?                  @db.VarChar(255)
   email         String?                  @db.VarChar(255)
   phone         String?                  @db.VarChar(255)
+  avatar_url    String?                  @db.VarChar(500)
   created_at    DateTime?                @default(now()) @db.DateTime(0)
   updated_at    DateTime?                @updatedAt @default(now()) @db.DateTime(0)
   deleted_at    DateTime?                @map("deleted_at") @db.DateTime(0)
@@ -478,6 +480,7 @@ model mon_an {
   id                                               BigInt             @id @default(autoincrement())
   nguoi_dung_id                                    String?            @db.Char(36)
   ten_mon                                          String             @db.VarChar(255)
+  image_url                                        String?            @db.VarChar(500)
   trang_thai                                       String?            @default("RIENG_TU") @db.VarChar(50)
   deleted_at                                       DateTime?          @map("deleted_at") @db.DateTime(0)
   mon_goc_id                                       BigInt?
@@ -562,6 +565,7 @@ model nguoi_dung {
 model nguyen_lieu {
   id                                      BigInt                      @id @default(autoincrement())
   ten_nguyen_lieu                         String                      @unique(map: "uk_ingredient_name") @db.VarChar(255)
+  image_url                               String?                     @db.VarChar(500)
   danh_muc                                Int?
   edible                                  Float?
   water                                   Float?
@@ -703,6 +707,7 @@ model thuc_don {
   id                     BigInt                  @id @default(autoincrement())
   nguoi_dung_id          String                  @db.Char(36)
   ten_thuc_don           String                  @db.VarChar(255)
+  image_url              String?                 @db.VarChar(500)
   loai_thuc_don          String                  @db.VarChar(50)
   loai_doi_tuong         String                  @db.VarChar(50)
   deleted_at             DateTime?               @map("deleted_at") @db.DateTime(0)

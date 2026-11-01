@@ -5,37 +5,37 @@ import { Transform, Type } from 'class-transformer';
 export class CreatePlanDto {
   @ApiPropertyOptional({ example: 'PRO_1M', description: 'Mã gói cước duy nhất' })
   @IsOptional()
-  @IsString({ message: 'Mã gói cước phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.plan_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã gói cước tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.plan_code_max_50' })
   ma_goi?: string;
 
   @ApiPropertyOptional({ example: 'PRO_1M', description: 'Mã gói cước (alias code)' })
   @IsOptional()
-  @IsString({ message: 'Mã gói cước phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.plan_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã gói cước tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.plan_code_max_50' })
   code?: string;
 
   @ApiPropertyOptional({ example: 'PRO_1M', description: 'Mã gói cước (alias packageCode)' })
   @IsOptional()
-  @IsString({ message: 'Mã gói cước phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.plan_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã gói cước tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.plan_code_max_50' })
   packageCode?: string;
 
   @ApiPropertyOptional({ example: 'Gói Pro 1 Tháng', description: 'Tên gói cước' })
   @IsOptional()
-  @IsString({ message: 'Tên gói cước phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.plan_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên gói cước tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.subscriptions.plan_name_max_255' })
   ten_goi?: string;
 
   @ApiPropertyOptional({ example: 'Gói Pro 1 Tháng', description: 'Tên gói cước (alias name)' })
   @IsOptional()
-  @IsString({ message: 'Tên gói cước phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.plan_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên gói cước tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.subscriptions.plan_name_max_255' })
   name?: string;
 
   @ApiPropertyOptional({
@@ -43,41 +43,41 @@ export class CreatePlanDto {
     description: 'Tên gói cước (alias packageName)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên gói cước phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.plan_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên gói cước tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.subscriptions.plan_name_max_255' })
   packageName?: string;
 
   @ApiPropertyOptional({ example: 30, description: 'Số ngày sử dụng' })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'Số ngày sử dụng phải là số nguyên' })
-  @Min(1, { message: 'Số ngày sử dụng phải lớn hơn 0' })
-  @Max(3650, { message: 'Số ngày sử dụng tối đa 3650 ngày (10 năm)' })
+  @IsInt({ message: 'validation.subscriptions.duration_int' })
+  @Min(1, { message: 'validation.subscriptions.duration_positive' })
+  @Max(3650, { message: 'validation.subscriptions.duration_max' })
   so_ngay_su_dung?: number;
 
   @ApiPropertyOptional({ example: 30, description: 'Số ngày sử dụng (alias usageDays)' })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'Số ngày sử dụng phải là số nguyên' })
-  @Min(1, { message: 'Số ngày sử dụng phải lớn hơn 0' })
-  @Max(3650, { message: 'Số ngày sử dụng tối đa 3650 ngày (10 năm)' })
+  @IsInt({ message: 'validation.subscriptions.duration_int' })
+  @Min(1, { message: 'validation.subscriptions.duration_positive' })
+  @Max(3650, { message: 'validation.subscriptions.duration_max' })
   usageDays?: number;
 
   @ApiPropertyOptional({ example: 199000, description: 'Giá tiền (VND)' })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Giá tiền phải là số' })
-  @Min(0, { message: 'Giá tiền không được âm' })
-  @Max(1000000000, { message: 'Giá tiền không được vượt quá 1,000,000,000 VND' })
+  @IsNumber({}, { message: 'validation.subscriptions.price_number' })
+  @Min(0, { message: 'validation.subscriptions.price_min_0' })
+  @Max(1000000000, { message: 'validation.subscriptions.price_max' })
   gia_tien?: number;
 
   @ApiPropertyOptional({ example: 199000, description: 'Giá tiền (alias price)' })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Giá tiền phải là số' })
-  @Min(0, { message: 'Giá tiền không được âm' })
-  @Max(1000000000, { message: 'Giá tiền không được vượt quá 1,000,000,000 VND' })
+  @IsNumber({}, { message: 'validation.subscriptions.price_number' })
+  @Min(0, { message: 'validation.subscriptions.price_min_0' })
+  @Max(1000000000, { message: 'validation.subscriptions.price_max' })
   price?: number;
 
   @ApiPropertyOptional({
@@ -85,9 +85,9 @@ export class CreatePlanDto {
     description: 'Mô tả gói',
   })
   @IsOptional()
-  @IsString({ message: 'Mô tả phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.desc_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(5000, { message: 'Mô tả không được vượt quá 5000 ký tự' })
+  @MaxLength(5000, { message: 'validation.subscriptions.desc_max' })
   mo_ta?: string;
 
   @ApiPropertyOptional({
@@ -95,23 +95,23 @@ export class CreatePlanDto {
     description: 'Mô tả (alias description)',
   })
   @IsOptional()
-  @IsString({ message: 'Mô tả phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.desc_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(5000, { message: 'Mô tả không được vượt quá 5000 ký tự' })
+  @MaxLength(5000, { message: 'validation.subscriptions.desc_max' })
   description?: string;
 
   @ApiPropertyOptional({ example: 'ACTIVE', description: 'Trạng thái gói: ACTIVE | INACTIVE' })
   @IsOptional()
-  @IsString({ message: 'Trạng thái phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.status_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
-  @MaxLength(50, { message: 'Trạng thái tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.status_max_50' })
   trang_thai?: string;
 
   @ApiPropertyOptional({ example: 'ACTIVE', description: 'Trạng thái gói (alias status)' })
   @IsOptional()
-  @IsString({ message: 'Trạng thái phải là chuỗi ký tự' })
+  @IsString({ message: 'validation.subscriptions.status_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim().toUpperCase() : value))
-  @MaxLength(50, { message: 'Trạng thái tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.status_max_50' })
   status?: string;
 
   getPackageCode(): string {

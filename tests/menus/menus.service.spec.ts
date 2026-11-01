@@ -100,6 +100,7 @@ describe('MenusService', () => {
       const res = await service.create({
         dto: {
           menuName: 'Thực đơn ngày 1',
+          imageUrl: '/uploads/public/menus/menu-1.jpg',
           menuType: MenuType.NGAY,
           targetType: TargetType.BENH_NHAN,
           meals: [
@@ -115,6 +116,13 @@ describe('MenusService', () => {
 
       expect(res.id).toBe('10');
       expect(res.menuName).toBe('Thực đơn ngày 1');
+      expect(mockPrisma.thuc_don.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            image_url: '/uploads/public/menus/menu-1.jpg',
+          }),
+        }),
+      );
       expect(mockCache.invalidateTag).toHaveBeenCalledWith('menus');
       expect(mockPrisma.$transaction).toHaveBeenCalled();
     });
@@ -127,6 +135,7 @@ describe('MenusService', () => {
         {
           id: BigInt(10),
           ten_thuc_don: 'Thực đơn test',
+          image_url: '/uploads/public/menus/menu-1.jpg',
           loai_thuc_don: MenuType.NGAY,
           loai_doi_tuong: TargetType.BENH_NHAN,
           ngay_tao: new Date(),
@@ -152,6 +161,8 @@ describe('MenusService', () => {
       expect(result.items[0].id).toBe('10');
       expect(result.items[0].patientName).toBe('Bệnh nhân A');
       expect(result.items[0].createdBy).toBe('Bác sĩ Tài');
+      expect(result.items[0].imageUrl).toBe('/uploads/public/menus/menu-1.jpg');
+      expect(result.items[0].image_url).toBe('/uploads/public/menus/menu-1.jpg');
     });
   });
 
@@ -197,6 +208,7 @@ describe('MenusService', () => {
         id: '10',
         dto: {
           menuName: 'Thực đơn mới',
+          imageUrl: '/uploads/public/menus/updated-menu.jpg',
           meals: [
             {
               mealId: '500',
@@ -210,6 +222,13 @@ describe('MenusService', () => {
       });
 
       expect(res.id).toBe('10');
+      expect(mockPrisma.thuc_don.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            image_url: '/uploads/public/menus/updated-menu.jpg',
+          }),
+        }),
+      );
       expect(mockPrisma.bua_an.create).toHaveBeenCalled(); // Xác nhận CoW tạo bữa ăn mới
       expect(mockCache.invalidateTag).toHaveBeenCalledWith('menus');
     });

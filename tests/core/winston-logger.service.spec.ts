@@ -7,7 +7,6 @@ import {
   LOG_FILENAMES,
 } from '../../src/config/constants/logger.constants';
 import * as fs from 'fs';
-import * as path from 'path';
 
 describe('WinstonLoggerService & Daily Rotate File Policy', () => {
   let loggerService: WinstonLoggerService;

@@ -24,6 +24,7 @@ import {
   ErrorRowItem,
   BaseExcelStreamer,
   ExcelColumnDefinition,
+  ExcelExportColumn,
   setExcelResponseHeaders,
 } from '../../../core/excel-engine';
 import { streamPrismaInBatches } from '../../../core/excel-engine/prisma-cursor-streamer';
@@ -41,11 +42,7 @@ export interface DishImportResult {
   totalRows?: number;
 }
 
-export interface DishExportColumn {
-  key: string;
-  header: string;
-  unit: string;
-}
+export type DishExportColumn = ExcelExportColumn;
 
 export function normalizeVietnameseNFC(str: string): string {
   if (!str) return '';
@@ -492,13 +489,15 @@ export class DishExcelService {
     if (this.cacheService) {
       const cached = this.cacheService.get<Buffer>(DishExcelService.TEMPLATE_CACHE_KEY);
       if (cached && Buffer.isBuffer(cached)) {
-        this.logger.debug('🚀 [Cache Hit] Trả về template import món ăn tức thì từ bộ đệm (0ms)');
+        this.logger.debug(
+          '🚀 [Cache Hit] Returning dish import template instantly from cache (0ms)',
+        );
         return cached;
       }
     }
 
     this.logger.debug(
-      '🔄 [Cache Miss] Đang tạo mới file Excel mẫu và nạp danh mục nguyên liệu từ DB...',
+      '🔄 [Cache Miss] Generating new template Excel file and loading ingredient catalog from DB...',
     );
 
     // 2. Tạo mới Workbook với thiết kế giao diện y khoa hiện đại, rõ ràng, đẹp mắt
@@ -512,7 +511,7 @@ export class DishExcelService {
         DishExcelService.TEMPLATE_CACHE_TTL_MS,
         DishExcelService.TEMPLATE_CACHE_TAG,
       );
-      this.logger.debug('💾 Đã lưu template Excel vào bộ nhớ đệm (TTL 30m, tag=ingredients)');
+      this.logger.debug('💾 Cached template Excel in CacheService (TTL 30m, tag=ingredients)');
     }
 
     return buffer;
@@ -759,7 +758,7 @@ export class DishExcelService {
     try {
       reader = ExcelStreamReader.createReader(fileBuffer);
     } catch (err: any) {
-      this.logger.error(`Lỗi đọc tập tin Excel: ${err.message}`, err.stack);
+      this.logger.error(`Error reading Excel file: ${err.message}`, err.stack);
       throw new HttpException(
         {
           code: 'IMPORT_FILE_CORRUPTED',
@@ -1123,7 +1122,7 @@ export class DishExcelService {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
         this.logger.debug(
-          '🚀 [Cache Hit] Trả về dữ liệu xuất món ăn tức thì từ CacheService (0ms)',
+          '🚀 [Cache Hit] Returning dish export data instantly from CacheService (0ms)',
         );
         const buf = Buffer.from(cached, 'base64');
         if (stream && typeof (stream as any).end === 'function') {
@@ -1332,7 +1331,7 @@ export class DishExcelService {
       const fullBuf = Buffer.concat(chunks);
       if (fullBuf.length <= 10 * 1024 * 1024) {
         await this.cacheService.set(cacheKey, fullBuf.toString('base64'), 2592000, 'dishes');
-        this.logger.debug('💾 Đã lưu dữ liệu xuất món ăn vào CacheService (tag=dishes)');
+        this.logger.debug('💾 Cached dish export data in CacheService (tag=dishes)');
       }
     }
   }

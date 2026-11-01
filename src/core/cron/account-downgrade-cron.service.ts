@@ -22,15 +22,20 @@ export class AccountDowngradeCronService {
   @Cron(CronExpression.EVERY_HOUR)
   async handleAccountDowngradeCron(): Promise<void> {
     if (this.isJobRunning) {
-      this.logger.warn('Cron job hạ cấp tài khoản đang chạy từ lượt trước. Bỏ qua tick này.');
+      this.logger.warn(
+        'Account downgrade cron job is already running from previous tick. Skipping this run.',
+      );
       return;
     }
     this.isJobRunning = true;
-    this.logger.log('Bắt đầu cron job quét hạ cấp tài khoản PRO hết hạn...');
+    this.logger.log('Starting account downgrade cron job for expired PRO accounts...');
     try {
       await this.downgradeExpiredAccounts();
-    } catch (err: any) {
-      this.logger.error(`Lỗi khi quét hạ cấp tài khoản: ${err?.message}`, err?.stack);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error scanning and downgrading expired accounts: ${(err as Error)?.message}`,
+        (err as Error)?.stack,
+      );
     } finally {
       this.isJobRunning = false;
     }
@@ -41,11 +46,14 @@ export class AccountDowngradeCronService {
    */
   @Cron('0 2 * * *')
   async handleCleanupTokensCron(): Promise<void> {
-    this.logger.log('Bắt đầu cron job dọn dẹp token hết hạn lúc 02:00...');
+    this.logger.log('Starting expired token cleanup cron job at 02:00...');
     try {
       await this.cleanupExpiredTokens();
-    } catch (err: any) {
-      this.logger.error(`Lỗi khi dọn dẹp token hết hạn: ${err?.message}`, err?.stack);
+    } catch (err: unknown) {
+      this.logger.error(
+        `Error cleaning up expired tokens: ${(err as Error)?.message}`,
+        (err as Error)?.stack,
+      );
     }
   }
 
@@ -130,10 +138,10 @@ export class AccountDowngradeCronService {
 
     if (totalDowngraded > 0) {
       this.logger.log(
-        `Đã hạ cấp thành công ${totalDowngraded} tài khoản USERPRO về USER, cập nhật ${totalUpdatedRegistrations} bản ghi dang_ky sang HET_HAN.`,
+        `Successfully downgraded ${totalDowngraded} USERPRO account(s) to USER, updated ${totalUpdatedRegistrations} registration record(s) to HET_HAN.`,
       );
     } else {
-      this.logger.log('Không có tài khoản USERPRO nào hết hạn cần hạ cấp.');
+      this.logger.log('No expired USERPRO accounts found for downgrade.');
     }
 
     return {
@@ -169,7 +177,7 @@ export class AccountDowngradeCronService {
     });
 
     this.logger.log(
-      `Đã dọn dẹp ${deleteAuthTokensResult.count} mã xác thực hết hạn và ${deletePendingResult.count} đăng ký chờ xác thực quá hạn.`,
+      `Cleaned up ${deleteAuthTokensResult.count} expired verification token(s) and ${deletePendingResult.count} expired pending registration(s).`,
     );
 
     return {

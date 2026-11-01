@@ -19,10 +19,12 @@ describe('CoefficientsController', () => {
     controller = new CoefficientsController(service);
   });
 
+  const mockUser: any = { id: 'u1', sub: 'u1', username: 'user1', role: 'USER' };
+
   it('should call create and return result', async () => {
     const res = await controller.create(
       { ingredientId: 1, processingMethod: 'Luộc', coefficient: 0.85 },
-      { id: 'u1' },
+      mockUser,
     );
     expect(res).toEqual({ id: '1', coefficient: 0.85 });
     expect(service.create).toHaveBeenCalled();
@@ -35,8 +37,8 @@ describe('CoefficientsController', () => {
   });
 
   it('should call getMy and return user coefficients', async () => {
-    const res = await controller.getMy({ id: 'u1' });
+    const res = await controller.getMy(mockUser);
     expect(res).toEqual([{ id: '2', isPublic: false }]);
-    expect(service.findMy).toHaveBeenCalledWith({ currentUser: { id: 'u1' } });
+    expect(service.findMy).toHaveBeenCalledWith({ currentUser: mockUser });
   });
 });

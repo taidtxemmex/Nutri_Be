@@ -13,6 +13,12 @@ export const SOFT_DELETE_MODELS = [
   'de_xuat_thuc_don',
 ];
 
+declare global {
+  interface BigInt {
+    toJSON(): string;
+  }
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
@@ -25,7 +31,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     });
 
     // Fix BigInt serialization in JSON responses
-    (BigInt.prototype as any).toJSON = function () {
+    BigInt.prototype.toJSON = function () {
       return this.toString();
     };
 

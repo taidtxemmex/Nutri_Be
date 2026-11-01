@@ -171,14 +171,14 @@ export class DailyIntakeExcelService {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
         this.logger.debug(
-          `🚀 [Cache Hit] Trả về template khẩu phần 24h (${normalizedType}) từ bộ nhớ đệm (0ms)`,
+          `🚀 [Cache Hit] Returning 24h intake template (${normalizedType}) from cache (0ms)`,
         );
         return Buffer.from(cached, 'base64');
       }
     }
 
     this.logger.debug(
-      `🔄 [Cache Miss] Đang tạo mới template Excel khẩu phần 24h (${normalizedType}) từ DB...`,
+      `🔄 [Cache Miss] Generating new 24h intake Excel template (${normalizedType}) from DB...`,
     );
     const buffer = await this.buildTemplateWorkbook(userId, normalizedType);
 
@@ -190,7 +190,7 @@ export class DailyIntakeExcelService {
         DailyIntakeExcelService.TEMPLATE_CACHE_TAG,
       );
       this.logger.debug(
-        `💾 Đã lưu template khẩu phần 24h (${normalizedType}) vào CacheService (tag=ingredients)`,
+        `💾 Cached 24h intake template (${normalizedType}) in CacheService (tag=ingredients)`,
       );
     }
 
@@ -253,7 +253,7 @@ export class DailyIntakeExcelService {
         loadedFromTemplateFile = true;
       } catch (err: any) {
         this.logger.warn(
-          `Không thể đọc file template tĩnh ${safeFileName}, chuyển sang khởi tạo động: ${err.message}`,
+          `Unable to read static template file ${safeFileName}, falling back to dynamic initialization: ${err.message}`,
         );
       }
     }
@@ -648,7 +648,7 @@ export class DailyIntakeExcelService {
     try {
       reader = ExcelStreamReader.createReader(fileBuffer);
     } catch (err: any) {
-      this.logger.error(`Lỗi đọc tập tin Excel: ${err.message}`, err.stack);
+      this.logger.error(`Error reading Excel file: ${err.message}`, err.stack);
       throw new HttpException(
         {
           code: 'IMPORT_FILE_CORRUPTED',
@@ -1188,7 +1188,7 @@ export class DailyIntakeExcelService {
       }
     } catch (err: any) {
       if (err instanceof HttpException) throw err;
-      this.logger.error(`Lỗi phân tích stream Excel: ${err.message}`, err.stack);
+      this.logger.error(`Error parsing Excel stream: ${err.message}`, err.stack);
       throw new HttpException(
         {
           code: 'IMPORT_FILE_CORRUPTED',
@@ -1548,7 +1548,7 @@ export class DailyIntakeExcelService {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
         this.logger.debug(
-          `🚀 [Cache Hit] Trả về báo cáo lâm sàng 24h #${dailyIntakeIdOrData} tức thì (0ms)`,
+          `🚀 [Cache Hit] Returning clinical 24h report #${dailyIntakeIdOrData} instantly from cache (0ms)`,
         );
         return Buffer.from(cached, 'base64');
       }

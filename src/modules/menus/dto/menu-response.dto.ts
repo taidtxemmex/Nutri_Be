@@ -7,6 +7,18 @@ export class MenuListDto {
   @ApiProperty({ description: 'Tên thực đơn' })
   menuName: string;
 
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh đại diện thực đơn',
+    example: '/uploads/public/menus/2026/11/menu.jpg',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/menus/2026/11/menu.jpg',
+  })
+  image_url?: string | null;
+
   @ApiProperty({ description: 'Loại thực đơn: NGAY | TUAN | THANG' })
   menuType: string;
 
@@ -82,6 +94,18 @@ export class MenuDetailResponseDto {
   @ApiProperty({ description: 'Tên thực đơn' })
   menuName: string;
 
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh đại diện thực đơn',
+    example: '/uploads/public/menus/2026/11/menu.jpg',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/menus/2026/11/menu.jpg',
+  })
+  image_url?: string | null;
+
   @ApiProperty({ description: 'Loại thực đơn' })
   menuType: string;
 
@@ -128,6 +152,18 @@ export class MenuFullResponseDto {
 
   @ApiProperty({ description: 'Tên thực đơn' })
   menuName: string;
+
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh đại diện thực đơn',
+    example: '/uploads/public/menus/2026/11/menu.jpg',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/menus/2026/11/menu.jpg',
+  })
+  image_url?: string | null;
 
   @ApiProperty({ description: 'Loại thực đơn' })
   menuType: string;

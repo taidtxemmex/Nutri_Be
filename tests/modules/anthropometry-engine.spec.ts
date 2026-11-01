@@ -1,7 +1,5 @@
-import {
-  AnthropometryEngine,
-  BmiCategoryWPRO,
-} from '../../src/modules/patients/services/anthropometry.service';
+import { AnthropometryEngine } from '../../src/modules/patients/services/anthropometry.service';
+import { BmiCategoryWPRO } from '../../src/config/enums/domain.enum';
 import { PatientCodeAllocator } from '../../src/modules/patients/services/patient-code-allocator.service';
 
 describe('AnthropometryEngine & PatientCodeAllocator Domain Algorithm Suite', () => {

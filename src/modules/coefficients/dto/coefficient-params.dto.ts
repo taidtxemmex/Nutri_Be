@@ -1,10 +1,8 @@
+import { UserContext } from '../../../common/interfaces/user-context.interface';
 import { CreateCoefficientDto } from './create-coefficient.dto';
 import { UpdateCoefficientDto } from './update-coefficient.dto';
 
-export interface CoefficientUserContext {
-  id: string;
-  role?: string;
-}
+export type CoefficientUserContext = UserContext;
 
 export class CreateCoefficientParamsDto {
   dto: CreateCoefficientDto;

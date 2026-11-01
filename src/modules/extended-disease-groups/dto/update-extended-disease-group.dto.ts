@@ -5,9 +5,9 @@ import { Transform, Type } from 'class-transformer';
 export class UpdateExtendedDiseaseGroupDto {
   @ApiPropertyOptional({ example: '01', description: 'Mã nhóm mở rộng cập nhật' })
   @IsOptional()
-  @IsString({ message: 'Mã nhóm mở rộng phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.extended_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã nhóm mở rộng tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.extended_disease_groups.extended_code_max_50' })
   extendedCode?: string;
 
   @ApiPropertyOptional({
@@ -15,9 +15,9 @@ export class UpdateExtendedDiseaseGroupDto {
     description: 'Mã nhóm mở rộng cập nhật (alias maNhomBenh)',
   })
   @IsOptional()
-  @IsString({ message: 'Mã nhóm mở rộng phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.extended_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã nhóm mở rộng tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.extended_disease_groups.extended_code_max_50' })
   maNhomBenh?: string;
 
   @ApiPropertyOptional({
@@ -25,9 +25,9 @@ export class UpdateExtendedDiseaseGroupDto {
     description: 'Mã nhóm mở rộng cập nhật (alias maNhomMoRong)',
   })
   @IsOptional()
-  @IsString({ message: 'Mã nhóm mở rộng phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.extended_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã nhóm mở rộng tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.extended_disease_groups.extended_code_max_50' })
   maNhomMoRong?: string;
 
   @ApiPropertyOptional({
@@ -35,9 +35,9 @@ export class UpdateExtendedDiseaseGroupDto {
     description: 'Tên hiển thị cập nhật',
   })
   @IsOptional()
-  @IsString({ message: 'Tên hiển thị phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.display_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên hiển thị tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.extended_disease_groups.display_name_max_255' })
   displayName?: string;
 
   @ApiPropertyOptional({
@@ -45,9 +45,9 @@ export class UpdateExtendedDiseaseGroupDto {
     description: 'Tên nhóm bệnh cập nhật (alias tenNhomBenh)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên nhóm bệnh phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.group_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên nhóm bệnh tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.extended_disease_groups.group_name_max_255' })
   tenNhomBenh?: string;
 
   @ApiPropertyOptional({
@@ -55,16 +55,16 @@ export class UpdateExtendedDiseaseGroupDto {
     description: 'Tên hiển thị cập nhật (alias tenHienThi)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên hiển thị phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.display_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên hiển thị tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.extended_disease_groups.display_name_max_255' })
   tenHienThi?: string;
 
   @ApiPropertyOptional({ example: 1, description: 'ID nhóm bệnh cha' })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'ID nhóm bệnh cha phải là số nguyên' })
-  @Min(1, { message: 'ID nhóm bệnh cha phải lớn hơn 0' })
+  @IsInt({ message: 'validation.extended_disease_groups.parent_id_int' })
+  @Min(1, { message: 'validation.extended_disease_groups.parent_id_min' })
   parentId?: number;
 
   @ApiPropertyOptional({
@@ -72,7 +72,7 @@ export class UpdateExtendedDiseaseGroupDto {
     description: 'User ID (tùy chọn, hệ thống ưu tiên lấy từ JWT)',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.extended_disease_groups.user_id_string' })
   userId?: string;
 
   getExtendedCode(): string {

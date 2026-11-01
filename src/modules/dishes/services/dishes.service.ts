@@ -82,6 +82,8 @@ export class DishesService {
     return {
       id: Number(dish.id) as any,
       name: dish.ten_mon,
+      imageUrl: dish.image_url ?? null,
+      image_url: dish.image_url ?? null,
       coefficient: Number(dish.he_so_song_chin ?? 1),
       dishWeight: calc.cookedWeightGrams,
       status: dish.trang_thai || null,
@@ -134,6 +136,8 @@ export class DishesService {
     return {
       id: Number(dish.id) as any,
       name: dish.ten_mon,
+      imageUrl: dish.image_url ?? null,
+      image_url: dish.image_url ?? null,
       status: dish.trang_thai || null,
       recipeHash: dish.recipe_hash || null,
       dishWeight: calc.cookedWeightGrams,
@@ -222,6 +226,7 @@ export class DishesService {
         data: {
           nguoi_dung_id: currentUser.id,
           ten_mon: dto.name.trim(),
+          image_url: dto.image_url || dto.imageUrl || null,
           trang_thai: DishStatus.RIENG_TU,
           ngay_tao: new Date(),
           recipe_hash: recipeHash,
@@ -648,11 +653,14 @@ export class DishesService {
           )
         : undefined;
 
+    const newDishImageUrl = dto.image_url !== undefined ? dto.image_url : dto.imageUrl;
+
     const updatedDish = await this.prisma.$transaction(async (tx) => {
       await tx.mon_an.update({
         where: { id: BigInt(id) },
         data: {
           ten_mon: dto.name ? dto.name.trim() : undefined,
+          ...(newDishImageUrl !== undefined && { image_url: newDishImageUrl }),
           recipe_hash: recipeHash,
         },
       });

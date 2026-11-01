@@ -148,8 +148,9 @@ export class DeviceService {
         deviceType: device.device_type,
         isActive: device.is_active,
       };
-    } catch (err: any) {
-      this.logger.warn(`Lỗi ghi nhận thiết bị đăng nhập: ${err?.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to record login device: ${msg}`);
       return null;
     }
   }
@@ -164,8 +165,9 @@ export class DeviceService {
         where: { nguoi_dung_id: userId },
         orderBy: { updated_at: 'desc' },
       });
-    } catch (err: any) {
-      this.logger.warn(`Lỗi truy vấn danh sách thiết bị: ${err?.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to query device list: ${msg}`);
       return [];
     }
   }

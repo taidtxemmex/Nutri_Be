@@ -16,20 +16,20 @@ export class PaymentDocRequestDto {
     description: 'Object key từ file upload',
   })
   @IsOptional()
-  @IsString({ message: 'objectKey phải là chuỗi' })
-  @MaxLength(255, { message: 'objectKey tối đa 255 ký tự' })
+  @IsString({ message: 'validation.subscriptions.object_key_string' })
+  @MaxLength(255, { message: 'validation.subscriptions.object_key_max_255' })
   objectKey?: string;
 
   @ApiPropertyOptional({ example: 'bien_lai_chuyen_khoan.jpg', description: 'Tên file gốc' })
   @IsOptional()
-  @IsString({ message: 'originalFileName phải là chuỗi' })
-  @MaxLength(255, { message: 'originalFileName tối đa 255 ký tự' })
+  @IsString({ message: 'validation.subscriptions.original_filename_string' })
+  @MaxLength(255, { message: 'validation.subscriptions.original_filename_max_255' })
   originalFileName?: string;
 
   @ApiPropertyOptional({ example: 'image/jpeg', description: 'MIME type của file' })
   @IsOptional()
-  @IsString({ message: 'mimeType phải là chuỗi' })
-  @MaxLength(100, { message: 'mimeType tối đa 100 ký tự' })
+  @IsString({ message: 'validation.subscriptions.mime_type_string' })
+  @MaxLength(100, { message: 'validation.subscriptions.mime_type_max_100' })
   mimeType?: string;
 
   @ApiPropertyOptional({
@@ -38,10 +38,10 @@ export class PaymentDocRequestDto {
   })
   @Transform(({ value }) => (typeof value === 'string' && value.trim() === '' ? undefined : value))
   @IsOptional()
-  @IsString({ message: 'externalLink phải là chuỗi' })
-  @MaxLength(1000, { message: 'externalLink không được vượt quá 1000 ký tự' })
+  @IsString({ message: 'validation.subscriptions.external_link_string' })
+  @MaxLength(1000, { message: 'validation.subscriptions.external_link_max_1000' })
   @Matches(/^https?:\/\//i, {
-    message: 'externalLink chỉ chấp nhận URL an toàn bắt đầu bằng http:// hoặc https://',
+    message: 'validation.subscriptions.external_link_safe_url',
   })
   externalLink?: string;
 }
@@ -49,23 +49,23 @@ export class PaymentDocRequestDto {
 export class SubscriptionRequestDto {
   @ApiPropertyOptional({ example: 'PRO_1M', description: 'Mã gói cước đăng ký' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.subscriptions.plan_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã gói cước tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.plan_code_max_50' })
   ma_goi?: string;
 
   @ApiPropertyOptional({ example: 'PRO_1M', description: 'Mã gói cước (alias maGoi)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.subscriptions.plan_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã gói cước tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.plan_code_max_50' })
   maGoi?: string;
 
   @ApiPropertyOptional({ example: 'PRO_1M', description: 'Mã gói cước (alias packageCode)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.subscriptions.plan_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã gói cước tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.subscriptions.plan_code_max_50' })
   packageCode?: string;
 
   @ApiPropertyOptional({
@@ -73,8 +73,8 @@ export class SubscriptionRequestDto {
     description: 'Danh sách chứng từ / hóa đơn thanh toán đính kèm (tối đa 10 tệp)',
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(10, { message: 'Tối đa 10 chứng từ đính kèm' })
+  @IsArray({ message: 'validation.subscriptions.documents_array' })
+  @ArrayMaxSize(10, { message: 'validation.subscriptions.documents_max_10' })
   @ValidateNested({ each: true })
   @Type(() => PaymentDocRequestDto)
   documents?: PaymentDocRequestDto[];

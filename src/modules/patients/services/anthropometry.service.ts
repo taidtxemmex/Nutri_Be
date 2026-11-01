@@ -2,15 +2,11 @@
  * Anthropometry Calculation Engine (Động cơ Nhân trắc học Dinh dưỡng)
  * Chuẩn hóa theo tiêu chuẩn WHO Châu Á (WPRO), Mifflin-St Jeor, và Lịch Dân sự Gregorius
  */
+import { BmiCategoryWPRO } from '../../../config/enums/domain.enum';
+import { CalculateAgeParamDto } from '../../../common/interfaces/date-calculation.interface';
 
-export enum BmiCategoryWPRO {
-  UNDERWEIGHT = 'underweight',
-  NORMAL = 'normal',
-  OVERWEIGHT = 'overweight',
-  OBESE_1 = 'obese1',
-  OBESE_2 = 'obese2',
-  OBESE_3 = 'obese3',
-}
+// Re-export để duy trì tính tương thích ngược (Backward Compatibility)
+export { BmiCategoryWPRO, CalculateAgeParamDto };
 
 export const BMI_STATUS_VN: Record<BmiCategoryWPRO, string> = {
   [BmiCategoryWPRO.UNDERWEIGHT]: 'Thiếu cân',
@@ -35,12 +31,6 @@ export interface BmiResult {
   bmi: number | null;
   bmiLevel: BmiCategoryWPRO | null;
   bmiStatus: string | null;
-}
-
-export interface CalculateAgeParamDto {
-  dobInput?: Date | string | null;
-  birthYearOnly?: boolean;
-  referenceDate?: Date | string | null;
 }
 
 export interface CalculateBmiParamDto {
@@ -146,10 +136,14 @@ export class AnthropometryEngine {
       paramOrDob &&
       typeof paramOrDob === 'object' &&
       !(paramOrDob instanceof Date) &&
-      ('dobInput' in paramOrDob || 'birthYearOnly' in paramOrDob || 'referenceDate' in paramOrDob)
+      ('dobInput' in paramOrDob ||
+        'dateOfBirth' in paramOrDob ||
+        'birthYearOnly' in paramOrDob ||
+        'onlyBirthYear' in paramOrDob ||
+        'referenceDate' in paramOrDob)
     ) {
-      dobInput = paramOrDob.dobInput;
-      birthYearOnly = Boolean(paramOrDob.birthYearOnly);
+      dobInput = paramOrDob.dobInput ?? paramOrDob.dateOfBirth;
+      birthYearOnly = Boolean(paramOrDob.birthYearOnly ?? paramOrDob.onlyBirthYear);
       referenceDate = paramOrDob.referenceDate;
     } else {
       dobInput = paramOrDob as Date | string | null | undefined;

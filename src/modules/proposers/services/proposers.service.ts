@@ -23,12 +23,9 @@ import {
   UpdateProposerParamsDto,
 } from '../dto';
 
-export interface PaginatedProposersResult {
-  items: ProposerResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-}
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
+
+export type PaginatedProposersResult = PaginatedResult<ProposerResponseDto>;
 
 @Injectable()
 export class ProposersService {

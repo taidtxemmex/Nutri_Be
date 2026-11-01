@@ -4,7 +4,8 @@ import {
   ByMealCalculationInput,
   IngredientOnlyCalculationInput,
 } from './intake-calculation.engine';
-import { RdaComparisonEngine, RdaComplianceStatus } from './rda-comparison.engine';
+import { RdaComparisonEngine } from './rda-comparison.engine';
+import { RdaComplianceStatus } from '../../../config/enums/domain.enum';
 import { DemographicProfile } from './rda-reference-data';
 
 describe('Sprint 4: Module 07 - IntakeCalculationEngine & RdaComparisonEngine', () => {

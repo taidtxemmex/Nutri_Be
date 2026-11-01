@@ -3,3 +3,5 @@ export const PATIENT_CODE_REGEX = /^BN[0-9]{6}$/;
 export const PASSWORD_REGEX =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 export const USERNAME_REGEX = /^[a-zA-Z0-9_.-]{4,30}$/;
+export const EMAIL_OR_USERNAME_REGEX =
+  /^(?:[a-zA-Z0-9_.-]{3,50}|[a-zA-Z0-9_.+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z0-9.-]+)$/;

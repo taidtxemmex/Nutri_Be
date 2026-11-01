@@ -28,7 +28,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err: any, user: any, _info: any, context?: ExecutionContext) {
+  handleRequest<TUser = unknown>(
+    err: unknown,
+    user: TUser,
+    _info: unknown,
+    context?: ExecutionContext,
+  ): TUser {
     if (err || !user) {
       if (context) {
         const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
@@ -36,16 +41,16 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
           context.getClass(),
         ]);
         if (isPublic) {
-          return undefined;
+          return undefined as unknown as TUser;
         }
       }
-      throw (
-        err ||
-        new UnauthorizedException({
-          code: AUTH_ERROR_UNAUTHORIZED,
-          message: 'Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn.',
-        })
-      );
+      if (err instanceof Error) {
+        throw err;
+      }
+      throw new UnauthorizedException({
+        code: AUTH_ERROR_UNAUTHORIZED,
+        message: 'Bạn chưa đăng nhập hoặc phiên làm việc đã hết hạn.',
+      });
     }
     return user;
   }

@@ -2,13 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service';
 import { QueueService, EnqueueOptions, Job, DlqJob, JobHandler } from './queue.interface';
 
-export interface EnqueueJobParamDto<T = any> {
+export interface EnqueueJobParamDto<T = unknown> {
   queueName: string;
   payload: T;
   options?: EnqueueOptions;
 }
 
-export interface ProcessJobParamDto<T = any, R = any> {
+export interface ProcessJobParamDto<T = unknown, R = unknown> {
   queueName: string;
   handler: JobHandler<T, R>;
 }
@@ -21,14 +21,14 @@ export interface GetDlqParamDto {
 @Injectable()
 export class MysqlQueueService implements QueueService {
   private readonly logger = new Logger(MysqlQueueService.name);
-  private readonly handlers = new Map<string, JobHandler<any, any>>();
+  private readonly handlers = new Map<string, JobHandler<unknown, unknown>>();
 
   constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Đẩy một công việc mới vào hàng đợi CSDL _system_jobs
    */
-  async enqueue<T = any>(
+  async enqueue<T = unknown>(
     paramOrQueueName: EnqueueJobParamDto<T> | string,
     legacyPayload?: T,
     legacyOptions?: EnqueueOptions,
@@ -76,7 +76,7 @@ export class MysqlQueueService implements QueueService {
   /**
    * Đăng ký một processor handler cho queueName
    */
-  process<T = any, R = any>(
+  process<T = unknown, R = unknown>(
     paramOrQueueName: ProcessJobParamDto<T, R> | string,
     legacyHandler?: JobHandler<T, R>,
   ): void {
@@ -97,10 +97,12 @@ export class MysqlQueueService implements QueueService {
     }
 
     if (this.handlers.has(queueName)) {
-      this.logger.warn(`Processor cho queue "${queueName}" đã tồn tại. Đang ghi đè processor mới.`);
+      this.logger.warn(
+        `Processor for queue "${queueName}" already exists. Overwriting with new processor.`,
+      );
     }
     this.handlers.set(queueName, handler);
-    this.logger.log(`Đã đăng ký processor thành công cho queue: [${queueName}]`);
+    this.logger.log(`Processor successfully registered for queue: [${queueName}]`);
   }
 
   /**
@@ -179,7 +181,7 @@ export class MysqlQueueService implements QueueService {
     });
 
     if (!job) {
-      this.logger.warn(`Không tìm thấy job id ${jobId} để retry.`);
+      this.logger.warn(`Job id ${jobId} not found for retry.`);
       return false;
     }
 
@@ -202,7 +204,7 @@ export class MysqlQueueService implements QueueService {
       });
     });
 
-    this.logger.log(`Job id ${jobId} đã được đặt lại về hàng đợi để xử lý lại.`);
+    this.logger.log(`Job id ${jobId} has been reset to queue for reprocessing.`);
     return true;
   }
 

@@ -25,9 +25,17 @@ export class AuthRateLimitGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();
+    const xForwardedFor = request.headers['x-forwarded-for'];
     const ip =
-      request.headers['x-forwarded-for']?.toString().split(',')[0].trim() ||
+      (xForwardedFor
+        ? (Array.isArray(xForwardedFor)
+            ? xForwardedFor[0]
+            : xForwardedFor.toString().split(',')[0]
+          ).trim()
+        : null) ||
+      (request.ips && request.ips.length ? request.ips[0] : null) ||
       request.ip ||
+      request.socket?.remoteAddress ||
       request.connection?.remoteAddress ||
       'unknown-ip';
 
@@ -86,6 +94,17 @@ export class AuthRateLimitGuard implements CanActivate {
       for (const [k, b] of this.hits.entries()) {
         if (now > b.resetTime) {
           this.hits.delete(k);
+        }
+      }
+
+      // Phòng thủ quá tải bộ nhớ (CWE-400): Giới hạn cứng dung lượng Map dưới áp lực DDoS
+      if (this.hits.size > 15000) {
+        const toDeleteCount = this.hits.size - 10000;
+        let count = 0;
+        for (const k of this.hits.keys()) {
+          this.hits.delete(k);
+          count++;
+          if (count >= toDeleteCount) break;
         }
       }
     }

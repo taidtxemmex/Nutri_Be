@@ -27,7 +27,7 @@ describe('RequestLoggingInterceptor & Sensitive Payload Masking', () => {
         },
       };
 
-      const masked = maskSensitivePayload(rawPayload);
+      const masked = maskSensitivePayload(rawPayload) as any;
 
       expect(masked.username).toBe('dangtai79');
       expect(masked.email).toBe('lytruong070999@gmail.com');
@@ -46,7 +46,7 @@ describe('RequestLoggingInterceptor & Sensitive Payload Masking', () => {
         contentBase64: longString,
       };
 
-      const masked = maskSensitivePayload(payload);
+      const masked = maskSensitivePayload(payload) as any;
 
       expect(masked.filename).toBe('avatar.png');
       expect(masked.contentBase64).toContain('TRUNCATED len:600');

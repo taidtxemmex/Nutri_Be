@@ -45,8 +45,14 @@ export class GoogleLoginParamDto {
 
 export class ForgotPasswordParamDto {
   dto: ForgotPasswordDto;
+  clientOrigin?: string;
+  redirectUrl?: string;
 }
 
 export class ResetPasswordParamDto {
   dto: ResetPasswordDto;
+}
+
+export class VerifyResetTokenParamDto {
+  token: string;
 }

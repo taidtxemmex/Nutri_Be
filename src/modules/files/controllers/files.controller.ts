@@ -12,19 +12,33 @@ import {
   Res,
   BadRequestException,
   ForbiddenException,
+  NotFoundException,
+  UnauthorizedException,
   HttpStatus,
   HttpCode,
+  Optional,
 } from '@nestjs/common';
 import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import { ApiOperation, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiParam, ApiConsumes } from '@nestjs/swagger';
 import { Response } from 'express';
 import * as path from 'path';
 import { LocalStorageService } from '../services/local-storage.service';
 import { FileMagicBytePipe } from '../pipes/file-magic-byte.pipe';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
-import { FileUploadResponseDto, EvidenceUploadResponseDto } from '../dto/file-upload-response.dto';
+import {
+  FileUploadResponseDto,
+  EvidenceUploadResponseDto,
+  AvatarUploadResponseDto,
+  ImageUploadResponseDto,
+} from '../dto/file-upload-response.dto';
 import { UploadEvidenceDto } from '../dto/upload-evidence.dto';
 import { PrismaService } from '../../../core/database/prisma.service';
+import { CacheService } from '../../../core/cache/cache.service';
+import {
+  CACHE_TAG_PROFILES,
+  CACHE_TAG_USERS,
+  buildUserCacheTag,
+} from '../../../config/constants/cache.constants';
 import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 import {
   ApiController,
@@ -40,7 +54,34 @@ export class FilesController {
   constructor(
     private readonly storageService: LocalStorageService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly cacheService?: CacheService,
   ) {}
+
+  /**
+   * Helper trích xuất và xác thực nghiêm ngặt tệp ảnh đơn lẻ (JPEG, PNG, WebP tối đa 5MB)
+   * Chống Polyglot, Web Shell, MIME Spoofing qua FileMagicBytePipe (Universal DRY Code Law)
+   */
+  private extractAndValidateSingleImage(
+    files: Express.Multer.File[] | Express.Multer.File,
+  ): Express.Multer.File {
+    const file = Array.isArray(files) ? files[0] : files;
+    if (!file) {
+      throw new BadRequestException({
+        code: 'FILE_REQUIRED',
+        message: 'Vui lòng chọn 1 tệp tin ảnh hợp lệ để tải lên',
+      });
+    }
+
+    const allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedMimes.includes(file.mimetype)) {
+      throw new BadRequestException({
+        code: 'FILE_TYPE_NOT_ALLOWED',
+        message: 'Chỉ chấp nhận tệp hình ảnh định dạng JPEG, PNG hoặc WebP',
+      });
+    }
+
+    return file;
+  }
 
   /**
    * Tải lên một hoặc nhiều tệp tin lên ổ đĩa cứng VPS
@@ -87,6 +128,14 @@ export class FilesController {
       subDir = 'protected/payments';
     } else if (folder === 'evidence') {
       subDir = 'protected/evidence';
+    } else if (folder === 'avatars' || folder === 'avatar') {
+      subDir = 'public/avatars';
+    } else if (folder === 'dishes' || folder === 'dish') {
+      subDir = 'public/dishes';
+    } else if (folder === 'ingredients' || folder === 'ingredient') {
+      subDir = 'public/ingredients';
+    } else if (folder === 'menus' || folder === 'menu') {
+      subDir = 'public/menus';
     }
 
     const uploadResults: FileUploadResponseDto[] = [];
@@ -96,6 +145,260 @@ export class FilesController {
     }
 
     return uploadResults;
+  }
+
+  /**
+   * Tải lên và tự động cập nhật ảnh đại diện người dùng
+   * Endpoint: POST /api/files/avatar (Yêu cầu JwtAuthGuard)
+   * - Lưu vào thư mục public/avatars
+   * - Cập nhật cột ho_so_ca_nhan.avatar_url của @CurrentUser()
+   * - Invalidate cache hồ sơ người dùng (CACHE_TAG_PROFILES, CACHE_TAG_USERS)
+   * - Trả về DTO chuẩn { success: true, avatarUrl, avatar_url, message }
+   */
+  @Post('avatar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiFile('file', {
+    description: 'Tập tin ảnh đại diện (JPEG, PNG, WebP) - Tối đa 5MB',
+  })
+  @ApiOperation({
+    summary: 'Tải lên và cập nhật ảnh đại diện người dùng hiện tại (Yêu cầu đăng nhập)',
+  })
+  @ApiStandardResponse({
+    description: 'Cập nhật ảnh đại diện thành công',
+    type: AvatarUploadResponseDto,
+  })
+  async uploadAvatar(
+    @UploadedFiles(new FileMagicBytePipe({ allowImages: true, allowDocuments: false }))
+    files: Express.Multer.File[] | Express.Multer.File,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<AvatarUploadResponseDto> {
+    const file = this.extractAndValidateSingleImage(files);
+
+    const userId = user?.id || user?.sub || user?.userId;
+    if (!userId) {
+      throw new UnauthorizedException({
+        code: 'AUTH_REQUIRED',
+        message: 'Không thể xác định danh tính người dùng.',
+      });
+    }
+
+    let targetUserId = userId;
+    const existingUser = await this.prisma.nguoi_dung.findFirst({
+      where: {
+        OR: [{ id: userId }, { keycloak_user_id: userId }],
+      },
+      select: { id: true, deleted_at: true },
+    });
+
+    if (!existingUser || existingUser.deleted_at) {
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        message: 'Không tìm thấy thông tin tài khoản người dùng hoặc tài khoản đã bị vô hiệu hóa.',
+      });
+    }
+    targetUserId = existingUser.id;
+
+    // Lấy thông tin avatar cũ để dọn dẹp đĩa cứng sau khi đổi ảnh mới (Chống rò rỉ dung lượng CWE-400)
+    const existingProfile = await this.prisma.ho_so_ca_nhan.findUnique({
+      where: { nguoi_dung_id: targetUserId },
+      select: { avatar_url: true },
+    });
+    const oldAvatarUrl = existingProfile?.avatar_url;
+
+    let uploadRes: FileUploadResponseDto | undefined;
+    try {
+      uploadRes = await this.storageService.upload({
+        file,
+        subDirectory: 'public/avatars',
+      });
+
+      const relativePath = uploadRes.url;
+
+      await this.prisma.ho_so_ca_nhan.upsert({
+        where: { nguoi_dung_id: targetUserId },
+        create: {
+          nguoi_dung_id: targetUserId,
+          avatar_url: relativePath,
+        },
+        update: {
+          avatar_url: relativePath,
+        },
+      });
+
+      // Dọn dẹp tệp ảnh đại diện cũ khỏi đĩa cứng nếu có
+      if (oldAvatarUrl && oldAvatarUrl.startsWith('/uploads/public/avatars/')) {
+        const oldObjectKey = oldAvatarUrl.replace(/^\/uploads\//, '');
+        await this.storageService.delete({ objectKey: oldObjectKey }).catch(() => {});
+      }
+
+      if (this.cacheService) {
+        await this.cacheService.debouncedInvalidateTags([
+          CACHE_TAG_PROFILES,
+          CACHE_TAG_USERS,
+          buildUserCacheTag(targetUserId),
+        ]);
+      }
+
+      return {
+        success: true,
+        avatarUrl: relativePath,
+        avatar_url: relativePath,
+        message: 'Cập nhật ảnh đại diện thành công',
+      };
+    } catch (err) {
+      if (uploadRes?.objectKey) {
+        await this.storageService.delete({ objectKey: uploadRes.objectKey }).catch(() => {});
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * Tải lên hình ảnh món ăn
+   * Endpoint: POST /api/files/dish-image (Yêu cầu JwtAuthGuard)
+   * - Lưu vào thư mục public/dishes
+   * - Trả về { success: true, imageUrl, image_url }
+   */
+  @Post('dish-image')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiFile('file', {
+    description: 'Tập tin hình ảnh món ăn (JPEG, PNG, WebP) - Tối đa 5MB',
+  })
+  @ApiOperation({
+    summary: 'Tải lên hình ảnh món ăn (public/dishes, Yêu cầu đăng nhập)',
+  })
+  @ApiStandardResponse({
+    description: 'Tải lên hình ảnh món ăn thành công',
+    type: ImageUploadResponseDto,
+  })
+  async uploadDishImage(
+    @UploadedFiles(new FileMagicBytePipe({ allowImages: true, allowDocuments: false }))
+    files: Express.Multer.File[] | Express.Multer.File,
+  ): Promise<ImageUploadResponseDto> {
+    const file = this.extractAndValidateSingleImage(files);
+
+    const uploadRes = await this.storageService.upload({
+      file,
+      subDirectory: 'public/dishes',
+    });
+
+    return {
+      success: true,
+      imageUrl: uploadRes.url,
+      image_url: uploadRes.url,
+    };
+  }
+
+  /**
+   * Tải lên hình ảnh nguyên liệu
+   * Endpoint: POST /api/files/ingredient-image (Yêu cầu JwtAuthGuard)
+   * - Lưu vào thư mục public/ingredients
+   * - Trả về { success: true, imageUrl, image_url }
+   */
+  @Post('ingredient-image')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiFile('file', {
+    description: 'Tập tin hình ảnh nguyên liệu (JPEG, PNG, WebP) - Tối đa 5MB',
+  })
+  @ApiOperation({
+    summary: 'Tải lên hình ảnh nguyên liệu (public/ingredients, Yêu cầu đăng nhập)',
+  })
+  @ApiStandardResponse({
+    description: 'Tải lên hình ảnh nguyên liệu thành công',
+    type: ImageUploadResponseDto,
+  })
+  async uploadIngredientImage(
+    @UploadedFiles(new FileMagicBytePipe({ allowImages: true, allowDocuments: false }))
+    files: Express.Multer.File[] | Express.Multer.File,
+  ): Promise<ImageUploadResponseDto> {
+    const file = this.extractAndValidateSingleImage(files);
+
+    const uploadRes = await this.storageService.upload({
+      file,
+      subDirectory: 'public/ingredients',
+    });
+
+    return {
+      success: true,
+      imageUrl: uploadRes.url,
+      image_url: uploadRes.url,
+    };
+  }
+
+  /**
+   * Tải lên hình ảnh thực đơn
+   * Endpoint: POST /api/files/menu-image (Yêu cầu JwtAuthGuard)
+   * - Lưu vào thư mục public/menus
+   * - Trả về { success: true, imageUrl, image_url }
+   */
+  @Post('menu-image')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  @UseInterceptors(
+    AnyFilesInterceptor({
+      limits: {
+        fileSize: 5 * 1024 * 1024,
+        files: 1,
+      },
+    }),
+  )
+  @ApiConsumes('multipart/form-data')
+  @ApiFile('file', {
+    description: 'Tập tin hình ảnh thực đơn (JPEG, PNG, WebP) - Tối đa 5MB',
+  })
+  @ApiOperation({
+    summary: 'Tải lên hình ảnh thực đơn (public/menus, Yêu cầu đăng nhập)',
+  })
+  @ApiStandardResponse({
+    description: 'Tải lên hình ảnh thực đơn thành công',
+    type: ImageUploadResponseDto,
+  })
+  async uploadMenuImage(
+    @UploadedFiles(new FileMagicBytePipe({ allowImages: true, allowDocuments: false }))
+    files: Express.Multer.File[] | Express.Multer.File,
+  ): Promise<ImageUploadResponseDto> {
+    const file = this.extractAndValidateSingleImage(files);
+
+    const uploadRes = await this.storageService.upload({
+      file,
+      subDirectory: 'public/menus',
+    });
+
+    return {
+      success: true,
+      imageUrl: uploadRes.url,
+      image_url: uploadRes.url,
+    };
   }
 
   /**
@@ -126,7 +429,7 @@ export class FilesController {
     @UploadedFile(new FileMagicBytePipe())
     file: Express.Multer.File,
     @Body() body: UploadEvidenceDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<EvidenceUploadResponseDto> {
     if (!file) {
       throw new BadRequestException({
@@ -172,7 +475,7 @@ export class FilesController {
     }
 
     // 3. Lưu file an toàn vào thư mục protected (payments cho biên lai, evidence cho y tế)
-    let uploadRes: any;
+    let uploadRes: FileUploadResponseDto | undefined;
     const subFolder = body.paymentRequestId ? 'protected/payments' : 'protected/evidence';
     try {
       uploadRes = await this.storageService.upload({ file, subDirectory: subFolder });
@@ -321,7 +624,8 @@ export class FilesController {
     @Param('objectKey') objectKey: string,
     @CurrentUser() user?: AuthenticatedUser,
   ): Promise<{ success: boolean; message: string }> {
-    const role = (user as any)?.role || (user as any)?.vai_tro;
+    const role =
+      user?.role || (user as (AuthenticatedUser & { vai_tro?: string }) | undefined)?.vai_tro;
     const isAdmin = role === 'ADMIN' || role === 'SUPERADMIN';
     if (objectKey.startsWith('protected/') && !isAdmin) {
       throw new ForbiddenException({

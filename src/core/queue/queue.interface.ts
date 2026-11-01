@@ -5,7 +5,7 @@ export interface EnqueueOptions {
   maxAttempts?: number;
 }
 
-export interface Job<T = any> {
+export interface Job<T = unknown> {
   id: string | bigint;
   queueName: string;
   payload: T;
@@ -21,7 +21,7 @@ export interface Job<T = any> {
   updatedAt: Date;
 }
 
-export interface DlqJob<T = any> {
+export interface DlqJob<T = unknown> {
   id: string | bigint;
   originalJobId: string | bigint;
   queueName: string;
@@ -30,15 +30,15 @@ export interface DlqJob<T = any> {
   failedAt: Date;
 }
 
-export type JobHandler<T = any, R = any> = (payload: T, job: Job<T>) => Promise<R>;
+export type JobHandler<T = unknown, R = unknown> = (payload: T, job: Job<T>) => Promise<R>;
 
 /**
  * Universal QueueService interface across all broker implementations
  * (Embedded MySQL SKIP LOCKED, SQLite WAL queue, BullMQ/Redis, pg-boss)
  */
 export interface QueueService {
-  enqueue<T = any>(queueName: string, payload: T, options?: EnqueueOptions): Promise<Job<T>>;
-  process<T = any, R = any>(queueName: string, handler: JobHandler<T, R>): void;
+  enqueue<T = unknown>(queueName: string, payload: T, options?: EnqueueOptions): Promise<Job<T>>;
+  process<T = unknown, R = unknown>(queueName: string, handler: JobHandler<T, R>): void;
   getDlq(queueName?: string, limit?: number): Promise<DlqJob[]>;
   retry(jobId: string | bigint | number): Promise<boolean>;
 }

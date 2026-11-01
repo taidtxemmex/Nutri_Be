@@ -6,7 +6,7 @@ export interface EmailMessage {
   body?: string;
   html?: string;
   template?: string;
-  payload?: any;
+  payload?: unknown;
   sentAt: Date;
   from?: string;
 }
@@ -17,7 +17,7 @@ export interface MailOptions {
   body?: string;
   html?: string;
   template?: string;
-  payload?: any;
+  payload?: unknown;
   from?: string;
 }
 
@@ -44,7 +44,7 @@ export class InMemoryMailerService implements MailerService {
     };
 
     this.sentEmails.push(email);
-    this.logger.log(`[InMemoryMailer] Đã gửi email tới: ${email.to} - Tiêu đề: ${email.subject}`);
+    this.logger.log(`[InMemoryMailer] Sent email to: ${email.to} - Subject: ${email.subject}`);
   }
 
   getSentEmails(): EmailMessage[] {

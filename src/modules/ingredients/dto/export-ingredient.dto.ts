@@ -13,8 +13,8 @@ import { Transform } from 'class-transformer';
 export class ExportIngredientDto {
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo tên' })
   @IsOptional()
-  @IsString()
-  @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
+  @IsString({ message: 'validation.ingredients.search_string' })
+  @MaxLength(255, { message: 'validation.ingredients.search_max' })
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'ID danh mục' })
@@ -22,14 +22,14 @@ export class ExportIngredientDto {
   @Transform(({ value }) =>
     value === null || value === undefined || value === '' ? undefined : Number(value),
   )
-  @IsInt({ message: 'ID danh mục phải là số nguyên' })
-  @Min(1, { message: 'ID danh mục phải lớn hơn 0' })
+  @IsInt({ message: 'validation.ingredients.category_id_int' })
+  @Min(1, { message: 'validation.ingredients.category_id_min' })
   categoryId?: number;
 
   @ApiPropertyOptional({ description: 'Loại protein' })
   @IsOptional()
-  @IsString()
-  @MaxLength(50, { message: 'Loại protein tối đa 50 ký tự' })
+  @IsString({ message: 'validation.ingredients.protein_type_string' })
+  @MaxLength(50, { message: 'validation.ingredients.protein_type_max' })
   loaiProtein?: string;
 
   @ApiPropertyOptional({
@@ -37,9 +37,9 @@ export class ExportIngredientDto {
     type: [String],
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(100, { message: 'Danh sách cột xuất tối đa 100 cột' })
-  @IsString({ each: true, message: 'Tên cột phải là chuỗi' })
-  @MaxLength(100, { each: true, message: 'Tên cột tối đa 100 ký tự' })
+  @IsArray({ message: 'validation.ingredients.export_columns_array' })
+  @ArrayMaxSize(100, { message: 'validation.ingredients.export_columns_max' })
+  @IsString({ each: true, message: 'validation.ingredients.column_name_string' })
+  @MaxLength(100, { each: true, message: 'validation.ingredients.column_name_max' })
   columns?: string[];
 }

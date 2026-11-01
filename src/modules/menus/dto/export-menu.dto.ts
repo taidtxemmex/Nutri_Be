@@ -20,7 +20,7 @@ export class ExportMenuDto {
     description: 'Chế độ xuất Excel: FULL | NET | NET_NUTRITION | RAW | COOKED',
   })
   @IsOptional()
-  @IsEnum(MenuExportType)
+  @IsEnum(MenuExportType, { message: 'validation.menus.export_type_enum' })
   exportType?: MenuExportType = MenuExportType.FULL;
 
   @ApiPropertyOptional({
@@ -29,10 +29,10 @@ export class ExportMenuDto {
       'Danh sách mã chỉ tiêu dinh dưỡng cần xuất (nếu bỏ trống sẽ xuất đầy đủ 86 chỉ tiêu)',
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(100, { message: 'Danh sách mã chỉ tiêu dinh dưỡng tối đa 100 mục' })
-  @IsString({ each: true })
-  @MaxLength(100, { each: true, message: 'Mã chỉ tiêu dinh dưỡng tối đa 100 ký tự' })
+  @IsArray({ message: 'validation.menus.columns_is_array' })
+  @ArrayMaxSize(100, { message: 'validation.menus.nutrient_codes_max_100' })
+  @IsString({ each: true, message: 'validation.menus.nutrient_code_string' })
+  @MaxLength(100, { each: true, message: 'validation.menus.nutrient_code_max_len' })
   columns?: string[];
 
   @ApiPropertyOptional({
@@ -44,8 +44,8 @@ export class ExportMenuDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsInt()
-  @Min(1)
-  @Max(1000000)
+  @IsInt({ message: 'validation.menus.servings_int' })
+  @Min(1, { message: 'validation.menus.servings_min' })
+  @Max(1000000, { message: 'validation.menus.servings_max' })
   servings?: number = 1;
 }

@@ -50,7 +50,7 @@ export class PatientExcelService {
     if (this.cacheService) {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
-        this.logger.debug('🚀 [Cache Hit] Trả về template bệnh nhân từ CacheService (0ms)');
+        this.logger.debug('🚀 [Cache Hit] Returning patient template from CacheService (0ms)');
         return Buffer.from(cached, 'base64');
       }
     }
@@ -106,7 +106,7 @@ export class PatientExcelService {
 
     if (this.cacheService && buffer && buffer.length <= 5 * 1024 * 1024) {
       await this.cacheService.set(cacheKey, buffer.toString('base64'), 1800, CACHE_TAG_PATIENTS);
-      this.logger.debug('💾 Đã lưu template bệnh nhân vào CacheService (TTL 30m, tag=patients)');
+      this.logger.debug('💾 Saved patient template to CacheService (TTL 30m, tag=patients)');
     }
 
     return buffer;

@@ -116,3 +116,20 @@ export enum DailyIntakeExportTemplateType {
   DAILY_NUTRIENT_INTAKE_PATIENT = 3,
   TOTAL_WEIGHT_FOOD_GROUP_MULTI_PATIENTS = 4,
 }
+
+export enum BmiCategoryWPRO {
+  UNDERWEIGHT = 'underweight',
+  NORMAL = 'normal',
+  OVERWEIGHT = 'overweight',
+  OBESE_1 = 'obese1',
+  OBESE_2 = 'obese2',
+  OBESE_3 = 'obese3',
+}
+
+export enum RdaComplianceStatus {
+  SEVERE_DEFICIENCY = 'SEVERE_DEFICIENCY', // Thiếu trầm trọng (< 70%)
+  DEFICIENCY = 'DEFICIENCY', // Thiếu (70% - 89.9%)
+  ADEQUATE = 'ADEQUATE', // Đạt (90% - 110%)
+  EXCESS = 'EXCESS', // Vượt (111% - 130% hoặc <= 150%)
+  WARNING_TOXIC_OR_UL_EXCEEDED = 'WARNING_TOXIC_OR_UL_EXCEEDED', // Nguy cơ ngộ độc / Vượt ngưỡng an toàn UL (>UL hoặc >150%)
+}

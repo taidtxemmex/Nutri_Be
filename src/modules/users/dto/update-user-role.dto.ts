@@ -6,18 +6,19 @@ import { UserRole } from '../../../config/enums/role.enum';
 export class UpdateUserRoleDto {
   @ApiPropertyOptional({ description: 'Keycloak User ID hoặc UUID tương ứng' })
   @IsOptional()
-  @IsString({ message: 'keycloakUserId phải là chuỗi' })
-  @MaxLength(255, { message: 'keycloakUserId tối đa 255 ký tự' })
+  @IsString({ message: 'validation.users.keycloak_user_id_string' })
+  @MaxLength(255, { message: 'validation.users.keycloak_user_id_max_255' })
   keycloakUserId?: string;
 
   @ApiPropertyOptional({ description: 'User ID (UUID)' })
   @IsOptional()
-  @IsString({ message: 'userId phải là chuỗi' })
-  @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
+  @IsString({ message: 'validation.users.user_id_string' })
+  @MaxLength(50, { message: 'validation.users.user_id_max_50' })
   userId?: string;
 
   @ApiPropertyOptional({ enum: UserRole, description: 'Alias for newRole' })
   @IsOptional()
+  @IsEnum(UserRole, { message: 'validation.users.role_invalid' })
   role?: UserRole;
 
   @ApiProperty({
@@ -27,7 +28,7 @@ export class UpdateUserRoleDto {
   })
   @Expose()
   @Transform(({ value, obj }) => value || obj?.role)
-  @IsNotEmpty({ message: 'Vai trò mới không được để trống' })
-  @IsEnum(UserRole, { message: 'Vai trò người dùng không hợp lệ' })
+  @IsNotEmpty({ message: 'validation.users.new_role_required' })
+  @IsEnum(UserRole, { message: 'validation.users.role_invalid' })
   newRole: UserRole;
 }

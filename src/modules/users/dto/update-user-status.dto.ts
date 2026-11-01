@@ -5,14 +5,14 @@ import { Transform } from 'class-transformer';
 export class UpdateUserStatusDto {
   @ApiPropertyOptional({ description: 'Keycloak User ID hoặc UUID tương ứng' })
   @IsOptional()
-  @IsString({ message: 'keycloakUserId phải là chuỗi' })
-  @MaxLength(255, { message: 'keycloakUserId tối đa 255 ký tự' })
+  @IsString({ message: 'validation.users.keycloak_user_id_string' })
+  @MaxLength(255, { message: 'validation.users.keycloak_user_id_max_255' })
   keycloakUserId?: string;
 
   @ApiPropertyOptional({ description: 'User ID (UUID)' })
   @IsOptional()
-  @IsString({ message: 'userId phải là chuỗi' })
-  @MaxLength(50, { message: 'userId tối đa 50 ký tự' })
+  @IsString({ message: 'validation.users.user_id_string' })
+  @MaxLength(50, { message: 'validation.users.user_id_max_50' })
   userId?: string;
 
   @ApiPropertyOptional({ example: true, description: 'Trạng thái hoạt động' })
@@ -22,7 +22,7 @@ export class UpdateUserStatusDto {
     if (value === 'false' || value === false || value === 0 || value === '0') return false;
     return value;
   })
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.users.status_boolean' })
   isActive?: boolean;
 
   @ApiPropertyOptional({ example: true, description: 'Alias trạng thái hoạt động' })
@@ -32,6 +32,6 @@ export class UpdateUserStatusDto {
     if (value === 'false' || value === false || value === 0 || value === '0') return false;
     return value;
   })
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.users.status_boolean' })
   active?: boolean;
 }

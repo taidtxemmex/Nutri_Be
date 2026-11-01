@@ -5,17 +5,13 @@ import {
 } from '../../../core/nutrition-engine/nutrition.constants';
 import { DecimalMap, RoundedNutrientMap } from '../../../core/nutrition-engine/nutrition.engine';
 import { DemographicProfile, getStandardRdaTargetMap, RdaTargetMap } from './rda-reference-data';
+import { RdaComplianceStatus } from '../../../config/enums/domain.enum';
+
+// Re-export để duy trì tính tương thích ngược (Backward Compatibility)
+export { RdaComplianceStatus };
 
 // Cấu hình Decimal chuẩn độ chính xác cao
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
-
-export enum RdaComplianceStatus {
-  SEVERE_DEFICIENCY = 'SEVERE_DEFICIENCY', // Thiếu trầm trọng (< 70%)
-  DEFICIENCY = 'DEFICIENCY', // Thiếu (70% - 89.9%)
-  ADEQUATE = 'ADEQUATE', // Đạt (90% - 110%)
-  EXCESS = 'EXCESS', // Vượt (111% - 130% hoặc <= 150%)
-  WARNING_TOXIC_OR_UL_EXCEEDED = 'WARNING_TOXIC_OR_UL_EXCEEDED', // Nguy cơ ngộ độc / Vượt ngưỡng an toàn UL (>UL hoặc >150%)
-}
 
 export type ClinicalAlertLevel = 'NORMAL' | 'WARNING' | 'DANGER';
 

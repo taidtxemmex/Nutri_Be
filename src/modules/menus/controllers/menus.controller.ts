@@ -194,7 +194,8 @@ export class MenusController {
   @Auth()
   @SkipTransform()
   @ApiOperation({
-    summary: 'Xuất thực đơn tuần / chuyên sâu đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED) (POST)',
+    summary:
+      'Xuất thực đơn tuần / chuyên sâu đa chế độ (FULL, NET, NET_NUTRITION, RAW, COOKED) (POST)',
   })
   @ApiParam({ name: 'id', description: 'ID thực đơn' })
   @ApiBody({ type: ExportMenuDto, required: false })

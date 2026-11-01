@@ -17,16 +17,34 @@ import { MenuMealDto, MenuWeekDto } from './create-menu.dto';
 export class UpdateMenuDto {
   @ApiPropertyOptional({ description: 'Tên thực đơn' })
   @IsOptional()
-  @IsString({ message: 'Tên thực đơn phải là chuỗi' })
-  @MaxLength(255, { message: 'Tên thực đơn không được vượt quá 255 ký tự' })
+  @IsString({ message: 'validation.menus.name_string' })
+  @MaxLength(255, { message: 'validation.menus.name_max' })
   menuName?: string;
+
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh đại diện thực đơn (relative path)',
+    example: '/uploads/public/menus/2026/11/menu-tuan-1.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.menus.image_url_string' })
+  @MaxLength(500, { message: 'validation.menus.image_url_max' })
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/menus/2026/11/menu-tuan-1.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.menus.image_url_string' })
+  @MaxLength(500, { message: 'validation.menus.image_url_max' })
+  image_url?: string;
 
   @ApiPropertyOptional({
     description: 'Loại thực đơn: NGAY | TUAN | THANG',
     enum: MenuType,
   })
   @IsOptional()
-  @IsEnum(MenuType)
+  @IsEnum(MenuType, { message: 'validation.menus.menu_type_enum' })
   menuType?: MenuType;
 
   @ApiPropertyOptional({
@@ -34,7 +52,7 @@ export class UpdateMenuDto {
     enum: TargetType,
   })
   @IsOptional()
-  @IsEnum(TargetType)
+  @IsEnum(TargetType, { message: 'validation.menus.target_type_enum' })
   targetType?: TargetType;
 
   @ApiPropertyOptional({ description: 'ID bệnh nhân' })
@@ -46,8 +64,8 @@ export class UpdateMenuDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsInt({ message: 'ID nhóm bệnh phải là số nguyên' })
-  @Min(1, { message: 'ID nhóm bệnh phải lớn hơn 0' })
+  @IsInt({ message: 'validation.menus.disease_group_id_int' })
+  @Min(1, { message: 'validation.menus.disease_group_id_min' })
   diseaseGroupId?: number;
 
   @ApiPropertyOptional({ description: 'ID bộ giới hạn dinh dưỡng áp dụng' })
@@ -59,8 +77,8 @@ export class UpdateMenuDto {
     type: [MenuMealDto],
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(20, { message: 'Danh sách bữa ăn tối đa 20 bữa' })
+  @IsArray({ message: 'validation.menus.meals_is_array' })
+  @ArrayMaxSize(20, { message: 'validation.menus.meals_per_day_max_20' })
   @ValidateNested({ each: true })
   @Type(() => MenuMealDto)
   meals?: MenuMealDto[];
@@ -70,8 +88,8 @@ export class UpdateMenuDto {
     type: [MenuWeekDto],
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(5, { message: 'Danh sách tuần tối đa 5 tuần' })
+  @IsArray({ message: 'validation.menus.weeks_is_array' })
+  @ArrayMaxSize(5, { message: 'validation.menus.weeks_max_5' })
   @ValidateNested({ each: true })
   @Type(() => MenuWeekDto)
   weeks?: MenuWeekDto[];

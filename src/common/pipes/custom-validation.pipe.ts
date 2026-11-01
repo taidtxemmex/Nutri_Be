@@ -22,13 +22,18 @@ export class CustomValidationPipe extends ValidationPipe {
     errors: ValidationError[],
     parentField = '',
   ): Array<{ field: string; code: string; message: string }> {
-    let result: Array<{ field: string; code: string; message: string }> = [];
+    let result: Array<{ field: string; code: string; message: string; key?: string }> = [];
 
     for (const error of errors) {
       const fieldPath = parentField ? `${parentField}.${error.property}` : error.property;
 
       if (error.constraints) {
         for (const [code, rawMessage] of Object.entries(error.constraints)) {
+          const isNamespaceKey =
+            typeof rawMessage === 'string' &&
+            /^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/i.test(rawMessage) &&
+            Boolean(this.i18nService && this.i18nService.hasKey(rawMessage));
+
           const message =
             this.i18nService && this.i18nService.hasKey(rawMessage)
               ? this.i18nService.translate(rawMessage)
@@ -38,6 +43,7 @@ export class CustomValidationPipe extends ValidationPipe {
             field: fieldPath,
             code: code.toUpperCase(),
             message,
+            ...(isNamespaceKey ? { key: rawMessage } : {}),
           });
         }
       }

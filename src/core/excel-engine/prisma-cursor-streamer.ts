@@ -7,8 +7,8 @@
 
 export interface CursorStreamOptions<T> {
   model: string;
-  where?: Record<string, any>;
-  select?: Record<string, any>;
+  where?: Record<string, unknown>;
+  select?: Record<string, unknown>;
   orderBy?: Record<string, 'asc' | 'desc'>;
   batchSize?: number; // Mặc định 200 bản ghi / chunk
   onBatch: (items: T[]) => Promise<void>;
@@ -19,7 +19,7 @@ export interface StreamPrismaInBatchesDto<T> {
   options: CursorStreamOptions<T>;
 }
 
-export async function streamPrismaInBatches<T extends { id: any }>(
+export async function streamPrismaInBatches<T extends { id: unknown }>(
   paramOrPrisma: StreamPrismaInBatchesDto<T> | any,
   legacyOptions?: CursorStreamOptions<T>,
 ): Promise<number> {
@@ -40,7 +40,7 @@ export async function streamPrismaInBatches<T extends { id: any }>(
   }
 
   const batchSize = options.batchSize || 200;
-  let lastId: any = undefined;
+  let lastId: unknown = undefined;
   let totalProcessed = 0;
   const modelDelegate = prisma ? prisma[options.model] : null;
 

@@ -15,14 +15,12 @@ import {
 } from '../../config/constants/auth.constants';
 import { UserRole } from '../../config/enums/role.enum';
 import { PrismaService } from '../../core/database/prisma.service';
-import { CacheService } from '../../core/cache/cache.service';
 
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @Optional() private readonly prisma?: PrismaService,
-    @Optional() private readonly cacheService?: CacheService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {

@@ -10,7 +10,7 @@ import { CacheService } from '../../../core/cache/cache.service';
 import { MenuExportType, MenuType } from '../../../config/enums/domain.enum';
 import { EXCEL_FONT_FAMILY, EXCEL_STYLES } from '../../../config/constants/excel.constants';
 import { Response } from 'express';
-import { setExcelResponseHeaders } from '../../../core/excel-engine';
+import { setExcelResponseHeaders, ExcelExportColumn } from '../../../core/excel-engine';
 import {
   MenuMarketPlanStreamer,
   MarketPlanIngredient,
@@ -30,11 +30,7 @@ export interface MenuExportOptions {
   userId?: string;
 }
 
-export interface ResolvedExportColumn {
-  key: string;
-  header: string;
-  unit: string;
-}
+export type ResolvedExportColumn = ExcelExportColumn;
 
 @Injectable()
 export class MenuExcelService {
@@ -79,7 +75,7 @@ export class MenuExcelService {
 
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
-        this.logger.debug(`🚀 [Cache Hit] Trả về Excel thực đơn #${menuIdOrData} tức thì (0ms)`);
+        this.logger.debug(`🚀 [Cache Hit] Returning menu Excel #${menuIdOrData} immediately (0ms)`);
         return Buffer.from(cached, 'base64');
       }
     }
@@ -129,9 +125,7 @@ export class MenuExcelService {
         1800,
         `menu_${menuIdOrData}`,
       );
-      this.logger.debug(
-        `💾 Đã lưu Excel thực đơn #${menuIdOrData} vào bộ nhớ đệm (tag=menu_${menuIdOrData})`,
-      );
+      this.logger.debug(`💾 Saved menu Excel #${menuIdOrData} to cache (tag=menu_${menuIdOrData})`);
     }
 
     return buffer;

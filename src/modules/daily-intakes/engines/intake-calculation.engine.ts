@@ -4,6 +4,7 @@ import {
   BASE_NUTRIENT_CODES,
 } from '../../../core/nutrition-engine/nutrition.constants';
 import {
+  CalculationOptions,
   DecimalMap,
   NutritionEngine,
   RawIngredientInput,
@@ -14,11 +15,8 @@ import { IntakeInputType } from '../../../config/enums/domain.enum';
 // Khởi tạo cấu hình Decimal chính xác 20 chữ số và làm tròn ROUND_HALF_UP (chuẩn y khoa)
 Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 
-export interface IntakeCalculationOptions {
-  isNetWeight?: boolean; // Nếu true: coi rawWeight đã là khối lượng sạch
-  targetDecimalPlaces?: number; // Mặc định 2 chữ số thập phân
-  preserveDecimals?: boolean; // Giữ nguyên DecimalMap cho downstream engines (RDA)
-}
+export type IntakeCalculationOptions = CalculationOptions;
+export { CalculationOptions };
 
 export interface IntakeIngredientItemInput {
   ingredientId?: number | bigint | string | null;
@@ -541,7 +539,7 @@ export class IntakeCalculationEngine {
     let totalNet = this.ZERO;
 
     for (const comp of components) {
-      const ingSource = comp.ingredient || comp.nguyen_lieu || comp;
+      const ingSource: any = comp.ingredient || comp.nguyen_lieu || comp;
       const compRawWeight = this.toDecimal(comp.rawWeight ?? comp.khoi_luong_song_sach, 0).times(
         qtyDecimal,
       );
@@ -651,7 +649,7 @@ export class IntakeCalculationEngine {
             }
           } else {
             // Nguyên liệu trực tiếp trong bữa
-            const ingSource = item.ingredient || item.nguyen_lieu || item;
+            const ingSource: any = item.ingredient || item.nguyen_lieu || item;
             const ingDetail = this.calculateIngredient(
               {
                 ...ingSource,

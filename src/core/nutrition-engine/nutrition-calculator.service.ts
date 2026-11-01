@@ -189,7 +189,7 @@ export class NutritionCalculatorService {
         (ingId != null && ingredientMap ? ingredientMap.get(ingId) : null);
 
       if (!ingredient) {
-        this.logger.warn(`Không tìm thấy nguyên liệu có ID ${ingId} trong món ăn`);
+        this.logger.warn(`Ingredient with ID ${ingId} not found in dish`);
         continue;
       }
 

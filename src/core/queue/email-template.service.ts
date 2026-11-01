@@ -72,7 +72,8 @@ export class EmailTemplateService {
     const rawUrl =
       this.configService?.get<string>('FRONTEND_URL') ||
       this.configService?.get<string>('app.frontend-url') ||
-      'http://localhost:5173';
+      process.env.FRONTEND_URL ||
+      'https://truenutri.pages.dev';
     this.defaultFrontendUrl = rawUrl.split(',')[0].trim().replace(/\/+$/, '');
   }
 

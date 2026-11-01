@@ -1,5 +1,17 @@
-import { Controller, Post, Body, HttpCode, HttpStatus, UseGuards, Headers } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  Res,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  Headers,
+} from '@nestjs/common';
+import { Response } from 'express';
+import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
 import { AuthRateLimitGuard } from '../../../security/rate-limit/auth-rate-limit.guard';
 import {
@@ -11,7 +23,9 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   AuthResponseDto,
+  VerifyResetTokenDto,
 } from '../dto';
+
 import {
   Public,
   CurrentUser,
@@ -141,8 +155,52 @@ export class AuthController {
     status: 200,
     description: 'Yêu cầu đặt lại mật khẩu đã được tiếp nhận',
   })
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword({ dto });
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
+  ) {
+    let clientOrigin: string | undefined = undefined;
+    if (origin) {
+      clientOrigin = origin;
+    } else if (referer) {
+      try {
+        clientOrigin = new URL(referer).origin;
+      } catch {
+        // fallback
+      }
+    }
+    return this.authService.forgotPassword({
+      dto,
+      clientOrigin: dto.redirectUrl || clientOrigin,
+    });
+  }
+
+  @Public()
+  @Get('verify-reset-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kiểm tra tính hợp lệ của token đặt lại mật khẩu (GET)' })
+  @ApiQuery({ name: 'token', description: 'Mã token xác thực từ email', required: true })
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Mã xác thực hợp lệ',
+  })
+  @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc đã hết hạn')
+  async verifyResetTokenGet(@Query('token') token: string) {
+    return this.authService.verifyResetToken(token);
+  }
+
+  @Public()
+  @Post('verify-reset-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Kiểm tra tính hợp lệ của token đặt lại mật khẩu (POST)' })
+  @ApiStandardResponse({
+    status: 200,
+    description: 'Mã xác thực hợp lệ',
+  })
+  @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc đã hết hạn')
+  async verifyResetTokenPost(@Body() dto: VerifyResetTokenDto) {
+    return this.authService.verifyResetToken(dto.token);
   }
 
   @Public()
@@ -156,5 +214,14 @@ export class AuthController {
   @ApiErrorResponse(400, 'Mã xác thực không hợp lệ hoặc mật khẩu không đúng chuẩn')
   async resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword({ dto });
+  }
+
+  @Public()
+  @Get(['legacy/reset-credentials', 'realms/:realm/login-actions/reset-credentials'])
+  @ApiOperation({ summary: 'Chuyển hướng tương thích với đường dẫn Keycloak reset-credentials cũ' })
+  async legacyResetCredentials(@Res() res: Response) {
+    const rawFrontendUrl = process.env.FRONTEND_URL || 'https://truenutri.pages.dev';
+    const frontendUrl = rawFrontendUrl.split(',')[0].trim().replace(/\/+$/, '');
+    return res.redirect(302, `${frontendUrl}/login?action=forgot-password`);
   }
 }

@@ -8,9 +8,9 @@ export class CreateEvidenceDto {
     example: 'Chứng chỉ hành nghề y tế',
   })
   @IsOptional()
-  @IsString({ message: 'Tiêu đề minh chứng phải là chuỗi' })
+  @IsString({ message: 'validation.evidences.title_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tiêu đề minh chứng tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.evidences.title_max_255' })
   title?: string;
 
   @ApiPropertyOptional({
@@ -18,16 +18,16 @@ export class CreateEvidenceDto {
     example: 'Chứng chỉ hành nghề y tế',
   })
   @IsOptional()
-  @IsString({ message: 'Tiêu đề minh chứng phải là chuỗi' })
+  @IsString({ message: 'validation.evidences.title_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tiêu đề minh chứng tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.evidences.title_max_255' })
   tieuDe?: string;
 
   @ApiPropertyOptional({ description: 'Loại minh chứng', example: 'CHUNG_CHI_Y_KHOA' })
   @IsOptional()
-  @IsString({ message: 'Loại minh chứng phải là chuỗi' })
+  @IsString({ message: 'validation.evidences.type_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(100, { message: 'Loại minh chứng tối đa 100 ký tự' })
+  @MaxLength(100, { message: 'validation.evidences.type_max_100' })
   evidenceType?: string;
 
   @ApiPropertyOptional({
@@ -35,9 +35,9 @@ export class CreateEvidenceDto {
     example: 'CHUNG_CHI_Y_KHOA',
   })
   @IsOptional()
-  @IsString({ message: 'Loại minh chứng phải là chuỗi' })
+  @IsString({ message: 'validation.evidences.type_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(100, { message: 'Loại minh chứng tối đa 100 ký tự' })
+  @MaxLength(100, { message: 'validation.evidences.type_max_100' })
   loaiMinhChung?: string;
 
   @ApiPropertyOptional({
@@ -45,8 +45,8 @@ export class CreateEvidenceDto {
     example: 'Tài liệu cấp bởi Sở Y tế',
   })
   @IsOptional()
-  @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(5000, { message: 'Ghi chú tối đa 5000 ký tự' })
+  @IsString({ message: 'validation.evidences.note_string' })
+  @MaxLength(5000, { message: 'validation.evidences.note_max_5000' })
   note?: string;
 
   @ApiPropertyOptional({
@@ -54,21 +54,21 @@ export class CreateEvidenceDto {
     example: 'Tài liệu cấp bởi Sở Y tế',
   })
   @IsOptional()
-  @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(5000, { message: 'Ghi chú tối đa 5000 ký tự' })
+  @IsString({ message: 'validation.evidences.note_string' })
+  @MaxLength(5000, { message: 'validation.evidences.note_max_5000' })
   ghiChu?: string;
 
   @ApiPropertyOptional({ description: 'Tên file gốc', example: 'chung_chi.pdf' })
   @IsOptional()
-  @IsString({ message: 'Tên file gốc phải là chuỗi' })
+  @IsString({ message: 'validation.evidences.original_filename_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên file gốc tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.evidences.original_filename_max_255' })
   originalFileName?: string;
 
   @ApiPropertyOptional({ description: 'MIME type của file', example: 'application/pdf' })
   @IsOptional()
-  @IsString({ message: 'MIME type phải là chuỗi' })
-  @MaxLength(255, { message: 'MIME type tối đa 255 ký tự' })
+  @IsString({ message: 'validation.evidences.mime_type_string' })
+  @MaxLength(255, { message: 'validation.evidences.mime_type_max_255' })
   mimeType?: string;
 
   @ApiPropertyOptional({
@@ -76,8 +76,8 @@ export class CreateEvidenceDto {
     example: 'https://example.com/chungchi.pdf',
   })
   @IsOptional()
-  @IsString({ message: 'Đường dẫn liên kết ngoài phải là chuỗi' })
-  @MaxLength(2048, { message: 'Đường dẫn liên kết ngoài tối đa 2048 ký tự' })
+  @IsString({ message: 'validation.evidences.external_link_string' })
+  @MaxLength(2048, { message: 'validation.evidences.external_link_max_2048' })
   externalLink?: string;
 
   getTitle(): string {

@@ -36,7 +36,9 @@ export class ExtendedDiseaseGroupsImportService {
     if (this.cacheService && typeof this.cacheService.get === 'function') {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
-        this.logger.debug('🚀 [Cache Hit] Trả về template nhóm bệnh mở rộng từ CacheService (0ms)');
+        this.logger.debug(
+          '🚀 [Cache Hit] Returning extended disease groups template from CacheService (0ms)',
+        );
         return Buffer.from(cached, 'base64');
       }
     }
@@ -112,7 +114,7 @@ export class ExtendedDiseaseGroupsImportService {
         CACHE_TAG_DISEASE_GROUPS,
       ]);
       this.logger.debug(
-        '💾 Đã lưu template nhóm bệnh mở rộng vào CacheService (tags=extended_disease_groups,disease_groups)',
+        '💾 Cached extended disease groups template in CacheService (tags=extended_disease_groups,disease_groups)',
       );
     }
 

@@ -6,8 +6,8 @@ import { BasePaginationQueryDto } from '../../../common/dto/base-pagination-quer
 export class IngredientQueryDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo tên nguyên liệu' })
   @IsOptional()
-  @IsString()
-  @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
+  @IsString({ message: 'validation.ingredients.search_string' })
+  @MaxLength(255, { message: 'validation.ingredients.search_max' })
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'Lọc theo ID danh mục' })

@@ -8,6 +8,13 @@ export class FileUploadResponseDto {
   objectKey!: string;
 
   @ApiProperty({
+    description: 'Tên file đã được xử lý lưu trữ',
+    example: 'd8a4358a-81a1-4389-9a28-1b6fb891c9f2-anh_minh_chung.jpg',
+    required: false,
+  })
+  fileName?: string;
+
+  @ApiProperty({
     description: 'Tên file gốc do người dùng tải lên',
     example: 'anh_minh_chung.jpg',
   })
@@ -55,4 +62,50 @@ export class EvidenceUploadResponseDto extends FileUploadResponseDto {
     description: 'Thời điểm tải lên',
   })
   uploadedAt!: Date;
+}
+
+export class AvatarUploadResponseDto {
+  @ApiProperty({
+    description: 'Trạng thái xử lý',
+    example: true,
+  })
+  success!: boolean;
+
+  @ApiProperty({
+    description: 'Đường dẫn ảnh đại diện tương đối (camelCase)',
+    example: '/uploads/public/avatars/2026/11/d8a4358a-81a1-4389-9a28-1b6fb891c9f2-avatar.png',
+  })
+  avatarUrl!: string;
+
+  @ApiProperty({
+    description: 'Đường dẫn ảnh đại diện tương đối (snake_case)',
+    example: '/uploads/public/avatars/2026/11/d8a4358a-81a1-4389-9a28-1b6fb891c9f2-avatar.png',
+  })
+  avatar_url!: string;
+
+  @ApiProperty({
+    description: 'Thông báo kết quả',
+    example: 'Cập nhật ảnh đại diện thành công',
+  })
+  message!: string;
+}
+
+export class ImageUploadResponseDto {
+  @ApiProperty({
+    description: 'Trạng thái xử lý',
+    example: true,
+  })
+  success!: boolean;
+
+  @ApiProperty({
+    description: 'Đường dẫn hình ảnh tương đối (camelCase)',
+    example: '/uploads/public/dishes/2026/11/d8a4358a-81a1-4389-9a28-1b6fb891c9f2-dish.png',
+  })
+  imageUrl!: string;
+
+  @ApiProperty({
+    description: 'Đường dẫn hình ảnh tương đối (snake_case)',
+    example: '/uploads/public/dishes/2026/11/d8a4358a-81a1-4389-9a28-1b6fb891c9f2-dish.png',
+  })
+  image_url!: string;
 }

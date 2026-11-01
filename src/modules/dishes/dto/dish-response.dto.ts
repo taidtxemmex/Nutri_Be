@@ -24,6 +24,15 @@ export class DishSummaryDto {
   @ApiProperty({ description: 'Tên món ăn', example: 'Rau muống luộc' })
   name!: string;
 
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh món ăn',
+    example: '/uploads/public/dishes/2026/11/abc.jpg',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({ description: 'Alias snake_case cho imageUrl' })
+  image_url?: string | null;
+
   @ApiPropertyOptional({ description: 'Trạng thái món', example: 'RIENG_TU' })
   status?: string | null;
 
@@ -52,6 +61,15 @@ export class DishResponseDto {
 
   @ApiProperty({ description: 'Tên món ăn', example: 'Rau muống luộc' })
   name!: string;
+
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh món ăn',
+    example: '/uploads/public/dishes/2026/11/abc.jpg',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({ description: 'Alias snake_case cho imageUrl' })
+  image_url?: string | null;
 
   @ApiPropertyOptional({
     description: 'Trạng thái món (RIENG_TU, CHO_DUYET, DA_DUYET, TU_CHOI, HE_THONG)',

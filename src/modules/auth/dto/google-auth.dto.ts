@@ -5,13 +5,13 @@ export class GoogleAuthDto {
   @ApiPropertyOptional({ description: 'Google ID Token từ client SDK' })
   @IsOptional()
   @IsString()
-  @MaxLength(4096, { message: 'idToken không được vượt quá 4096 ký tự' })
+  @MaxLength(4096, { message: 'validation.auth.id_token_max' })
   idToken?: string;
 
   @ApiPropertyOptional({ description: 'Mã xác thực 1 lần khi redirect OAuth2' })
   @IsOptional()
   @IsString()
-  @MaxLength(1024, { message: 'code không được vượt quá 1024 ký tự' })
+  @MaxLength(1024, { message: 'validation.auth.code_max' })
   code?: string;
 
   @ApiPropertyOptional({
@@ -19,6 +19,6 @@ export class GoogleAuthDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(4096, { message: 'credential không được vượt quá 4096 ký tự' })
+  @MaxLength(4096, { message: 'validation.auth.credential_max' })
   credential?: string;
 }

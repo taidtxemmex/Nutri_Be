@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../database/prisma.service';
 import { CACHE_DEBOUNCE_WINDOW_MS } from '../../config/constants/cache.constants';
 
-export interface CacheEntry<T = any> {
+export interface CacheEntry<T = unknown> {
   value: T;
   expiresAt: number; // Unix timestamp (ms) - 0 = perpetual
   createdAt: number; // Unix timestamp (ms) of creation
@@ -28,7 +28,7 @@ export interface CacheGetOrSetParamDto<T> {
 
 export interface CacheGenerateKeyParamDto {
   prefix: string;
-  params?: Record<string, any>;
+  params?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -41,7 +41,7 @@ export class CacheService implements OnModuleDestroy {
 
   constructor(@Optional() private readonly prisma?: PrismaService) {}
 
-  onModuleDestroy() {
+  onModuleDestroy(): void {
     if (this.debounceTimer) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
@@ -79,10 +79,10 @@ export class CacheService implements OnModuleDestroy {
    */
   generateKey(
     paramOrPrefix: CacheGenerateKeyParamDto | string,
-    legacyParams?: Record<string, any>,
+    legacyParams?: Record<string, unknown>,
   ): string {
     let prefix: string;
-    let params: Record<string, any> | undefined;
+    let params: Record<string, unknown> | undefined;
 
     if (paramOrPrefix && typeof paramOrPrefix === 'object' && 'prefix' in paramOrPrefix) {
       prefix = paramOrPrefix.prefix;
@@ -99,7 +99,7 @@ export class CacheService implements OnModuleDestroy {
     const cleanParams = this.normalizeQueryParams(params);
 
     const sortedKeys = Object.keys(cleanParams).sort();
-    const sortedObj: Record<string, any> = {};
+    const sortedObj: Record<string, unknown> = {};
     for (const k of sortedKeys) {
       sortedObj[k] = cleanParams[k];
     }
@@ -112,8 +112,8 @@ export class CacheService implements OnModuleDestroy {
   /**
    * Chuẩn hóa query params cho cache key: chỉ loại bỏ '_' và '_t' hoặc các prefix tracking
    */
-  normalizeQueryParams(params: Record<string, any>): Record<string, any> {
-    const cleanParams: Record<string, any> = {};
+  normalizeQueryParams(params: Record<string, unknown>): Record<string, unknown> {
+    const cleanParams: Record<string, unknown> = {};
     const trackingPrefixes = ['utm_', 'fbclid', '_ga', 'timestamp', 'random', 'cachebust'];
 
     for (const [key, value] of Object.entries(params)) {
@@ -187,8 +187,8 @@ export class CacheService implements OnModuleDestroy {
             this.prisma.systemCache.delete({ where: { key } }).catch(() => {});
           }
         }
-      } catch (err: any) {
-        this.logger.warn(`Lỗi đọc _system_cache (${key}): ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to read _system_cache (${key}): ${(err as Error)?.message}`);
       }
     }
 
@@ -286,7 +286,7 @@ export class CacheService implements OnModuleDestroy {
       const lastInvalidatedAt = this.tagVersionMap.get(tag) || 0;
       if (lastInvalidatedAt >= entryCreatedAt) {
         this.logger.debug?.(
-          `Từ chối ghi cache (${key}) do tag "${tag}" vừa có mutation mới hơn (${lastInvalidatedAt} >= ${entryCreatedAt})`,
+          `Cache write rejected for key (${key}) because tag "${tag}" has newer mutation (${lastInvalidatedAt} >= ${entryCreatedAt})`,
         );
         return;
       }
@@ -332,8 +332,8 @@ export class CacheService implements OnModuleDestroy {
             createdAt: new Date(entryCreatedAt),
           },
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi ghi _system_cache (${key}): ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to write _system_cache (${key}): ${(err as Error)?.message}`);
       }
     }
   }
@@ -372,8 +372,8 @@ export class CacheService implements OnModuleDestroy {
             tag: { in: tags },
           },
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi xóa _system_cache theo tags: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to delete _system_cache by tags: ${(err as Error)?.message}`);
       }
     }
   }
@@ -413,7 +413,7 @@ export class CacheService implements OnModuleDestroy {
 
     this.debounceTimer = setTimeout(() => {
       this.flushPendingTagsToDb().catch((err) => {
-        this.logger.error(`Lỗi flush DB cache: ${err?.message || err}`);
+        this.logger.error(`Failed to flush DB cache: ${err?.message || err}`);
       });
     }, CACHE_DEBOUNCE_WINDOW_MS);
   }
@@ -439,8 +439,10 @@ export class CacheService implements OnModuleDestroy {
             tag: { in: tagsToFlush },
           },
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi debounced flush _system_cache: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `Failed to execute debounced flush for _system_cache: ${(err as Error)?.message}`,
+        );
       }
     }
   }

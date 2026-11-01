@@ -19,7 +19,7 @@ export function getExcelMulterOptions() {
       files: 1,
     },
     fileFilter: (
-      _req: any,
+      _req: unknown,
       file: Express.Multer.File,
       cb: (error: Error | null, acceptFile: boolean) => void,
     ) => {

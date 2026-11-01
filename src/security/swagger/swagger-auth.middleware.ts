@@ -11,7 +11,11 @@ const logger = new Logger('SwaggerSecurity');
  * - Sử dụng crypto.timingSafeEqual chống tấn công dò mật khẩu theo độ trễ thời gian (Timing Attack)
  * - Tự động chặn khi NODE_ENV === 'production' trừ khi biến ENABLE_SWAGGER=true được bật chủ đích
  */
-export function createSwaggerAuthMiddleware() {
+export function createSwaggerAuthMiddleware(): (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => void {
   const isProduction = process.env.NODE_ENV === 'production';
   const isSwaggerEnabled = process.env.ENABLE_SWAGGER === 'true';
 

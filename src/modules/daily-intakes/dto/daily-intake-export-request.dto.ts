@@ -21,20 +21,20 @@ export class DailyIntakeExportRequestDto {
     enum: [1, 2, 3, 4],
     example: 1,
   })
-  @IsNotEmpty({ message: 'Vui lòng chọn mẫu xuất báo cáo (1..4)' })
-  @IsInt({ message: 'Mẫu xuất báo cáo phải là số nguyên (1..4)' })
-  @Min(1, { message: 'Mẫu xuất báo cáo không hợp lệ (chỉ nhận 1..4)' })
-  @Max(4, { message: 'Mẫu xuất báo cáo không hợp lệ (chỉ nhận 1..4)' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.export_template_required' })
+  @IsInt({ message: 'validation.daily_intakes.export_template_int' })
+  @Min(1, { message: 'validation.daily_intakes.export_template_min' })
+  @Max(4, { message: 'validation.daily_intakes.export_template_max' })
   templateType: number;
 
   @ApiProperty({ description: 'Ngày bắt đầu (YYYY-MM-DD)', example: '2026-10-01' })
-  @IsNotEmpty({ message: 'Vui lòng chọn ngày bắt đầu' })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Định dạng ngày bắt đầu phải là YYYY-MM-DD' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.export_from_date_required' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'validation.daily_intakes.export_from_date_format' })
   fromDate: string;
 
   @ApiProperty({ description: 'Ngày kết thúc (YYYY-MM-DD)', example: '2026-10-20' })
-  @IsNotEmpty({ message: 'Vui lòng chọn ngày kết thúc' })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Định dạng ngày kết thúc phải là YYYY-MM-DD' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.export_to_date_required' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'validation.daily_intakes.export_to_date_format' })
   toDate: string;
 
   @ApiPropertyOptional({
@@ -49,8 +49,8 @@ export class DailyIntakeExportRequestDto {
     example: 'BY_MEAL',
   })
   @IsOptional()
-  @IsString({ message: 'Chế độ xuất phải là chuỗi ký tự' })
-  @MaxLength(50, { message: 'Chế độ xuất tối đa 50 ký tự' })
+  @IsString({ message: 'validation.daily_intakes.export_mode_string' })
+  @MaxLength(50, { message: 'validation.daily_intakes.export_mode_max' })
   mode?: string;
 
   /**
@@ -62,7 +62,7 @@ export class DailyIntakeExportRequestDto {
       throw new HttpException(
         {
           code: 'EXPORT_DATE_REQUIRED',
-          message: 'Vui lòng chọn dải ngày xuất báo cáo',
+          message: 'validation.daily_intakes.export_date_required',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -77,7 +77,7 @@ export class DailyIntakeExportRequestDto {
       throw new HttpException(
         {
           code: 'INVALID_DATE',
-          message: 'Định dạng ngày tháng không hợp lệ (YYYY-MM-DD)',
+          message: 'validation.daily_intakes.invalid_date',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -87,7 +87,7 @@ export class DailyIntakeExportRequestDto {
       throw new HttpException(
         {
           code: 'INVALID_DATE_RANGE',
-          message: 'Ngày bắt đầu không được lớn hơn ngày kết thúc',
+          message: 'validation.daily_intakes.invalid_date_range',
         },
         HttpStatus.BAD_REQUEST,
       );
@@ -100,7 +100,7 @@ export class DailyIntakeExportRequestDto {
       throw new HttpException(
         {
           code: 'EXPORT_DATE_RANGE_EXCEEDED',
-          message: 'Dải ngày xuất báo cáo không được vượt quá 31 ngày',
+          message: 'validation.daily_intakes.export_date_range_exceeded',
         },
         HttpStatus.UNPROCESSABLE_ENTITY, // 422
       );
@@ -111,7 +111,7 @@ export class DailyIntakeExportRequestDto {
         throw new HttpException(
           {
             code: 'EXPORT_PATIENT_REQUIRED',
-            message: 'Vui lòng chọn bệnh nhân cho mẫu báo cáo này',
+            message: 'validation.daily_intakes.export_patient_required',
           },
           HttpStatus.BAD_REQUEST,
         );
@@ -120,7 +120,7 @@ export class DailyIntakeExportRequestDto {
         throw new HttpException(
           {
             code: 'EXPORT_MODE_REQUIRED',
-            message: 'Vui lòng chọn chế độ xuất (BY_MEAL hoặc INGREDIENT_ONLY)',
+            message: 'validation.daily_intakes.export_mode_required',
           },
           HttpStatus.BAD_REQUEST,
         );

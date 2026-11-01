@@ -21,15 +21,15 @@ import { IntakeInputType } from '../../../config/enums/domain.enum';
 
 export class DailyIntakeIngredientInputDto {
   @ApiProperty({ description: 'ID nguyên liệu' })
-  @IsNotEmpty({ message: 'ID nguyên liệu không được để trống' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.ingredient_id_required' })
   @Type(() => Number)
   ingredientId: string | number;
 
   @ApiProperty({ description: 'Khối lượng sống sạch / thô thực tế (g)', example: 150 })
   @Type(() => Number)
-  @IsNumber({}, { message: 'Khối lượng phải là số' })
-  @Min(0, { message: 'Khối lượng không được âm' })
-  @Max(1000000, { message: 'Khối lượng không được vượt quá 1000000 gam' })
+  @IsNumber({}, { message: 'validation.daily_intakes.weight_number' })
+  @Min(0, { message: 'validation.daily_intakes.weight_min_0' })
+  @Max(1000000, { message: 'validation.daily_intakes.weight_max_1m' })
   rawWeight: number;
 }
 
@@ -39,29 +39,29 @@ export class DailyIntakeMealInputDto {
     example: 1,
   })
   @Type(() => Number)
-  @IsInt({ message: 'Thứ tự bữa ăn phải là số nguyên' })
-  @Min(1, { message: 'Thứ tự bữa ăn tối thiểu là 1' })
-  @Max(1000, { message: 'Thứ tự bữa ăn tối đa là 1000' })
+  @IsInt({ message: 'validation.daily_intakes.meal_order_int' })
+  @Min(1, { message: 'validation.daily_intakes.meal_order_min' })
+  @Max(1000, { message: 'validation.daily_intakes.meal_order_max_1000' })
   mealOrder: number;
 
   @ApiPropertyOptional({ description: 'Tên bữa ăn', example: 'Bữa Sáng' })
   @IsOptional()
-  @IsString({ message: 'Tên bữa ăn phải là chuỗi' })
-  @MaxLength(255, { message: 'Tên bữa ăn tối đa 255 ký tự' })
+  @IsString({ message: 'validation.daily_intakes.meal_name_string' })
+  @MaxLength(255, { message: 'validation.daily_intakes.meal_name_max' })
   mealName?: string;
 
   @ApiPropertyOptional({ description: 'Giờ ăn định dạng HH:mm', example: '07:30' })
   @IsOptional()
-  @IsString({ message: 'Giờ ăn phải là chuỗi' })
-  @MaxLength(50, { message: 'Giờ ăn không được vượt quá 50 ký tự' })
+  @IsString({ message: 'validation.daily_intakes.meal_time_string' })
+  @MaxLength(50, { message: 'validation.daily_intakes.meal_time_max' })
   mealTime?: string;
 
   @ApiProperty({
     description: 'Danh sách nguyên liệu trong bữa',
     type: [DailyIntakeIngredientInputDto],
   })
-  @IsArray({ message: 'Danh sách nguyên liệu phải là mảng' })
-  @ArrayMaxSize(100, { message: 'Danh sách nguyên liệu tối đa 100 mục' })
+  @IsArray({ message: 'validation.daily_intakes.ingredients_is_array' })
+  @ArrayMaxSize(100, { message: 'validation.daily_intakes.ingredients_max_100' })
   @ValidateNested({ each: true })
   @Type(() => DailyIntakeIngredientInputDto)
   ingredients: DailyIntakeIngredientInputDto[];
@@ -69,13 +69,13 @@ export class DailyIntakeMealInputDto {
 
 export class CreateDailyIntakeDto {
   @ApiProperty({ description: 'ID bệnh nhân', example: '1' })
-  @IsNotEmpty({ message: 'ID bệnh nhân không được để trống' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.patient_id_required' })
   @Type(() => Number)
   patientId: string | number;
 
   @ApiProperty({ description: 'Ngày ăn định dạng YYYY-MM-DD', example: '2026-02-01' })
-  @IsNotEmpty({ message: 'Ngày ăn không được để trống' })
-  @IsDateString({}, { message: 'Ngày ăn phải có định dạng YYYY-MM-DD' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.intake_date_required' })
+  @IsDateString({}, { message: 'validation.daily_intakes.intake_date_format' })
   intakeDate: string;
 
   @ApiProperty({
@@ -83,23 +83,23 @@ export class CreateDailyIntakeDto {
     enum: IntakeInputType,
     example: IntakeInputType.BY_MEAL,
   })
-  @IsNotEmpty({ message: 'Kiểu nhập không được để trống' })
-  @IsEnum(IntakeInputType, { message: 'Kiểu nhập khẩu phần không hợp lệ' })
+  @IsNotEmpty({ message: 'validation.daily_intakes.input_type_required' })
+  @IsEnum(IntakeInputType, { message: 'validation.daily_intakes.input_type_enum' })
   inputType: IntakeInputType;
 
   @ApiPropertyOptional({ description: 'Ghi chú lâm sàng của bác sĩ' })
   @IsOptional()
-  @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(2000, { message: 'Ghi chú tối đa 2000 ký tự' })
+  @IsString({ message: 'validation.daily_intakes.note_string' })
+  @MaxLength(2000, { message: 'validation.daily_intakes.note_max_2000' })
   note?: string;
 
   @ApiProperty({
     description: 'Danh sách bữa ăn và nguyên liệu ghi nhận',
     type: [DailyIntakeMealInputDto],
   })
-  @IsArray({ message: 'Danh sách bữa ăn phải là mảng' })
-  @ArrayMinSize(1, { message: 'Danh sách bữa ăn phải có ít nhất 1 bữa' })
-  @ArrayMaxSize(50, { message: 'Danh sách bữa ăn tối đa 50 bữa' })
+  @IsArray({ message: 'validation.daily_intakes.meals_is_array' })
+  @ArrayMinSize(1, { message: 'validation.daily_intakes.meals_min_1' })
+  @ArrayMaxSize(50, { message: 'validation.daily_intakes.meals_max_50' })
   @ValidateNested({ each: true })
   @Type(() => DailyIntakeMealInputDto)
   meals: DailyIntakeMealInputDto[];
@@ -108,8 +108,8 @@ export class CreateDailyIntakeDto {
 export class UpdateDailyIntakeDto {
   @ApiPropertyOptional({ description: 'Ngày ăn định dạng YYYY-MM-DD', example: '2026-02-01' })
   @IsOptional()
-  @IsString({ message: 'Ngày ăn phải là chuỗi' })
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Ngày ăn phải có định dạng YYYY-MM-DD' })
+  @IsString({ message: 'validation.daily_intakes.intake_date_string' })
+  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'validation.daily_intakes.intake_date_format' })
   intakeDate?: string;
 
   @ApiPropertyOptional({ description: 'ID bệnh nhân', example: 1 })
@@ -118,14 +118,14 @@ export class UpdateDailyIntakeDto {
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
   @Type(() => Number)
-  @IsInt({ message: 'ID bệnh nhân phải là số nguyên' })
-  @Min(1, { message: 'ID bệnh nhân tối thiểu là 1' })
+  @IsInt({ message: 'validation.daily_intakes.patient_id_int' })
+  @Min(1, { message: 'validation.daily_intakes.patient_id_min' })
   patientId?: number;
 
   @ApiPropertyOptional({ description: 'Ghi chú lâm sàng' })
   @IsOptional()
-  @IsString({ message: 'Ghi chú phải là chuỗi' })
-  @MaxLength(2000, { message: 'Ghi chú tối đa 2000 ký tự' })
+  @IsString({ message: 'validation.daily_intakes.note_string' })
+  @MaxLength(2000, { message: 'validation.daily_intakes.note_max_2000' })
   note?: string;
 
   @ApiPropertyOptional({
@@ -133,7 +133,7 @@ export class UpdateDailyIntakeDto {
     enum: IntakeInputType,
   })
   @IsOptional()
-  @IsEnum(IntakeInputType, { message: 'Kiểu nhập khẩu phần không hợp lệ' })
+  @IsEnum(IntakeInputType, { message: 'validation.daily_intakes.input_type_enum' })
   inputType?: IntakeInputType;
 
   @ApiPropertyOptional({
@@ -141,8 +141,8 @@ export class UpdateDailyIntakeDto {
     type: [DailyIntakeMealInputDto],
   })
   @IsOptional()
-  @IsArray({ message: 'Danh sách bữa ăn phải là mảng' })
-  @ArrayMaxSize(50, { message: 'Danh sách bữa ăn tối đa 50 bữa' })
+  @IsArray({ message: 'validation.daily_intakes.meals_is_array' })
+  @ArrayMaxSize(50, { message: 'validation.daily_intakes.meals_max_50' })
   @ValidateNested({ each: true })
   @Type(() => DailyIntakeMealInputDto)
   meals?: DailyIntakeMealInputDto[];

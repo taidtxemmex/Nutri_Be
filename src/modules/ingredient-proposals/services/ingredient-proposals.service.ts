@@ -124,10 +124,13 @@ export class IngredientProposalsService {
 
     const nutrientsJson = JSON.stringify(dto.nutrients || {});
 
+    const img = dto.image_url !== undefined ? dto.image_url : dto.imageUrl;
+
     const proposal = await this.prisma.$transaction(async (tx) => {
       const created = await tx.de_xuat_nguyen_lieu.create({
         data: {
           ten_nguyen_lieu: ingredientName,
+          image_url: img || null,
           danh_muc: categoryId,
           loai_protein: dto.loaiProtein || null,
           edible: dto.edible != null ? Number(dto.edible) : 100,
@@ -203,6 +206,8 @@ export class IngredientProposalsService {
       ingredientId: p.nguyen_lieu_id ? Number(p.nguyen_lieu_id) : null,
       name: p.ten_nguyen_lieu,
       ingredientName: p.ten_nguyen_lieu,
+      imageUrl: p.image_url ?? null,
+      image_url: p.image_url ?? null,
       categoryName: p.danh_muc_de_xuat_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc ?? null,
       categoryId: p.danh_muc,
       loaiProtein: p.loai_protein,
@@ -254,7 +259,7 @@ export class IngredientProposalsService {
     try {
       nutrients = JSON.parse(proposal.gia_tri_dinh_duong_json || '{}');
     } catch (e: any) {
-      this.logger.warn(`Lỗi parse nutrients JSON: ${e?.message}`);
+      this.logger.warn(`Failed to parse nutrients JSON: ${e?.message}`);
     }
 
     const normalizedType = this.normalizeProposalType(proposal.loai_de_xuat);
@@ -284,7 +289,7 @@ export class IngredientProposalsService {
         try {
           parsedOldJson = JSON.parse(proposal.gia_tri_dinh_duong_cu_json);
         } catch (e: any) {
-          this.logger.warn(`Lỗi parse old nutrients JSON: ${e?.message}`);
+          this.logger.warn(`Failed to parse old nutrients JSON: ${e?.message}`);
         }
       }
 
@@ -371,6 +376,8 @@ export class IngredientProposalsService {
       id: proposal.id.toString(),
       name: proposal.ten_nguyen_lieu,
       ingredientName: proposal.ten_nguyen_lieu,
+      imageUrl: proposal.image_url ?? null,
+      image_url: proposal.image_url ?? null,
       categoryId: proposal.danh_muc,
       categoryName,
       proposalType: normalizedType,
@@ -439,7 +446,7 @@ export class IngredientProposalsService {
     try {
       nutrients = JSON.parse(proposal.gia_tri_dinh_duong_json || '{}');
     } catch (e: any) {
-      this.logger.warn(`Lỗi parse nutrients JSON: ${e?.message}`);
+      this.logger.warn(`Failed to parse nutrients JSON: ${e?.message}`);
     }
 
     const isUpdate = this.normalizeProposalType(proposal.loai_de_xuat) === 'UPDATE';
@@ -455,6 +462,7 @@ export class IngredientProposalsService {
             danh_muc: proposal.danh_muc,
             loai_protein: proposal.loai_protein || 'THUC_VAT',
             edible: proposal.edible != null ? Number(proposal.edible) : 100,
+            ...(proposal.image_url ? { image_url: proposal.image_url } : {}),
             ...mappedNutrientsForUpdate,
             trang_thai: 'DA_DUYET',
           },
@@ -471,6 +479,7 @@ export class IngredientProposalsService {
               danh_muc: proposal.danh_muc,
               loai_protein: proposal.loai_protein || 'THUC_VAT',
               edible: proposal.edible != null ? Number(proposal.edible) : 100,
+              ...(proposal.image_url ? { image_url: proposal.image_url } : {}),
               ...mappedNutrientsForUpdate,
               trang_thai: 'DA_DUYET',
               deleted_at: null,
@@ -480,6 +489,7 @@ export class IngredientProposalsService {
           finalIng = await tx.nguyen_lieu.create({
             data: {
               ten_nguyen_lieu: proposal.ten_nguyen_lieu,
+              image_url: proposal.image_url || null,
               danh_muc: proposal.danh_muc,
               loai_protein: proposal.loai_protein || 'THUC_VAT',
               edible: proposal.edible != null ? Number(proposal.edible) : 100,

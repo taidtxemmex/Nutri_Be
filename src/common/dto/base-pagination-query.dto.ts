@@ -13,6 +13,8 @@ export interface NormalizedPagination {
   skip: number;
 }
 
+export { PaginatedResult } from '../interfaces/pagination.interface';
+
 export interface NormalizePaginationParamDto {
   query?: { page?: number | string; limit?: number | string; size?: number | string };
   defaultLimit?: number;

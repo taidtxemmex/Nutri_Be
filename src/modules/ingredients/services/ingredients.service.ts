@@ -166,6 +166,7 @@ export class IngredientsService {
         select: {
           id: true,
           ten_nguyen_lieu: true,
+          image_url: true,
           danh_muc: true,
           loai_protein: true,
           trang_thai: true,
@@ -185,6 +186,8 @@ export class IngredientsService {
           ten_nguyen_lieu: i.ten_nguyen_lieu,
           material: i.ten_nguyen_lieu,
           name: i.ten_nguyen_lieu,
+          imageUrl: i.image_url ?? null,
+          image_url: i.image_url ?? null,
           danh_muc: i.danh_muc,
           categoryId: i.danh_muc,
           categoryName: i.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc || null,
@@ -511,11 +514,13 @@ export class IngredientsService {
       },
     });
 
+    const ingredientImg = dto.image_url || dto.imageUrl || null;
     let created: any;
     if (softDeleted) {
       created = await this.prisma.nguyen_lieu.update({
         where: { id: softDeleted.id },
         data: {
+          image_url: ingredientImg,
           danh_muc: dto.categoryId || null,
           loai_protein: dto.loaiProtein || null,
           trang_thai: trangThai,
@@ -532,6 +537,7 @@ export class IngredientsService {
       created = await this.prisma.nguyen_lieu.create({
         data: {
           ten_nguyen_lieu: material,
+          image_url: ingredientImg,
           danh_muc: dto.categoryId || null,
           loai_protein: dto.loaiProtein || null,
           trang_thai: trangThai,
@@ -644,6 +650,10 @@ export class IngredientsService {
     if (dto.edible !== undefined && dto.edible !== null) {
       updateData.edible = Number(dto.edible);
     }
+    const img = dto.image_url !== undefined ? dto.image_url : dto.imageUrl;
+    if (img !== undefined) {
+      updateData.image_url = img || null;
+    }
 
     const updated = await this.prisma.nguyen_lieu.update({
       where: { id: BigInt(id) },
@@ -683,8 +693,10 @@ export class IngredientsService {
       normalizeVietnameseNFC(targetMaterial).toLowerCase() ===
       normalizeVietnameseNFC(existing.ten_nguyen_lieu).toLowerCase();
 
+    const img = dto.image_url !== undefined ? dto.image_url : dto.imageUrl;
     const basePayload = {
       ten_nguyen_lieu: targetMaterial,
+      image_url: img !== undefined ? img || null : (existing.image_url ?? null),
       danh_muc:
         dto.categoryId !== undefined && dto.categoryId !== null
           ? dto.categoryId
@@ -942,6 +954,8 @@ export class IngredientsService {
       ten_nguyen_lieu: item.ten_nguyen_lieu,
       material: item.ten_nguyen_lieu,
       name: item.ten_nguyen_lieu,
+      imageUrl: item.image_url ?? null,
+      image_url: item.image_url ?? null,
       danh_muc: item.danh_muc,
       categoryId: item.danh_muc,
       categoryName: item.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc || null,

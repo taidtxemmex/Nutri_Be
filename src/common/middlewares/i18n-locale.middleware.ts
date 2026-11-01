@@ -15,7 +15,7 @@ declare global {
 export class I18nLocaleMiddleware implements NestMiddleware {
   private readonly supportedLocales: Set<string> = new Set(['vi', 'en', 'zh']);
 
-  use(req: Request, res: Response, next: NextFunction) {
+  use(req: Request, res: Response, next: NextFunction): void {
     // 1. Kiểm tra query param ?lang= (cho phép override nhanh khi test)
     const queryLang = typeof req.query?.lang === 'string' ? req.query.lang.toLowerCase() : '';
     if (this.supportedLocales.has(queryLang)) {

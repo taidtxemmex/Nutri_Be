@@ -278,16 +278,18 @@ describe('P1 Security & Authentication Fixes', () => {
 
     it('should link device_id into lich_su_dang_nhap during AuthService.login', async () => {
       const fakeDeviceId = BigInt(88);
+      const userMock = {
+        id: 'user-login-dev',
+        ten_dang_nhap: 'testuser',
+        mat_khau: '$2b$10$abcdefghijklmnopqrstuvwxyz123456789012345678901234567890',
+        vai_tro: 'USER',
+        active: true,
+        ho_so_ca_nhan: { ho_ten: 'Test User', email: 'test@example.com' },
+      };
       const mockPrismaAuth: any = {
         nguoi_dung: {
-          findUnique: jest.fn().mockResolvedValue({
-            id: 'user-login-dev',
-            ten_dang_nhap: 'testuser',
-            mat_khau: '$2b$10$abcdefghijklmnopqrstuvwxyz123456789012345678901234567890',
-            vai_tro: 'USER',
-            active: true,
-            ho_so_ca_nhan: { ho_ten: 'Test User', email: 'test@example.com' },
-          }),
+          findUnique: jest.fn().mockResolvedValue(userMock),
+          findFirst: jest.fn().mockResolvedValue(userMock),
           update: jest.fn(),
         },
         thiet_bi_dang_nhap: {

@@ -7,6 +7,7 @@ import {
   EXCEL_FONT_FAMILY,
   EXCEL_MIME_TYPE,
 } from '../../config/constants/excel.constants';
+export * from './excel.types';
 
 export interface ExcelStreamOptions {
   sheetName?: string;
@@ -74,17 +75,17 @@ export interface AddRowOptions {
 }
 
 export interface AddRowParamDto {
-  data: any[] | Record<string, any>;
+  data: unknown[] | Record<string, unknown>;
   options?: AddRowOptions;
 }
 
 export interface AddClinicalAlertRowParamDto {
-  data: any[] | Record<string, any>;
+  data: unknown[] | Record<string, unknown>;
   indicator?: 'DEFICIENCY' | 'EXCESS' | 'OPTIMAL' | 'WARNING';
 }
 
 export interface AddSummaryRowParamDto {
-  data: any[] | Record<string, any>;
+  data: unknown[] | Record<string, unknown>;
   options?: SummaryRowOptions;
 }
 
@@ -106,7 +107,7 @@ export interface AddWorksheetParamDto {
  * Sử dụng exceljs.stream.xlsx.WorkbookWriter với useSharedStrings: false
  * Tuân thủ Pillar III (Memory Protection Anti-OOM) & CWE-1236 Formula Injection Mitigation
  */
-export abstract class BaseExcelStreamer<TRecord = any> {
+export abstract class BaseExcelStreamer<TRecord = unknown> {
   protected workbook: ExcelJS.stream.xlsx.WorkbookWriter;
   protected worksheet: ExcelJS.Worksheet;
   protected rowCount = 0;
@@ -117,7 +118,7 @@ export abstract class BaseExcelStreamer<TRecord = any> {
     options: ExcelStreamOptions = {},
   ) {
     this.isHttpResponse =
-      Boolean(this.outputStream) && typeof (this.outputStream as any).setHeader === 'function';
+      Boolean(this.outputStream) && typeof (this.outputStream as Response).setHeader === 'function';
 
     // 1. Cấu hình HTTP Response Headers nếu stream là Express Response
     if (this.isHttpResponse) {

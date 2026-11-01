@@ -118,7 +118,8 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
               const rawFrontendUrl =
                 this.configService?.get<string>('FRONTEND_URL') ||
                 this.configService?.get<string>('app.frontend-url') ||
-                'http://localhost:5173';
+                process.env.FRONTEND_URL ||
+                'https://truenutri.pages.dev';
               const frontendUrl = rawFrontendUrl.split(',')[0].trim().replace(/\/+$/, '');
 
               if (payload.type === 'VERIFY_EMAIL') {
@@ -187,14 +188,14 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
     if (this.isRunning) return;
     this.isRunning = true;
     this.logger.log(
-      `[EmbeddedQueueWorker] Bắt đầu chạy polling worker (interval: ${this.pollIntervalMs}ms, workerId: ${this.workerId})...`,
+      `[EmbeddedQueueWorker] Starting polling worker (interval: ${this.pollIntervalMs}ms, workerId: ${this.workerId})...`,
     );
 
     this.timer = setInterval(async () => {
       try {
         await this.processBatch();
-      } catch (err: any) {
-        this.logger.error(`[EmbeddedQueueWorker] Lỗi polling tick: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.error(`[EmbeddedQueueWorker] Polling tick error: ${(err as Error)?.message}`);
       }
     }, this.pollIntervalMs);
   }
@@ -208,7 +209,7 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
       this.timer = null;
     }
     this.isRunning = false;
-    this.logger.log(`[EmbeddedQueueWorker] Đã dừng polling worker.`);
+    this.logger.log(`[EmbeddedQueueWorker] Polling worker stopped.`);
   }
 
   /**
@@ -248,7 +249,7 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
       }
 
       this.logger.log(
-        `[EmbeddedQueueWorker] Worker [${this.workerId}] đã claim ${claimedJobs.length} jobs để xử lý.`,
+        `[EmbeddedQueueWorker] Worker [${this.workerId}] claimed ${claimedJobs.length} jobs for processing.`,
       );
 
       // 2. Dispatch từng job tới processor tương ứng (DB connection đã release)
@@ -280,11 +281,11 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
 
         if (!handler) {
           this.logger.warn(
-            `Không tìm thấy processor handler cho queue: [${rawJob.queueName}]. Đánh dấu lỗi tạm thời.`,
+            `No processor handler found for queue: [${rawJob.queueName}]. Marking as temporary error.`,
           );
           await this.handleJobFailure(
             rawJob,
-            new Error(`Không có processor đăng ký cho queue "${rawJob.queueName}"`),
+            new Error(`No processor registered for queue "${rawJob.queueName}"`),
           );
           failedCount++;
           continue;
@@ -306,17 +307,19 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
           });
 
           successCount++;
-          this.logger.log(`Job id ${rawJob.id} [${rawJob.queueName}] đã hoàn thành thành công.`);
-        } catch (execError: any) {
+          this.logger.log(`Job id ${rawJob.id} [${rawJob.queueName}] completed successfully.`);
+        } catch (execError: unknown) {
           this.logger.error(
-            `Job id ${rawJob.id} [${rawJob.queueName}] thất bại: ${execError?.message}`,
+            `Job id ${rawJob.id} [${rawJob.queueName}] failed: ${(execError as Error)?.message}`,
           );
           await this.handleJobFailure(rawJob, execError);
           failedCount++;
         }
       }
-    } catch (err: any) {
-      this.logger.error(`[EmbeddedQueueWorker] Lỗi trong tiến trình processBatch: ${err?.message}`);
+    } catch (err: unknown) {
+      this.logger.error(
+        `[EmbeddedQueueWorker] Error in processBatch process: ${(err as Error)?.message}`,
+      );
     } finally {
       this.isProcessing = false;
     }
@@ -367,10 +370,10 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
           where: { id: { in: candidateIds } },
         });
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Fallback cho môi trường test mock hoặc MariaDB/DB không hỗ trợ cú pháp SKIP LOCKED
       this.logger.debug?.(
-        `[EmbeddedQueueWorker] Fallback atomic query do SKIP LOCKED không được hỗ trợ: ${err?.message}`,
+        `[EmbeddedQueueWorker] Fallback atomic query because SKIP LOCKED is not supported: ${(err as Error)?.message}`,
       );
 
       return this.prisma.$transaction(async (tx) => {
@@ -409,11 +412,11 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
   /**
    * Xử lý khi job gặp lỗi: Retry với exponential backoff hoặc đẩy vào DLQ
    */
-  private async handleJobFailure(rawJob: any, error: any): Promise<void> {
+  private async handleJobFailure(rawJob: any, error: unknown): Promise<void> {
     const nextAttempts = (rawJob.attempts || 0) + 1;
     const maxAttempts = rawJob.maxAttempts || 3;
-    const errorMessage = error?.message || String(error);
-    const errorStack = error?.stack || errorMessage;
+    const errorMessage = (error as Error)?.message || String(error);
+    const errorStack = (error as Error)?.stack || errorMessage;
 
     if (nextAttempts < maxAttempts) {
       // Exponential backoff: Math.pow(2, nextAttempts) * 1000 ms (ví dụ: 2s, 4s, 8s...)
@@ -433,7 +436,7 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
       });
 
       this.logger.warn(
-        `Job id ${rawJob.id} sẽ được thử lại (attempt ${nextAttempts}/${maxAttempts}) lúc ${nextRunAt.toISOString()}.`,
+        `Job id ${rawJob.id} will be retried (attempt ${nextAttempts}/${maxAttempts}) at ${nextRunAt.toISOString()}.`,
       );
     } else {
       // Vượt quá số lần thử tối đa -> Ghi vào _system_jobs_dlq và đánh dấu status = 'failed'
@@ -461,7 +464,7 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
       });
 
       this.logger.error(
-        `Job id ${rawJob.id} đã vượt quá ${maxAttempts} lần thử. Đã chuyển sang Dead Letter Queue (_system_jobs_dlq).`,
+        `Job id ${rawJob.id} exceeded maximum ${maxAttempts} attempts. Moved to Dead Letter Queue (_system_jobs_dlq).`,
       );
     }
   }
@@ -485,12 +488,12 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
       });
       if (result.count > 0) {
         this.logger.warn(
-          `[EmbeddedQueueWorker] Đã phục hồi ${result.count} jobs bị kẹt quá hạn về trạng thái pending.`,
+          `[EmbeddedQueueWorker] Recovered ${result.count} stuck expired jobs back to pending status.`,
         );
       }
       return result.count;
-    } catch (err: any) {
-      this.logger.warn(`Lỗi phục hồi jobs kẹt: ${err?.message}`);
+    } catch (err: unknown) {
+      this.logger.warn(`Error recovering stuck jobs: ${(err as Error)?.message}`);
       return 0;
     }
   }

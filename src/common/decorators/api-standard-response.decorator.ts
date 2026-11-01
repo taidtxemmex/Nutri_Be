@@ -2,14 +2,14 @@ import { applyDecorators, Type } from '@nestjs/common';
 import { ApiExtraModels, ApiResponse, getSchemaPath } from '@nestjs/swagger';
 import { PaginationMetaDto, SingleMetaDto, ErrorEnvelopeDto } from '../dto/api-response.dto';
 
-export interface StandardResponseOptions<T extends Type<any>> {
+export interface StandardResponseOptions<T extends Type<unknown>> {
   type?: T;
   status?: number;
   description?: string;
   isArray?: boolean;
 }
 
-export interface PaginatedResponseOptions<T extends Type<any>> {
+export interface PaginatedResponseOptions<T extends Type<unknown>> {
   type: T;
   status?: number;
   description?: string;
@@ -18,7 +18,9 @@ export interface PaginatedResponseOptions<T extends Type<any>> {
 /**
  * Decorator Swagger chuẩn hóa cho các API trả về Single Entity hoặc Mutation (Rule 10)
  */
-export function ApiStandardResponse<T extends Type<any>>(options: StandardResponseOptions<T> = {}) {
+export function ApiStandardResponse<T extends Type<unknown>>(
+  options: StandardResponseOptions<T> = {},
+) {
   const status = options.status || 200;
   const description = options.description || 'Thao tác thành công';
 
@@ -69,7 +71,9 @@ export function ApiStandardResponse<T extends Type<any>>(options: StandardRespon
 /**
  * Decorator Swagger chuẩn hóa cho các API trả về danh sách phân trang (Rule 10)
  */
-export function ApiPaginatedResponse<T extends Type<any>>(options: PaginatedResponseOptions<T>) {
+export function ApiPaginatedResponse<T extends Type<unknown>>(
+  options: PaginatedResponseOptions<T>,
+) {
   const status = options.status || 200;
   const description = options.description || 'Lấy danh sách phân trang thành công';
 

@@ -350,8 +350,9 @@ describe('Sprint 4: Daily Intakes & Nutrition Limit Sets (3-Layer E2E Suite)', (
         .expect(201);
 
       // Layer 2: Kiểm tra tổng đạm và năng lượng được tính toán chính xác
+      // Thịt bò (100g, edible=100% -> 21.5g đạm) + Cần tây (100g, edible=80% -> 80g net -> 0.96g đạm) = 22.46g đạm
       const nutrients = res.body.data.totalDayNutrients;
-      expect(nutrients.protein).toBeCloseTo(22.7, 1);
+      expect(nutrients.protein).toBeCloseTo(22.46, 1);
       expect(nutrients.fat).toBeCloseTo(4.7, 1);
       expect(nutrients.energy).toBeGreaterThan(120);
 

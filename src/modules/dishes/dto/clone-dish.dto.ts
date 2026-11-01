@@ -15,17 +15,17 @@ export class DishCloneRequestDto {
     description: 'Tên mới cho món ăn bản sao',
     example: 'Cơm rang dưa bò (Bản sao)',
   })
-  @IsString()
+  @IsString({ message: 'validation.dishes.name_string' })
   @IsOptional()
-  @MaxLength(255, { message: 'Tên món ăn không được vượt quá 255 ký tự' })
+  @MaxLength(255, { message: 'validation.dishes.name_max' })
   newName?: string;
 
   @ApiPropertyOptional({
     description: 'Danh sách nguyên liệu thay thế (nếu không truyền sẽ sao chép từ món gốc)',
     type: [DishIngredientInputDto],
   })
-  @IsArray()
-  @ArrayMaxSize(100, { message: 'Danh sách nguyên liệu không được vượt quá 100 mục' })
+  @IsArray({ message: 'validation.dishes.details_array' })
+  @ArrayMaxSize(100, { message: 'validation.dishes.ingredients_max_100' })
   @ValidateNested({ each: true })
   @Type(() => DishIngredientInputDto)
   @IsOptional()

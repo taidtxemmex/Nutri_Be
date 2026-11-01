@@ -1,9 +1,7 @@
+import { UserContext } from '../../../common/interfaces/user-context.interface';
 import { CreateNutritionLimitSetDto, UpdateNutritionLimitSetDto } from './nutrition-limit-set.dto';
 
-export interface NutritionLimitSetUserContext {
-  id: string;
-  role?: string;
-}
+export type NutritionLimitSetUserContext = UserContext;
 
 export class CreateNutritionLimitSetParamsDto {
   dto: CreateNutritionLimitSetDto;

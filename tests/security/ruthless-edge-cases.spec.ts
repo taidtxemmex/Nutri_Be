@@ -210,11 +210,11 @@ describe('Ruthless Hostile QA Audit - Edge Cases & Regression Verification', () 
 
       expect(heightError).toBeDefined();
       expect(heightError?.constraints).toHaveProperty('isPositive');
-      expect(heightError?.constraints?.min).toContain('0.01');
+      expect(heightError?.constraints?.min).toMatch(/0\.01|validation\.patients\.height_min/);
 
       expect(weightError).toBeDefined();
       expect(weightError?.constraints).toHaveProperty('isPositive');
-      expect(weightError?.constraints?.min).toContain('0.01 kg');
+      expect(weightError?.constraints?.min).toMatch(/0\.01|validation\.patients\.weight_min/);
     });
 
     it('should allow height: 0.8 for infant/newborn', async () => {

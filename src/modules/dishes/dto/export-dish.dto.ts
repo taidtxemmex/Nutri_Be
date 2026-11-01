@@ -3,16 +3,16 @@ import { IsArray, IsOptional, IsString, MaxLength, ArrayMaxSize } from 'class-va
 
 export class ExportDishDto {
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo tên món' })
-  @IsString()
+  @IsString({ message: 'validation.dishes.name_string' })
   @IsOptional()
-  @MaxLength(255, { message: 'Từ khóa tìm kiếm tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.dishes.keyword_max' })
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'Danh sách các cột dinh dưỡng cần xuất ra Excel' })
   @IsArray()
-  @ArrayMaxSize(100, { message: 'Danh sách cột xuất tối đa 100 cột' })
-  @IsString({ each: true, message: 'Tên cột phải là chuỗi' })
-  @MaxLength(100, { each: true, message: 'Tên cột tối đa 100 ký tự' })
+  @ArrayMaxSize(100, { message: 'validation.dishes.export_columns_max' })
+  @IsString({ each: true, message: 'validation.dishes.column_string' })
+  @MaxLength(100, { each: true, message: 'validation.dishes.column_max' })
   @IsOptional()
   columns?: string[];
 }

@@ -131,6 +131,7 @@ describe('IngredientsService', () => {
       mockPrisma.nguyen_lieu.findFirst.mockResolvedValue({
         id: BigInt(1),
         ten_nguyen_lieu: 'Gạo tẻ',
+        image_url: '/uploads/public/ingredients/2026/11/gao.jpg',
         danh_muc: 1,
         loai_protein: 'THUC_VAT',
         trang_thai: 'DA_DUYET',
@@ -151,6 +152,8 @@ describe('IngredientsService', () => {
 
       expect(detail.id).toBe(1);
       expect(detail.material).toBe('Gạo tẻ');
+      expect(detail.imageUrl).toBe('/uploads/public/ingredients/2026/11/gao.jpg');
+      expect(detail.image_url).toBe('/uploads/public/ingredients/2026/11/gao.jpg');
       // Carbohydrate (Java legacy sync) = 100 - (13.8 + 7.9 + 0.7 + 0.8) = 76.8
       expect(detail.carbohydrate).toBe(76.8);
       // Energy = 4 * 7.9 + 9 * 0.7 + 4 * 76.8 = 31.6 + 6.3 + 307.2 = 345.1
@@ -249,7 +252,12 @@ describe('IngredientsService', () => {
 
       const result = await service.update({
         id: 1,
-        dto: { material: 'Gạo tẻ sửa đổi', edible: 95, protein: null } as any,
+        dto: {
+          material: 'Gạo tẻ sửa đổi',
+          imageUrl: '/uploads/public/ingredients/gao-user.jpg',
+          edible: 95,
+          protein: null,
+        } as any,
         currentUser: { id: 'user-uuid', role: UserRole.USER },
       });
 
@@ -259,6 +267,7 @@ describe('IngredientsService', () => {
       expect(createData.tao_boi_id).toBe('user-uuid');
       expect(createData.edible).toBe(95);
       expect(createData.protein).toBe(7.9);
+      expect(createData.image_url).toBe('/uploads/public/ingredients/gao-user.jpg');
       expect(result.id).toBe(2);
     });
 
@@ -311,7 +320,13 @@ describe('IngredientsService', () => {
 
       await service.update({
         id: 1,
-        dto: { material: 'Gạo tẻ thơm', water: null, protein: undefined, fat: 1.2 } as any,
+        dto: {
+          material: 'Gạo tẻ thơm',
+          imageUrl: '/uploads/public/ingredients/gao-thom.jpg',
+          water: null,
+          protein: undefined,
+          fat: 1.2,
+        } as any,
         currentUser: { id: 'admin-uuid', role: UserRole.ADMIN },
       });
 
@@ -322,6 +337,7 @@ describe('IngredientsService', () => {
       expect(updateData.water).toBeUndefined();
       expect(updateData.protein).toBeUndefined();
       expect(updateData.fat).toBe(1.2);
+      expect(updateData.image_url).toBe('/uploads/public/ingredients/gao-thom.jpg');
     });
   });
 

@@ -1,9 +1,7 @@
+import { UserContext } from '../../../common/interfaces/user-context.interface';
 import { CreateIngredientProposalDto } from './create-ingredient-proposal.dto';
 
-export interface ProposalUserContext {
-  id: string;
-  role?: string;
-}
+export type ProposalUserContext = UserContext;
 
 export class CreateIngredientProposalParamsDto {
   dto: CreateIngredientProposalDto;

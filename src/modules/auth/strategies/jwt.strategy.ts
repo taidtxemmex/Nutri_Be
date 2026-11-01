@@ -42,18 +42,27 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(reqOrPayload: any, maybePayload?: any): Promise<AuthenticatedUser> {
-    let req: any;
+  async validate(reqOrPayload: unknown, maybePayload?: unknown): Promise<AuthenticatedUser> {
+    let req:
+      | {
+          headers?: Record<string, string | string[] | undefined>;
+          get?: (header: string) => string | undefined;
+        }
+      | undefined;
     let payload: JwtPayload;
 
     if (maybePayload !== undefined) {
-      req = reqOrPayload;
-      payload = maybePayload;
-    } else if (reqOrPayload && (reqOrPayload.headers || reqOrPayload.get)) {
-      req = reqOrPayload;
-      payload = reqOrPayload.user;
+      req = reqOrPayload as typeof req;
+      payload = maybePayload as JwtPayload;
+    } else if (
+      reqOrPayload &&
+      typeof reqOrPayload === 'object' &&
+      ('headers' in reqOrPayload || 'get' in reqOrPayload)
+    ) {
+      req = reqOrPayload as typeof req;
+      payload = (reqOrPayload as { user?: JwtPayload }).user as JwtPayload;
     } else {
-      payload = reqOrPayload;
+      payload = reqOrPayload as JwtPayload;
       req = undefined;
     }
 
@@ -68,8 +77,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
           token = authHeader.replace(/^Bearer\s+/i, '').trim();
         }
       }
-    } else if (payload && (payload as any).__rawToken) {
-      token = (payload as any).__rawToken;
+    } else if (payload && typeof payload === 'object' && '__rawToken' in payload) {
+      token = (payload as { __rawToken?: string }).__rawToken;
     }
 
     if (token && this.tokenBlacklistService) {
@@ -82,7 +91,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     }
 
-    const userId = payload?.sub || (payload as any)?.id;
+    const userId = payload?.sub || payload?.id;
 
     if (!payload || !userId) {
       throw new UnauthorizedException({
@@ -104,7 +113,15 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
       if (this.cacheService) {
         // Shared Entity Cache / Identity Map: Kiểm tra xem user detail đã có trong cache chưa
-        const cachedDetail = await this.cacheService.get<any>(buildUserDetailCacheKey(userId));
+        const cachedDetail = await this.cacheService.get<{
+          id: string;
+          ten_dang_nhap?: string;
+          username?: string;
+          vai_tro?: string;
+          role?: string;
+          active?: boolean;
+          deleted_at?: Date | null;
+        }>(buildUserDetailCacheKey(userId));
         if (cachedDetail && cachedDetail.id) {
           user = {
             id: cachedDetail.id,

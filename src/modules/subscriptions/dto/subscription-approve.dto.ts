@@ -8,9 +8,9 @@ export class SubscriptionApproveDto {
     description: 'Ghi chú phê duyệt',
   })
   @IsOptional()
-  @IsString({ message: 'Ghi chú phải là chuỗi' })
+  @IsString({ message: 'validation.subscriptions.note_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(500, { message: 'Ghi chú tối đa 500 ký tự' })
+  @MaxLength(500, { message: 'validation.subscriptions.note_max_500' })
   note?: string;
 
   @ApiPropertyOptional({
@@ -18,9 +18,9 @@ export class SubscriptionApproveDto {
     description: 'Lý do từ chối',
   })
   @IsOptional()
-  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
+  @IsString({ message: 'validation.subscriptions.reject_reason_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Lý do từ chối tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.subscriptions.reject_reason_max_255' })
   lyDoTuChoi?: string;
 
   @ApiPropertyOptional({
@@ -28,9 +28,9 @@ export class SubscriptionApproveDto {
     description: 'Lý do từ chối (alias reason)',
   })
   @IsOptional()
-  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
+  @IsString({ message: 'validation.subscriptions.reject_reason_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Lý do từ chối tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.subscriptions.reject_reason_max_255' })
   reason?: string;
 
   getRejectionReason(): string {

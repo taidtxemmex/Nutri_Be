@@ -17,7 +17,7 @@ export interface IsOwnerParamDto {
   targetUserId?: string;
 }
 
-export interface SanitizePiiParamDto<T extends Record<string, any>> {
+export interface SanitizePiiParamDto<T extends Record<string, unknown>> {
   data: T;
   isPrivileged: boolean;
 }
@@ -123,16 +123,22 @@ export class IdorDefenseService {
   /**
    * Strip sensitive PII fields if user is neither admin nor the owner
    */
-  sanitizePii<T extends Record<string, any>>(
+  sanitizePii<T extends Record<string, unknown>>(
     paramOrData: SanitizePiiParamDto<T> | T,
     legacyIsPrivileged?: boolean,
   ): Partial<T> {
     let data: T;
     let isPrivileged: boolean;
 
-    if (paramOrData && typeof paramOrData === 'object' && 'data' in paramOrData) {
-      data = paramOrData.data;
-      isPrivileged = Boolean(paramOrData.isPrivileged);
+    if (
+      paramOrData &&
+      typeof paramOrData === 'object' &&
+      'data' in paramOrData &&
+      'isPrivileged' in paramOrData
+    ) {
+      const dto = paramOrData as SanitizePiiParamDto<T>;
+      data = dto.data;
+      isPrivileged = Boolean(dto.isPrivileged);
     } else {
       data = paramOrData as T;
       isPrivileged = Boolean(legacyIsPrivileged);

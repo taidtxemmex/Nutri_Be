@@ -153,8 +153,10 @@ export class TokenBlacklistService implements OnModuleDestroy {
           ttlSeconds: effectiveTtlSeconds,
           tagOrTags: CACHE_TAG_TOKEN_BLACKLIST,
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi ghi nhận token blacklist vào CacheService: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `Failed to record token blacklist in CacheService: ${(err as Error)?.message}`,
+        );
       }
     } else if (this.prisma) {
       try {
@@ -172,8 +174,8 @@ export class TokenBlacklistService implements OnModuleDestroy {
             expiresAt: new Date(expiresAtMs),
           },
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi ghi nhận token blacklist vào DB: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to record token blacklist in DB: ${(err as Error)?.message}`);
       }
     }
   }
@@ -210,8 +212,8 @@ export class TokenBlacklistService implements OnModuleDestroy {
           this.memoryStore.set(tokenHash, cached.expiresAt || now + 60000);
           return true;
         }
-      } catch (err: any) {
-        this.logger.warn(`Lỗi kiểm tra blacklist từ CacheService: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to check blacklist from CacheService: ${(err as Error)?.message}`);
       }
     } else if (this.prisma) {
       try {
@@ -222,8 +224,8 @@ export class TokenBlacklistService implements OnModuleDestroy {
           this.memoryStore.set(tokenHash, new Date(dbRecord.expiresAt).getTime());
           return true;
         }
-      } catch (err: any) {
-        this.logger.warn(`Lỗi kiểm tra blacklist từ DB: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(`Failed to check blacklist from DB: ${(err as Error)?.message}`);
       }
     }
 

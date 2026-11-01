@@ -138,9 +138,9 @@ export class RefreshTokenRotationService {
             expiresAt,
           },
         });
-      } catch (err: any) {
+      } catch (err: unknown) {
         this.logger.warn(
-          `Failed writing token to database cache, falling back to memory: ${err?.message}`,
+          `Failed writing token to database cache, falling back to memory: ${(err as Error)?.message}`,
         );
         this.memoryStore.set(cacheKey, record);
       }
@@ -192,8 +192,10 @@ export class RefreshTokenRotationService {
         if (cached?.value) {
           record = JSON.parse(cached.value);
         }
-      } catch (err: any) {
-        this.logger.warn(`Failed reading token from DB, checking memory: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.warn(
+          `Failed reading token from DB, checking memory: ${(err as Error)?.message}`,
+        );
         record = this.memoryStore.get(cacheKey) || null;
       }
     } else {
@@ -271,7 +273,7 @@ export class RefreshTokenRotationService {
         if (cached?.value) {
           record = JSON.parse(cached.value);
         }
-      } catch (err: any) {
+      } catch {
         record = this.memoryStore.get(cacheKey) || null;
       }
     } else {
@@ -301,7 +303,7 @@ export class RefreshTokenRotationService {
         if (cached?.value) {
           return JSON.parse(cached.value);
         }
-      } catch (err: any) {
+      } catch {
         return this.memoryStore.get(cacheKey) || null;
       }
     }
@@ -353,8 +355,8 @@ export class RefreshTokenRotationService {
             }
           }
         }
-      } catch (err: any) {
-        this.logger.error(`Error revoking batch user tokens from DB: ${err?.message}`);
+      } catch (err: unknown) {
+        this.logger.error(`Error revoking batch user tokens from DB: ${(err as Error)?.message}`);
       }
     }
 
@@ -369,7 +371,7 @@ export class RefreshTokenRotationService {
   /**
    * Revoke all tokens in a token family upon replay attack detection
    */
-  private async revokeFamilyTokens(familyId: string, userId: string): Promise<void> {
+  private async revokeFamilyTokens(_familyId: string, userId: string): Promise<void> {
     await this.revokeAllUserTokens(userId);
   }
 

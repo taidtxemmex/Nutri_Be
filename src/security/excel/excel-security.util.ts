@@ -59,7 +59,7 @@ export class ExcelSecurityUtil {
   /**
    * Khử độc toàn bộ các ô trong một mảng dòng dữ liệu (Row Array)
    */
-  public static sanitizeRow(row: any[]): any[] {
+  public static sanitizeRow<T = unknown>(row: T[]): Array<T | string> {
     if (!Array.isArray(row)) return [];
     return row.map((cell) => this.sanitizeCellValue(cell));
   }
@@ -67,12 +67,12 @@ export class ExcelSecurityUtil {
   /**
    * Khử độc toàn bộ các thuộc tính trong một đối tượng dữ liệu (Object Record)
    */
-  public static sanitizeRecord<T extends Record<string, any>>(record: T): T {
+  public static sanitizeRecord<T extends Record<string, unknown>>(record: T): T {
     if (!record || typeof record !== 'object' || Array.isArray(record)) {
       return record;
     }
 
-    const sanitized: Record<string, any> = {};
+    const sanitized: Record<string, unknown> = {};
     for (const [key, val] of Object.entries(record)) {
       sanitized[key] = this.sanitizeCellValue(val);
     }
@@ -82,7 +82,7 @@ export class ExcelSecurityUtil {
   /**
    * Bí danh cho sanitizeRecord
    */
-  public static sanitizeObject<T extends Record<string, any>>(record: T): T {
+  public static sanitizeObject<T extends Record<string, unknown>>(record: T): T {
     return this.sanitizeRecord(record);
   }
 }

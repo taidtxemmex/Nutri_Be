@@ -90,9 +90,7 @@ export class SubscriptionsService {
     if (username && this.isValidEmail(username)) {
       return username;
     }
-    this.logger.warn(
-      `Không tìm thấy địa chỉ email hợp lệ cho người dùng: ${username || 'Unknown'}`,
-    );
+    this.logger.warn(`No valid email address found for user: ${username || 'Unknown'}`);
     return null;
   }
 
@@ -552,7 +550,7 @@ export class SubscriptionsService {
           }
         }
       } catch (err: any) {
-        this.logger.warn(`Lỗi đẩy email tạo yêu cầu thanh toán vào queue: ${err?.message}`);
+        this.logger.warn(`Failed to enqueue payment request creation email: ${err?.message}`);
       }
     }
 
@@ -609,7 +607,7 @@ export class SubscriptionsService {
           request = lockedRequests[0];
         }
       } catch (err: any) {
-        this.logger.warn(`Lỗi khi lock row đăng ký gói: ${err?.message}`);
+        this.logger.warn(`Failed to lock subscription payment request row: ${err?.message}`);
         // Fallback to findUnique
       }
 
@@ -787,7 +785,7 @@ export class SubscriptionsService {
           });
         }
       } catch (err: any) {
-        this.logger.warn(`Lỗi đẩy email duyệt thanh toán vào queue: ${err?.message}`);
+        this.logger.warn(`Failed to enqueue payment approval email: ${err?.message}`);
       }
     }
 
@@ -915,7 +913,7 @@ export class SubscriptionsService {
           });
         }
       } catch (err: any) {
-        this.logger.warn(`Lỗi đẩy email từ chối thanh toán vào queue: ${err?.message}`);
+        this.logger.warn(`Failed to enqueue payment rejection email: ${err?.message}`);
       }
     }
 

@@ -49,6 +49,13 @@ async function bootstrap() {
 
   // 3. URL Rewriting Middleware: Maps legacy /api/v1/* to /api/* for seamless transition
   app.use((req: Request, res: Response, next: NextFunction) => {
+    // Keycloak Reset Credentials backward compatibility redirect
+    if (req.url.includes('/login-actions/reset-credentials')) {
+      const rawFrontendUrl = process.env.FRONTEND_URL || 'https://truenutri.pages.dev';
+      const frontendUrl = rawFrontendUrl.split(',')[0].trim().replace(/\/+$/, '');
+      return res.redirect(302, `${frontendUrl}/login?action=forgot-password`);
+    }
+
     if (req.url.startsWith('/api/v1/')) {
       req.url = req.url.replace('/api/v1/', '/api/');
     }
@@ -65,10 +72,7 @@ async function bootstrap() {
   // 6. Global Validation, Interceptors, Filters (Inject I18nService vào Pipe & Filter)
   const i18nService = app.get(I18nService);
   app.useGlobalPipes(new CustomValidationPipe(i18nService));
-  app.useGlobalInterceptors(
-    new RequestLoggingInterceptor(),
-    new TransformResponseInterceptor(),
-  );
+  app.useGlobalInterceptors(new RequestLoggingInterceptor(), new TransformResponseInterceptor());
   app.useGlobalFilters(new GlobalExceptionFilter(i18nService));
 
   // 7. Swagger OpenAPI UI Hardening (Basic Auth Protection & Production Disable Gate)

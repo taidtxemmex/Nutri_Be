@@ -18,6 +18,9 @@ export const UPLOAD_SCOPES = {
 export const UPLOAD_SUBDIRS = {
   // 1. TÀI NGUYÊN CÔNG KHAI (Static Asset Serving qua /uploads/public/*)
   AVATARS: 'public/avatars',
+  DISHES: 'public/dishes',
+  INGREDIENTS: 'public/ingredients',
+  MENUS: 'public/menus',
   TEMPLATES: 'public/templates',
 
   // 2. TÀI NGUYÊN BẢO MẬT (CHẶN STATIC, chỉ truy xuất qua Auth Guard / Signed HMAC URL)
@@ -34,6 +37,9 @@ export const PUBLIC_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SCOPES.PUB
 export const PROTECTED_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SCOPES.PROTECTED);
 
 export const AVATAR_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.AVATARS);
+export const DISH_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.DISHES);
+export const INGREDIENT_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.INGREDIENTS);
+export const MENU_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.MENUS);
 export const TEMPLATE_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.TEMPLATES);
 export const CERTIFICATE_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.CERTIFICATES);
 export const EVIDENCE_UPLOAD_DIR = path.join(DEFAULT_UPLOAD_DIR, UPLOAD_SUBDIRS.EVIDENCE);
@@ -72,6 +78,9 @@ export function ensureUploadDirsExist(): void {
     PUBLIC_UPLOAD_DIR,
     PROTECTED_UPLOAD_DIR,
     AVATAR_UPLOAD_DIR,
+    DISH_UPLOAD_DIR,
+    INGREDIENT_UPLOAD_DIR,
+    MENU_UPLOAD_DIR,
     TEMPLATE_UPLOAD_DIR,
     CERTIFICATE_UPLOAD_DIR,
     EVIDENCE_UPLOAD_DIR,

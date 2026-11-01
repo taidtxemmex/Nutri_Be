@@ -25,10 +25,10 @@ export class ExportProposalExcelDto {
     description: 'Danh sách mã chỉ tiêu dinh dưỡng cần xuất',
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(100, { message: 'Danh sách mã chỉ tiêu dinh dưỡng tối đa 100 mục' })
-  @IsString({ each: true })
-  @MaxLength(100, { each: true, message: 'Mã chỉ tiêu dinh dưỡng tối đa 100 ký tự' })
+  @IsArray({ message: 'validation.menu_proposals.nutrient_codes_array' })
+  @ArrayMaxSize(100, { message: 'validation.menu_proposals.nutrient_codes_max' })
+  @IsString({ each: true, message: 'validation.menu_proposals.nutrient_code_string' })
+  @MaxLength(100, { each: true, message: 'validation.menu_proposals.nutrient_code_max_len' })
   columns?: string[];
 
   @ApiPropertyOptional({
@@ -40,7 +40,7 @@ export class ExportProposalExcelDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsNumber()
+  @IsNumber({}, { message: 'validation.menu_proposals.servings_number' })
   servings?: number;
 }
 
@@ -50,14 +50,14 @@ export class RejectProposalDto {
     example: 'Cơ cấu đạm vượt quá ngưỡng an toàn cho bệnh nhân suy thận',
   })
   @IsOptional()
-  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
-  @MaxLength(500, { message: 'Lý do từ chối không được vượt quá 500 ký tự' })
+  @IsString({ message: 'validation.menu_proposals.reject_reason_string' })
+  @MaxLength(500, { message: 'validation.menu_proposals.reject_reason_max' })
   reason?: string;
 
   @ApiPropertyOptional({ description: 'Lý do từ chối (alias tương thích FE)' })
   @IsOptional()
-  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
-  @MaxLength(500, { message: 'Lý do từ chối không được vượt quá 500 ký tự' })
+  @IsString({ message: 'validation.menu_proposals.reject_reason_string' })
+  @MaxLength(500, { message: 'validation.menu_proposals.reject_reason_max' })
   rejectReason?: string;
 }
 
@@ -67,8 +67,8 @@ export class MenuProposalQueryDto {
       'Trạng thái đề xuất lọc (phân tách dấu phẩy hoặc đơn lẻ: PENDING, APPROVED, REJECTED hoặc CHO_DUYET, DA_DUYET, TU_CHOI)',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(100, { message: 'Trạng thái lọc tối đa 100 ký tự' })
+  @IsString({ message: 'validation.menu_proposals.statuses_string' })
+  @MaxLength(100, { message: 'validation.menu_proposals.statuses_max' })
   statuses?: string;
 
   @ApiPropertyOptional({ description: 'Trang hiện tại (1-based)', default: 1 })

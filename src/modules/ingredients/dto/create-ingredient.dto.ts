@@ -15,17 +15,35 @@ import { Transform } from 'class-transformer';
 export class CreateIngredientDto {
   @ApiProperty({ description: 'Tên nguyên liệu', example: 'Gạo tẻ' })
   @Transform(({ value, obj }) => (value !== undefined ? value : obj?.name)?.toString().trim())
-  @IsNotEmpty({ message: 'Tên nguyên liệu không được để trống' })
-  @IsString()
-  @MaxLength(255)
+  @IsNotEmpty({ message: 'validation.ingredients.name_required' })
+  @IsString({ message: 'validation.ingredients.name_string' })
+  @MaxLength(255, { message: 'validation.ingredients.name_max' })
   material: string;
 
   // Alias name for backward compatibility
   @ApiPropertyOptional({ description: 'Tên nguyên liệu (alias)', example: 'Gạo tẻ' })
   @IsOptional()
-  @IsString()
-  @MaxLength(255, { message: 'Tên nguyên liệu tối đa 255 ký tự' })
+  @IsString({ message: 'validation.ingredients.name_string' })
+  @MaxLength(255, { message: 'validation.ingredients.name_max' })
   name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh nguyên liệu (relative path, không chứa domain)',
+    example: '/uploads/public/ingredients/2026/11/gao-te.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.ingredients.image_url_string' })
+  @MaxLength(500, { message: 'validation.ingredients.image_url_max' })
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/ingredients/2026/11/gao-te.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.ingredients.image_url_string' })
+  @MaxLength(500, { message: 'validation.ingredients.image_url_max' })
+  image_url?: string;
 
   @ApiPropertyOptional({ description: 'ID danh mục nhóm thực phẩm', example: 1 })
   @Transform(({ value, obj }) => {
@@ -35,8 +53,8 @@ export class CreateIngredientDto {
     return isNaN(num) ? undefined : num;
   })
   @IsOptional()
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'validation.ingredients.category_id_int' })
+  @Min(1, { message: 'validation.ingredients.category_id_min' })
   categoryId?: number;
 
   @ApiPropertyOptional({
@@ -52,9 +70,9 @@ export class CreateIngredientDto {
     return raw;
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  @IsIn(['THUC_VAT', 'DONG_VAT'])
+  @IsString({ message: 'validation.ingredients.protein_type_string' })
+  @MaxLength(50, { message: 'validation.ingredients.protein_type_max' })
+  @IsIn(['THUC_VAT', 'DONG_VAT'], { message: 'validation.ingredients.protein_type_in' })
   loaiProtein?: string;
 
   @ApiPropertyOptional({ description: 'Tỷ lệ phần ăn được (%) (0 - 100)', example: 100 })
@@ -62,9 +80,9 @@ export class CreateIngredientDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsNumber()
-  @Min(0)
-  @Max(100)
+  @IsNumber({}, { message: 'validation.ingredients.edible_number' })
+  @Min(0, { message: 'validation.ingredients.edible_min' })
+  @Max(100, { message: 'validation.ingredients.edible_max' })
   edible?: number;
 
   // ===== 77 CHỈ TIÊU VI CHẤT CƠ SỞ (BASE NUTRIENTS) =====

@@ -28,7 +28,7 @@ const SENSITIVE_KEYS = new Set([
 /**
  * Hàm làm sạch và ẩn thông tin nhạy cảm trong payload trước khi ghi log
  */
-export function maskSensitivePayload(payload: any, maxDepth = 4): any {
+export function maskSensitivePayload<T = any>(payload: T, maxDepth = 4): any {
   if (!payload || typeof payload !== 'object' || maxDepth <= 0) {
     return payload;
   }
@@ -40,8 +40,8 @@ export function maskSensitivePayload(payload: any, maxDepth = 4): any {
     return payload.map((item) => maskSensitivePayload(item, maxDepth - 1));
   }
 
-  const sanitized: Record<string, any> = {};
-  for (const [key, value] of Object.entries(payload)) {
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload as Record<string, unknown>)) {
     const lowerKey = key.toLowerCase().replace(/[-_]/g, '');
     if (SENSITIVE_KEYS.has(lowerKey)) {
       sanitized[key] = '***[REDACTED]***';
@@ -67,7 +67,7 @@ export function maskSensitivePayload(payload: any, maxDepth = 4): any {
 export class RequestLoggingInterceptor implements NestInterceptor {
   private readonly logger = new Logger('HTTP');
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const http = context.switchToHttp();
     const req = http.getRequest();
     const res = http.getResponse();
@@ -88,11 +88,7 @@ export class RequestLoggingInterceptor implements NestInterceptor {
 
     const method = req.method || 'GET';
     const url = req.originalUrl || req.url || '';
-    const ip =
-      req.headers['x-forwarded-for'] ||
-      req.socket?.remoteAddress ||
-      req.ip ||
-      'unknown';
+    const ip = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || req.ip || 'unknown';
 
     const userId = req.user?.id || 'anonymous';
     const sanitizedBody = maskSensitivePayload(req.body);
@@ -113,21 +109,33 @@ export class RequestLoggingInterceptor implements NestInterceptor {
           ip,
           userId,
           payload:
-            method !== 'GET' && sanitizedBody && Object.keys(sanitizedBody).length > 0
+            method !== 'GET' &&
+            sanitizedBody &&
+            typeof sanitizedBody === 'object' &&
+            Object.keys(sanitizedBody).length > 0
               ? sanitizedBody
               : undefined,
         };
 
         this.logger.log(logMessage, JSON.stringify(metadata));
       }),
-      catchError((error: any) => {
+      catchError((error: unknown) => {
         const duration = Date.now() - startTime;
+        const errObj = error as {
+          name?: string;
+          message?: string;
+          stack?: string;
+          status?: number;
+        };
         const statusCode =
           error instanceof HttpException
             ? error.getStatus()
-            : error.status || 500;
+            : typeof errObj?.status === 'number'
+              ? errObj.status
+              : 500;
 
-        const logMessage = `[${traceId}] ${method} ${url} ${statusCode} +${duration}ms - Error: ${error.message} - user:${userId}`;
+        const errMessage = errObj?.message || 'Unknown error';
+        const logMessage = `[${traceId}] ${method} ${url} ${statusCode} +${duration}ms - Error: ${errMessage} - user:${userId}`;
 
         const metadata = {
           traceId,
@@ -138,15 +146,18 @@ export class RequestLoggingInterceptor implements NestInterceptor {
           ip,
           userId,
           payload:
-            method !== 'GET' && sanitizedBody && Object.keys(sanitizedBody).length > 0
+            method !== 'GET' &&
+            sanitizedBody &&
+            typeof sanitizedBody === 'object' &&
+            Object.keys(sanitizedBody).length > 0
               ? sanitizedBody
               : undefined,
-          errorName: error.name,
-          errorMessage: error.message,
+          errorName: errObj?.name,
+          errorMessage: errMessage,
         };
 
         if (statusCode >= 500) {
-          this.logger.error(logMessage, error.stack, JSON.stringify(metadata));
+          this.logger.error(logMessage, errObj?.stack, JSON.stringify(metadata));
         } else {
           this.logger.warn(logMessage, JSON.stringify(metadata));
         }

@@ -3,6 +3,8 @@ import {
   UnauthorizedException,
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Logger,
   Optional,
 } from '@nestjs/common';
@@ -39,7 +41,9 @@ import {
   GoogleLoginParamDto,
   ForgotPasswordParamDto,
   ResetPasswordParamDto,
+  VerifyResetTokenParamDto,
 } from '../dto';
+import type { dang_ky_cho_xac_thuc } from '@prisma/client';
 import { UserRole, AuthProvider } from '../../../config/enums';
 import { JwtPayload, AuthenticatedUser } from '../interfaces/jwt-payload.interface';
 
@@ -101,8 +105,9 @@ export class AuthService {
       });
 
       return res.ok;
-    } catch (err: any) {
-      this.logger.warn(`Keycloak fallback authentication failed for ${username}: ${err?.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Keycloak fallback authentication failed for ${username}: ${msg}`);
       return false;
     }
   }
@@ -144,7 +149,7 @@ export class AuthService {
 
     // 3. Dọn dẹp các bản ghi chờ xác thực đã hết hạn và bản ghi cũ có cùng email (khớp AuthServiceImpl.java:109-117)
     const now = new Date();
-    if (typeof (this.prisma.dang_ky_cho_xac_thuc as any).deleteMany === 'function') {
+    if (typeof this.prisma.dang_ky_cho_xac_thuc?.deleteMany === 'function') {
       await this.prisma.dang_ky_cho_xac_thuc.deleteMany({
         where: { expires_at: { lt: now } },
       });
@@ -180,7 +185,7 @@ export class AuthService {
         email: trimmedEmail,
         phone: dto.phone.trim(),
         dia_chi: dto.address?.trim() || null,
-        gioi_tinh: dto.gender as any,
+        gioi_tinh: dto.gender,
         ngay_sinh: dto.dob ? new Date(dto.dob) : null,
         token_hash: verifyToken,
         created_at: new Date(),
@@ -207,8 +212,9 @@ export class AuthService {
           runAt: new Date(),
         },
       });
-    } catch (err: any) {
-      this.logger.error(`Lỗi khi đẩy email job vào _system_jobs: ${err?.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to push email job into _system_jobs: ${msg}`);
     }
 
     return {
@@ -236,7 +242,7 @@ export class AuthService {
     const rawToken = token.trim();
     const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
 
-    let pending: any = null;
+    let pending: dang_ky_cho_xac_thuc | null = null;
     if (typeof this.prisma.dang_ky_cho_xac_thuc.findFirst === 'function') {
       pending = await this.prisma.dang_ky_cho_xac_thuc.findFirst({
         where: {
@@ -358,24 +364,35 @@ export class AuthService {
       },
     };
 
-    let user: any = null;
-    if (trimmedUsername.includes('@') && typeof this.prisma.nguoi_dung.findFirst === 'function') {
-      user = await this.prisma.nguoi_dung.findFirst({
-        where: {
-          OR: [
-            { ten_dang_nhap: trimmedUsername },
-            { ho_so_ca_nhan: { is: { email: trimmedUsername } } },
-          ],
-        },
-        select: userSelect,
-      });
-    }
-    if (!user && typeof this.prisma.nguoi_dung.findUnique === 'function') {
-      user = await this.prisma.nguoi_dung.findUnique({
-        where: { ten_dang_nhap: trimmedUsername },
-        select: userSelect,
-      });
-    }
+    let user: {
+      id: string;
+      ten_dang_nhap: string;
+      mat_khau: string | null;
+      vai_tro: string;
+      active: boolean | null;
+      deleted_at: Date | null;
+      keycloak_user_id: string | null;
+      ho_so_ca_nhan: {
+        ho_ten: string | null;
+        email: string | null;
+      } | null;
+    } | null = null;
+    user = await this.prisma.nguoi_dung.findFirst({
+      where: {
+        OR: [
+          { ten_dang_nhap: trimmedUsername },
+          { ho_so_ca_nhan: { is: { email: trimmedUsername } } },
+          // Hỗ trợ người dùng nhập username 'skymen00' khi tài khoản trong DB lưu 'skymen00@gmail.com'
+          ...(!trimmedUsername.includes('@')
+            ? [
+                { ten_dang_nhap: { startsWith: `${trimmedUsername}@` } },
+                { ho_so_ca_nhan: { is: { email: { startsWith: `${trimmedUsername}@` } } } },
+              ]
+            : []),
+        ],
+      },
+      select: userSelect,
+    });
 
     if (!user) {
       throw new UnauthorizedException({
@@ -420,10 +437,9 @@ export class AuthService {
           // Fallback kiểm tra bcrypt cho các định dạng khác
           isMatch = await bcrypt.compare(dto.password, user.mat_khau);
         }
-      } catch (verifyErr: any) {
-        this.logger.warn(
-          `Lỗi khi kiểm tra mật khẩu cho tài khoản ${user.ten_dang_nhap}: ${verifyErr?.message}`,
-        );
+      } catch (verifyErr: unknown) {
+        const msg = verifyErr instanceof Error ? verifyErr.message : String(verifyErr);
+        this.logger.warn(`Error verifying password for account ${user.ten_dang_nhap}: ${msg}`);
         isMatch = false;
       }
     }
@@ -460,13 +476,21 @@ export class AuthService {
           data: { mat_khau: newBcryptHash },
         });
         this.logger.log(
-          `Tài khoản ${user.ten_dang_nhap} đã tự động nâng cấp mật khẩu từ Keycloak sang Bcrypt!`,
+          `Account ${user.ten_dang_nhap} password automatically upgraded from Keycloak to Bcrypt!`,
         );
-      } catch (rehashErr: any) {
+      } catch (rehashErr: unknown) {
+        const msg = rehashErr instanceof Error ? rehashErr.message : String(rehashErr);
         this.logger.error(
-          `Lỗi khi tự động nâng cấp mật khẩu (Lazy Rehash) cho ${user.ten_dang_nhap}: ${rehashErr?.message}`,
+          `Error during lazy rehash password upgrade for ${user.ten_dang_nhap}: ${msg}`,
         );
       }
+    }
+
+    // Dọn token reset password khi đăng nhập thành công bằng mật khẩu cũ (hủy link reset)
+    if (this.prisma?.ma_xac_thuc?.deleteMany) {
+      await this.prisma.ma_xac_thuc
+        .deleteMany({ where: { nguoi_dung_id: user.id } })
+        .catch(() => {});
     }
 
     const fullName = user.ho_so_ca_nhan?.ho_ten || user.ten_dang_nhap;
@@ -515,8 +539,9 @@ export class AuthService {
         if (deviceRecord?.id) {
           deviceId = deviceRecord.id;
         }
-      } catch (devErr: any) {
-        this.logger.warn(`Lỗi ghi nhận thiết bị đăng nhập: ${devErr?.message}`);
+      } catch (devErr: unknown) {
+        const msg = devErr instanceof Error ? devErr.message : String(devErr);
+        this.logger.warn(`Failed to record login device: ${msg}`);
       }
     }
 
@@ -532,8 +557,9 @@ export class AuthService {
           ...(deviceId ? { device_id: deviceId } : {}),
         },
       });
-    } catch (err: any) {
-      this.logger.warn(`Lỗi ghi nhận lịch sử đăng nhập: ${err?.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to record login history: ${msg}`);
     }
 
     return {
@@ -595,7 +621,7 @@ export class AuthService {
       },
     });
 
-    if (!user || user.active === false || (user as any).deleted_at) {
+    if (!user || user.active === false || user.deleted_at) {
       throw new UnauthorizedException({
         code: AUTH_ERROR_INACTIVE_ACCOUNT,
         message: 'Tài khoản không tồn tại hoặc đã bị khóa.',
@@ -699,20 +725,22 @@ export class AuthService {
     if (rawAccessToken && this.tokenBlacklistService) {
       try {
         await this.tokenBlacklistService.blacklistToken(rawAccessToken);
-      } catch (err: any) {
-        this.logger.warn(`Lỗi đưa token vào blacklist: ${err?.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to blacklist token: ${msg}`);
       }
     }
 
     // 3. Nếu chưa có userId, giải mã token (kể cả đã hết hạn) để trích xuất userId (P1-2)
     if (!userId && rawAccessToken) {
       try {
-        const decoded: any = this.jwtService.decode(rawAccessToken);
+        const decoded = this.jwtService.decode(rawAccessToken) as JwtPayload | null;
         if (decoded && (decoded.sub || decoded.userId || decoded.id)) {
           userId = decoded.sub || decoded.userId || decoded.id;
         }
-      } catch (err: any) {
-        this.logger.debug?.(`Không thể giải mã Access Token: ${err?.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.debug?.(`Unable to decode Access Token: ${msg}`);
       }
     }
 
@@ -724,8 +752,9 @@ export class AuthService {
         if (!userId && revokedRecord?.userId) {
           userId = revokedRecord.userId;
         }
-      } catch (err: any) {
-        this.logger.warn(`Lỗi thu hồi refresh token: ${err?.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to revoke refresh token: ${msg}`);
       }
     }
 
@@ -736,8 +765,9 @@ export class AuthService {
           where: { session_id: sessionId, logout_time: null },
           data: { logout_time: new Date() },
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi cập nhật logout_time theo session: ${err?.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to update logout_time by session: ${msg}`);
       }
     }
 
@@ -747,8 +777,9 @@ export class AuthService {
           where: { nguoi_dung_id: userId, logout_time: null },
           data: { logout_time: new Date() },
         });
-      } catch (err: any) {
-        this.logger.warn(`Lỗi cập nhật logout_time theo user: ${err?.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        this.logger.warn(`Failed to update logout_time by user: ${msg}`);
       }
     }
 
@@ -781,8 +812,8 @@ export class AuthService {
     }
 
     let rawToken = dto.credential || dto.idToken;
-    if (!rawToken && (dto as any).code) {
-      const authCode = (dto as any).code;
+    if (!rawToken && dto.code) {
+      const authCode = dto.code;
       const clientId = process.env.GOOGLE_CLIENT_ID;
       const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
       const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'postmessage';
@@ -800,11 +831,12 @@ export class AuthService {
             }).toString(),
           });
           if (tokenRes.ok) {
-            const tokenData = (await tokenRes.json()) as any;
+            const tokenData = (await tokenRes.json()) as { id_token?: string };
             rawToken = tokenData.id_token;
           }
-        } catch (e: any) {
-          this.logger.warn(`Không thể đổi authorization code sang id_token: ${e.message}`);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.logger.warn(`Failed to exchange authorization code for id_token: ${msg}`);
         }
       }
       if (!rawToken) {
@@ -831,7 +863,14 @@ export class AuthService {
           message: 'Token Google không hợp lệ, không thể xác thực chữ ký số hoặc đã hết hạn.',
         });
       }
-      const info = (await res.json()) as any;
+      const info = (await res.json()) as {
+        email?: string;
+        sub?: string;
+        aud?: string;
+        email_verified?: boolean | string;
+        name?: string;
+        picture?: string;
+      };
       if (!info.email || !info.sub) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_UNAUTHORIZED,
@@ -862,11 +901,13 @@ export class AuthService {
         name: info.name,
         picture: info.picture,
       };
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e instanceof UnauthorizedException) {
         throw e;
       }
-      this.logger.error(`Lỗi xác thực Google OAuth2: ${e.message}`, e.stack);
+      const msg = e instanceof Error ? e.message : String(e);
+      const stack = e instanceof Error ? e.stack : undefined;
+      this.logger.error(`Google OAuth2 authentication error: ${msg}`, stack);
       throw new UnauthorizedException({
         code: AUTH_ERROR_UNAUTHORIZED,
         message: 'Không thể kết nối đến máy chủ Google để xác thực chữ ký token.',
@@ -943,7 +984,7 @@ export class AuthService {
       });
     }
 
-    if (user.active === false || (user as any).deleted_at) {
+    if (user.active === false || user.deleted_at) {
       throw new UnauthorizedException({
         code: AUTH_ERROR_INACTIVE_ACCOUNT,
         message: 'Tài khoản của bạn đã bị vô hiệu hóa.',
@@ -1001,18 +1042,61 @@ export class AuthService {
   }
 
   /**
+   * Phân giải base URL Frontend bảo mật:
+   * Kiểm tra clientOrigin có nằm trong danh sách trắng FRONTEND_URL không.
+   * Nếu không, fallback về domain mặc định (ưu tiên Cloudflare Pages https://truenutri.pages.dev).
+   */
+  private resolveFrontendUrl(clientOrigin?: string): string {
+    const rawUrl =
+      this.configService?.get<string>('FRONTEND_URL') ||
+      process.env.FRONTEND_URL ||
+      'https://truenutri.pages.dev';
+    const allowedOrigins = rawUrl
+      .split(',')
+      .map((u) => u.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
+
+    const defaultUrl = allowedOrigins[0] || 'https://truenutri.pages.dev';
+
+    if (!clientOrigin) {
+      return defaultUrl;
+    }
+
+    try {
+      const parsedOrigin = new URL(clientOrigin).origin;
+      const matched = allowedOrigins.find((allowed) => {
+        try {
+          return new URL(allowed).origin === parsedOrigin;
+        } catch {
+          return allowed === parsedOrigin;
+        }
+      });
+      return matched || defaultUrl;
+    } catch {
+      return defaultUrl;
+    }
+  }
+
+  /**
    * Quên mật khẩu: sinh token OTP trong `ma_xac_thuc`, đẩy mail job vào `_system_jobs` (< 5ms)
    */
   async forgotPassword(
     paramOrDto: ForgotPasswordParamDto | ForgotPasswordDto,
+    legacyOrigin?: string,
   ): Promise<{ success: boolean; message: string }> {
     const dto =
       paramOrDto && typeof paramOrDto === 'object' && 'dto' in paramOrDto
         ? paramOrDto.dto
         : (paramOrDto as ForgotPasswordDto);
+    const clientOrigin =
+      (typeof paramOrDto === 'object' && 'clientOrigin' in paramOrDto
+        ? paramOrDto.clientOrigin
+        : undefined) ||
+      dto?.redirectUrl ||
+      legacyOrigin;
     const email = dto.email.trim().toLowerCase();
 
-    const profile = await this.prisma.ho_so_ca_nhan.findFirst({
+    let profile = await this.prisma.ho_so_ca_nhan.findFirst({
       where: { email },
       select: {
         nguoi_dung_id: true,
@@ -1027,14 +1111,43 @@ export class AuthService {
       },
     });
 
+    // Fallback tìm theo username nếu người dùng nhập username thay vì email
+    if (!profile) {
+      const userByUsername = await this.prisma.nguoi_dung.findFirst({
+        where: { ten_dang_nhap: email },
+        select: {
+          id: true,
+          active: true,
+          deleted_at: true,
+          ho_so_ca_nhan: {
+            select: {
+              ho_ten: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      if (userByUsername?.ho_so_ca_nhan?.email) {
+        profile = {
+          nguoi_dung_id: userByUsername.id,
+          ho_ten: userByUsername.ho_so_ca_nhan.ho_ten,
+          email: userByUsername.ho_so_ca_nhan.email,
+          nguoi_dung: {
+            active: userByUsername.active,
+            deleted_at: userByUsername.deleted_at,
+          },
+        };
+      }
+    }
+
     if (profile && profile.nguoi_dung_id) {
       const user =
-        (profile as any).nguoi_dung !== undefined
-          ? (profile as any).nguoi_dung
-          : await this.prisma.nguoi_dung.findUnique({
-              where: { id: profile.nguoi_dung_id },
-              select: { active: true, deleted_at: true },
-            });
+        profile.nguoi_dung ??
+        (await this.prisma.nguoi_dung.findUnique({
+          where: { id: profile.nguoi_dung_id },
+          select: { active: true, deleted_at: true },
+        }));
 
       const isUserEligible =
         user === undefined ||
@@ -1043,22 +1156,69 @@ export class AuthService {
           (user.deleted_at === null || user.deleted_at === undefined));
 
       if (isUserEligible) {
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const expiresAt = new Date(Date.now() + PASSWORD_RESET_OTP_TTL_MINUTES * 60 * 1000);
-
-        // Lưu/Cập nhật mã OTP trong bảng `ma_xac_thuc`
-        await this.prisma.ma_xac_thuc.upsert({
+        // 1. Kiểm tra Anti-Spam & Token Reuse trong `ma_xac_thuc`
+        const existingToken = await this.prisma.ma_xac_thuc.findUnique({
           where: { nguoi_dung_id: profile.nguoi_dung_id },
-          create: {
-            nguoi_dung_id: profile.nguoi_dung_id,
-            ma_token: resetToken,
-            ngay_het_han: expiresAt,
-          },
-          update: {
-            ma_token: resetToken,
-            ngay_het_han: expiresAt,
-          },
         });
+
+        const now = Date.now();
+        const ttlMs = PASSWORD_RESET_OTP_TTL_MINUTES * 60 * 1000;
+        let resetToken: string;
+        let expiresAt: Date;
+
+        if (existingToken && existingToken.ngay_het_han) {
+          const remainingMs = existingToken.ngay_het_han.getTime() - now;
+          const cooldownWindowMs = (PASSWORD_RESET_OTP_TTL_MINUTES - 1) * 60 * 1000; // 14 phút còn lại (vừa tạo trong 60s qua)
+
+          // a) Chống Spam Cooldown 60 giây
+          if (remainingMs > cooldownWindowMs) {
+            throw new HttpException(
+              {
+                code: 'RATE_LIMIT_EXCEEDED',
+                message:
+                  'Bạn đã yêu cầu gửi email quá nhanh. Vui lòng đợi 60 giây trước khi thử lại.',
+              },
+              HttpStatus.TOO_MANY_REQUESTS,
+            );
+          }
+
+          // b) Tái sử dụng Token đang còn hạn (Token Reuse)
+          if (remainingMs > 0) {
+            resetToken = existingToken.ma_token;
+            expiresAt = existingToken.ngay_het_han;
+          } else {
+            // Token đã hết hạn: Sinh token mới
+            resetToken = crypto.randomBytes(32).toString('hex');
+            expiresAt = new Date(now + ttlMs);
+            await this.prisma.ma_xac_thuc.update({
+              where: { nguoi_dung_id: profile.nguoi_dung_id },
+              data: {
+                ma_token: resetToken,
+                ngay_het_han: expiresAt,
+              },
+            });
+          }
+        } else {
+          // c) Chưa có token: Sinh token mới
+          resetToken = crypto.randomBytes(32).toString('hex');
+          expiresAt = new Date(now + ttlMs);
+          await this.prisma.ma_xac_thuc.upsert({
+            where: { nguoi_dung_id: profile.nguoi_dung_id },
+            create: {
+              nguoi_dung_id: profile.nguoi_dung_id,
+              ma_token: resetToken,
+              ngay_het_han: expiresAt,
+            },
+            update: {
+              ma_token: resetToken,
+              ngay_het_han: expiresAt,
+            },
+          });
+        }
+
+        // Tạo link đặt lại mật khẩu đúng frontend domain
+        const frontendUrl = this.resolveFrontendUrl(clientOrigin);
+        const resetLink = `${frontendUrl}/reset-password?token=${resetToken}`;
 
         // Đẩy job gửi email vào `_system_jobs`
         try {
@@ -1070,6 +1230,7 @@ export class AuthService {
                 email: profile.email,
                 fullName: profile.ho_ten || 'Người dùng',
                 token: resetToken,
+                resetLink,
                 expiresAt: expiresAt.toISOString(),
               }),
               status: 'PENDING',
@@ -1079,8 +1240,9 @@ export class AuthService {
               runAt: new Date(),
             },
           });
-        } catch (err: any) {
-          this.logger.error(`Lỗi khi tạo email job đặt lại mật khẩu: ${err?.message}`);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.error(`Failed to create password reset email job: ${msg}`);
         }
       }
     }
@@ -1090,6 +1252,78 @@ export class AuthService {
       success: true,
       message:
         'Nếu email tồn tại trong hệ thống, bạn sẽ nhận được hướng dẫn đặt lại mật khẩu trong hộp thư.',
+    };
+  }
+
+  /**
+   * Kiểm tra tính hợp lệ của token đặt lại mật khẩu trước khi người dùng nhập mật khẩu mới
+   */
+  async verifyResetToken(
+    paramOrToken: VerifyResetTokenParamDto | { token: string } | string,
+  ): Promise<{
+    valid: boolean;
+    email?: string;
+    fullName?: string;
+    username?: string;
+    message: string;
+  }> {
+    const token =
+      paramOrToken && typeof paramOrToken === 'object' && 'token' in paramOrToken
+        ? paramOrToken.token
+        : (paramOrToken as string);
+
+    if (!token || !token.trim()) {
+      throw new BadRequestException('Mã xác thực không hợp lệ.');
+    }
+
+    const trimmedToken = token.trim();
+    const record = await this.prisma.ma_xac_thuc.findUnique({
+      where: { ma_token: trimmedToken },
+      include: {
+        nguoi_dung: {
+          select: {
+            id: true,
+            ten_dang_nhap: true,
+            active: true,
+            deleted_at: true,
+            ho_so_ca_nhan: {
+              select: {
+                ho_ten: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!record) {
+      throw new BadRequestException('Mã xác thực không hợp lệ hoặc đã được sử dụng.');
+    }
+
+    if (new Date(record.ngay_het_han).getTime() < Date.now()) {
+      await this.prisma.ma_xac_thuc.delete({ where: { id: record.id } }).catch(() => {});
+      throw new BadRequestException('Mã xác thực đã hết hạn. Vui lòng yêu cầu cấp lại mã mới.');
+    }
+
+    const user = record.nguoi_dung;
+    if (
+      !user ||
+      user.active === false ||
+      (user.deleted_at !== null && user.deleted_at !== undefined)
+    ) {
+      throw new UnauthorizedException({
+        code: AUTH_ERROR_INACTIVE_ACCOUNT,
+        message: 'Tài khoản của bạn đã bị vô hiệu hóa hoặc chưa kích hoạt.',
+      });
+    }
+
+    return {
+      valid: true,
+      username: user.ten_dang_nhap,
+      fullName: user.ho_so_ca_nhan?.ho_ten || 'Người dùng',
+      email: user.ho_so_ca_nhan?.email || undefined,
+      message: 'Mã xác thực hợp lệ.',
     };
   }
 
@@ -1107,6 +1341,11 @@ export class AuthService {
 
     const record = await this.prisma.ma_xac_thuc.findUnique({
       where: { ma_token: token },
+      include: {
+        nguoi_dung: {
+          select: { id: true, active: true, deleted_at: true, mat_khau: true },
+        },
+      },
     });
 
     if (!record) {
@@ -1118,13 +1357,7 @@ export class AuthService {
       throw new BadRequestException('Mã xác thực đã hết hạn. Vui lòng yêu cầu cấp lại mã mới.');
     }
 
-    const user =
-      (record as any).nguoi_dung !== undefined
-        ? (record as any).nguoi_dung
-        : await this.prisma.nguoi_dung.findUnique({
-            where: { id: record.nguoi_dung_id },
-            select: { id: true, active: true, deleted_at: true },
-          });
+    const user = record.nguoi_dung;
 
     if (
       user !== undefined &&
@@ -1134,6 +1367,14 @@ export class AuthService {
       throw new UnauthorizedException({
         code: AUTH_ERROR_INACTIVE_ACCOUNT,
         message: 'Tài khoản của bạn đã bị vô hiệu hóa hoặc chưa kích hoạt.',
+      });
+    }
+
+    // Chặn đặt mật khẩu mới trùng mật khẩu cũ (Password Reuse Prevention)
+    if (user?.mat_khau && (await bcrypt.compare(dto.newPassword, user.mat_khau))) {
+      throw new BadRequestException({
+        code: 'PASSWORD_CANNOT_BE_OLD',
+        message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại.',
       });
     }
 

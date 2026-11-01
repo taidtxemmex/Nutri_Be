@@ -159,7 +159,7 @@ describe('AuthService', () => {
   describe('login', () => {
     it('should login successfully with valid credentials and return JWT claims matching FE format', async () => {
       const hashedPassword = await bcrypt.hash('P@ssw0rd123!', 10);
-      mockPrisma.nguoi_dung.findUnique.mockResolvedValue({
+      const userMock = {
         id: 'user-uuid-1',
         ten_dang_nhap: 'bs_minhtri',
         mat_khau: hashedPassword,
@@ -170,7 +170,9 @@ describe('AuthService', () => {
           ho_ten: 'Nguyễn Minh Trí',
           email: 'bsminhtri@gmail.com',
         },
-      });
+      };
+      mockPrisma.nguoi_dung.findUnique.mockResolvedValue(userMock);
+      mockPrisma.nguoi_dung.findFirst.mockResolvedValue(userMock);
 
       const result = await authService.login(
         { username: 'bs_minhtri', password: 'P@ssw0rd123!' },

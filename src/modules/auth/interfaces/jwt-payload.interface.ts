@@ -22,6 +22,7 @@ export interface AuthenticatedUser {
   sub: string;
   username: string;
   role: string;
+  userId?: string;
   keycloakUserId?: string;
   email?: string;
 }

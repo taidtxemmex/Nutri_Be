@@ -10,7 +10,7 @@ export class ExportDailyIntakeDto {
       'Mẫu báo cáo lâm sàng: ALL_IN_ONE | RDA_COMPARISON | PLC_STRUCTURE | MEAL_DISTRIBUTION | INGREDIENT_DETAILS',
   })
   @IsOptional()
-  @IsEnum(DailyIntakeClinicalReportType)
+  @IsEnum(DailyIntakeClinicalReportType, { message: 'validation.daily_intakes.report_type_enum' })
   reportType?: DailyIntakeClinicalReportType = DailyIntakeClinicalReportType.ALL_IN_ONE;
 }
 
@@ -20,14 +20,14 @@ export class ImportDailyIntakeQueryDto {
   })
   @IsOptional()
   @IsString()
-  @MaxLength(50, { message: 'ID bệnh nhân tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.daily_intakes.patient_id_max' })
   patientId?: string;
 
   @ApiPropertyOptional({
     description: 'Ngày ăn (định dạng YYYY-MM-DD)',
   })
   @IsOptional()
-  @IsDateString()
+  @IsDateString({}, { message: 'validation.daily_intakes.date_invalid' })
   date?: string;
 
   @ApiPropertyOptional({

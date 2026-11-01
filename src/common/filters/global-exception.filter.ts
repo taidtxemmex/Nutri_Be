@@ -34,7 +34,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
 
     const traceId =
-      (request.headers['x-trace-id'] as string) || (request as any).id || crypto.randomUUID();
+      (request.headers['x-trace-id'] as string) ||
+      (request as { id?: string }).id ||
+      crypto.randomUUID();
     response.setHeader('X-Trace-Id', traceId);
     const timestamp = new Date().toISOString();
     const locale = request.locale || 'vi';
@@ -42,25 +44,29 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status = HttpStatus.INTERNAL_SERVER_ERROR;
     let errorCode = 'INTERNAL_SERVER_ERROR';
     let message = 'Hệ thống gặp sự cố bất ngờ. Vui lòng liên hệ quản trị viên.';
-    let details: any = undefined;
+    let details: Array<{ field?: string; message?: string; code?: string }> | undefined = undefined;
 
     // 1. HttpException
     if (exception instanceof HttpException) {
       status = exception.getStatus();
-      const res: any = exception.getResponse();
+      const res = exception.getResponse();
 
-      if (typeof res === 'object') {
-        errorCode = res.code || this.mapStatusToErrorCode(status);
-        message = res.message || exception.message;
-        details = res.details;
+      if (typeof res === 'object' && res !== null) {
+        const resObj = res as Record<string, unknown>;
+        errorCode =
+          (typeof resObj.code === 'string' ? resObj.code : '') || this.mapStatusToErrorCode(status);
+        message = (typeof resObj.message === 'string' ? resObj.message : '') || exception.message;
+        details = Array.isArray(resObj.details)
+          ? (resObj.details as Array<{ field?: string; message?: string; code?: string }>)
+          : undefined;
 
-        if (Array.isArray(res.message)) {
+        if (Array.isArray(resObj.message)) {
           errorCode = 'VALIDATION_FAILED';
           message = 'Dữ liệu gửi lên không đúng định dạng';
-          details = res.message.map((msg: string) => ({ message: msg }));
+          details = (resObj.message as string[]).map((msg: string) => ({ message: msg }));
         }
       } else {
-        message = res;
+        message = String(res);
         errorCode = this.mapStatusToErrorCode(status);
       }
     }
@@ -171,14 +177,21 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     return message;
   }
 
-  private translateErrorDetails(details: any[], locale: string): any[] {
+  private translateErrorDetails(
+    details: Array<{ field?: string; message?: string; code?: string; key?: string }>,
+    locale: string,
+  ): Array<{ field?: string; message?: string; code?: string }> {
     if (!this.i18nService) {
       return details;
     }
 
     const cloned = details.map((item) => ({ ...item }));
     for (const item of cloned) {
-      if (item.message) {
+      if (item.key && this.i18nService.hasKey(item.key)) {
+        item.message = this.i18nService.translate(item.key, locale);
+        delete item.key;
+      } else if (item.message) {
+        delete item.key;
         const hasKey = this.i18nService.hasKey(item.message);
         const translated = this.i18nService.translateTextOrKey(item.message, locale);
         if (hasKey || (translated && translated !== item.message)) {
@@ -193,6 +206,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           item.message = translated;
         }
       } else if (item.code && item.field) {
+        delete item.key;
         item.message = this.i18nService.translateValidationConstraint({
           code: item.code,
           field: item.field,

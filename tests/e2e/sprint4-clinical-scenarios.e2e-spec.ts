@@ -372,18 +372,18 @@ describe('Sprint 4: Deep Clinical Pathology E2E Scenarios (3-Layer Assertion Law
       expect(watermelonItem).toBeDefined();
       expect(orangeItem).toBeDefined();
 
-      // Kiểm tra Available Carbohydrate cho từng loại quả (sai lệch < 0.1g)
-      expect(bananaItem.nutrients.carbohydrate).toBeCloseTo(30.38, 1);
-      expect(watermelonItem.nutrients.carbohydrate).toBeCloseTo(11.55, 1);
-      expect(orangeItem.nutrients.carbohydrate).toBeCloseTo(13.09, 1);
+      // Kiểm tra Carbohydrate cho từng loại quả theo chuẩn NIN (100 - water - protein - fat - ash)
+      expect(bananaItem.nutrients.carbohydrate).toBeCloseTo(34.28, 1);
+      expect(watermelonItem.nutrients.carbohydrate).toBeCloseTo(12.2, 1);
+      expect(orangeItem.nutrients.carbohydrate).toBeCloseTo(16.45, 1);
 
-      // Tổng Available Carbohydrate cả ngày
+      // Tổng Carbohydrate cả ngày
       const totalCarb = intakeData.totalDayNutrients.carbohydrate;
-      expect(totalCarb).toBeCloseTo(55.02, 1);
+      expect(totalCarb).toBeCloseTo(62.93, 1);
 
       // KHẲNG ĐỊNH: Tuyệt đối không được tính khống theo Java cũ (80.59g)
-      expect(totalCarb).toBeLessThan(60.0);
-      expect(Math.abs(totalCarb - 80.59)).toBeGreaterThan(20.0);
+      expect(totalCarb).toBeLessThan(70.0);
+      expect(Math.abs(totalCarb - 80.59)).toBeGreaterThan(15.0);
 
       // Layer 3: Direct Database State Persistence
       const prisma = helper.getPrisma();

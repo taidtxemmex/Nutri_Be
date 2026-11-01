@@ -34,9 +34,7 @@ export class WinstonLoggerService implements LoggerService {
       winston.format.printf(({ timestamp, level, message, context, trace, ...meta }) => {
         const ctx = context ? `[${context}] ` : '';
         const metaStr =
-          Object.keys(meta).length > 0 && !meta.isAxiosError
-            ? ` ${JSON.stringify(meta)}`
-            : '';
+          Object.keys(meta).length > 0 && !meta.isAxiosError ? ` ${JSON.stringify(meta)}` : '';
         const traceStr = trace ? `\n${trace}` : '';
         return `[Nest] ${process.pid}  - ${timestamp}     ${level.toUpperCase().padEnd(7)} ${ctx}${message}${metaStr}${traceStr}`;
       }),

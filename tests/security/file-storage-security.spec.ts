@@ -470,7 +470,7 @@ describe('FileStorageSecurity & MIME Spoofing Defense (Task 7.3 - CWE-434, CWE-2
         paymentRequestId: '20',
         note: 'Bản chụp X-quang phổi',
       };
-      const mockUser = { id: 'doctor-user-uuid-1' };
+      const mockUser = { id: 'doctor-user-uuid-1' } as any;
 
       const evidenceResponse = await filesController.uploadEvidence(
         mockEvidenceFile,

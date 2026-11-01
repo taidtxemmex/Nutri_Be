@@ -4,31 +4,31 @@ import { Transform, Type } from 'class-transformer';
 
 export class CreateExtendedDiseaseGroupDto {
   @ApiProperty({ example: '01', description: 'Mã nhóm mở rộng (suffix hoặc đầy đủ như A-01)' })
-  @IsNotEmpty({ message: 'Mã nhóm mở rộng không được để trống' })
-  @IsString({ message: 'Mã nhóm mở rộng phải là chuỗi' })
+  @IsNotEmpty({ message: 'validation.extended_disease_groups.extended_code_required' })
+  @IsString({ message: 'validation.extended_disease_groups.extended_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã nhóm mở rộng tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.extended_disease_groups.extended_code_max_50' })
   extendedCode: string;
 
   @ApiPropertyOptional({ example: '01', description: 'Mã nhóm mở rộng (alias maNhomBenh)' })
   @IsOptional()
-  @IsString({ message: 'Mã nhóm mở rộng phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.extended_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã nhóm mở rộng tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.extended_disease_groups.extended_code_max_50' })
   maNhomBenh?: string;
 
   @ApiPropertyOptional({ example: '01', description: 'Mã nhóm mở rộng (alias maNhomMoRong)' })
   @IsOptional()
-  @IsString({ message: 'Mã nhóm mở rộng phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.extended_code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã nhóm mở rộng tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.extended_disease_groups.extended_code_max_50' })
   maNhomMoRong?: string;
 
   @ApiProperty({ example: 'Tăng huyết áp nguyên phát', description: 'Tên hiển thị' })
-  @IsNotEmpty({ message: 'Tên hiển thị không được để trống' })
-  @IsString({ message: 'Tên hiển thị phải là chuỗi' })
+  @IsNotEmpty({ message: 'validation.extended_disease_groups.display_name_required' })
+  @IsString({ message: 'validation.extended_disease_groups.display_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên hiển thị tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.extended_disease_groups.display_name_max_255' })
   displayName: string;
 
   @ApiPropertyOptional({
@@ -36,9 +36,9 @@ export class CreateExtendedDiseaseGroupDto {
     description: 'Tên nhóm bệnh (alias tenNhomBenh)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên nhóm bệnh phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.group_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên nhóm bệnh tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.extended_disease_groups.group_name_max_255' })
   tenNhomBenh?: string;
 
   @ApiPropertyOptional({
@@ -46,16 +46,16 @@ export class CreateExtendedDiseaseGroupDto {
     description: 'Tên hiển thị (alias tenHienThi)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên hiển thị phải là chuỗi' })
+  @IsString({ message: 'validation.extended_disease_groups.display_name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên hiển thị tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.extended_disease_groups.display_name_max_255' })
   tenHienThi?: string;
 
   @ApiProperty({ example: 1, description: 'ID nhóm bệnh cha' })
-  @IsNotEmpty({ message: 'ID nhóm bệnh cha không được để trống' })
+  @IsNotEmpty({ message: 'validation.extended_disease_groups.parent_id_required' })
   @Type(() => Number)
-  @IsInt({ message: 'ID nhóm bệnh cha phải là số nguyên' })
-  @Min(1, { message: 'ID nhóm bệnh cha phải lớn hơn 0' })
+  @IsInt({ message: 'validation.extended_disease_groups.parent_id_int' })
+  @Min(1, { message: 'validation.extended_disease_groups.parent_id_min' })
   parentId: number;
 
   @ApiPropertyOptional({
@@ -63,7 +63,7 @@ export class CreateExtendedDiseaseGroupDto {
     description: 'User ID (tùy chọn, hệ thống ưu tiên lấy từ JWT)',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.extended_disease_groups.user_id_string' })
   userId?: string;
 
   getExtendedCode(): string {

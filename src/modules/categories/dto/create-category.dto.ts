@@ -8,9 +8,9 @@ export class CreateCategoryDto {
     description: 'Tên danh mục (CamelCase FE convention)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên danh mục phải là chuỗi' })
+  @IsString({ message: 'validation.categories.name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên danh mục tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.categories.name_max' })
   categoryName?: string;
 
   @ApiPropertyOptional({
@@ -18,9 +18,9 @@ export class CreateCategoryDto {
     description: 'Tên danh mục (Snake/Tiếng Việt convention)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên danh mục phải là chuỗi' })
+  @IsString({ message: 'validation.categories.name_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(255, { message: 'Tên danh mục tối đa 255 ký tự' })
+  @MaxLength(255, { message: 'validation.categories.name_max' })
   tenDanhMuc?: string;
 
   @ApiPropertyOptional({
@@ -28,9 +28,9 @@ export class CreateCategoryDto {
     description: 'Mã danh mục (CamelCase FE convention)',
   })
   @IsOptional()
-  @IsString({ message: 'Mã danh mục phải là chuỗi' })
+  @IsString({ message: 'validation.categories.code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã danh mục tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.categories.code_max' })
   categoryCode?: string;
 
   @ApiPropertyOptional({
@@ -38,9 +38,9 @@ export class CreateCategoryDto {
     description: 'Mã danh mục (Snake/Tiếng Việt convention)',
   })
   @IsOptional()
-  @IsString({ message: 'Mã danh mục phải là chuỗi' })
+  @IsString({ message: 'validation.categories.code_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(50, { message: 'Mã danh mục tối đa 50 ký tự' })
+  @MaxLength(50, { message: 'validation.categories.code_max' })
   maDanhMuc?: string;
 
   @ApiPropertyOptional({
@@ -48,9 +48,9 @@ export class CreateCategoryDto {
     description: 'Mô tả danh mục',
   })
   @IsOptional()
-  @IsString({ message: 'Mô tả danh mục phải là chuỗi' })
+  @IsString({ message: 'validation.categories.desc_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(5000, { message: 'Mô tả danh mục tối đa 5000 ký tự' })
+  @MaxLength(5000, { message: 'validation.categories.desc_max' })
   description?: string;
 
   @ApiPropertyOptional({
@@ -58,9 +58,9 @@ export class CreateCategoryDto {
     description: 'Mô tả danh mục (Tiếng Việt)',
   })
   @IsOptional()
-  @IsString({ message: 'Mô tả danh mục phải là chuỗi' })
+  @IsString({ message: 'validation.categories.desc_string' })
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @MaxLength(5000, { message: 'Mô tả danh mục tối đa 5000 ký tự' })
+  @MaxLength(5000, { message: 'validation.categories.desc_max' })
   moTa?: string;
 
   /**

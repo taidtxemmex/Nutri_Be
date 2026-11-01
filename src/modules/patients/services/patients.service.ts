@@ -17,6 +17,7 @@ import {
   CreateMedicalRecordParamDto,
   GetPatientEntityParamDto,
 } from '../dto';
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
 import { isAdminRole } from '../../../config/enums/role.enum';
 import { AnthropometryEngine } from './anthropometry.service';
 import { PatientCodeAllocatorService } from './patient-code-allocator.service';
@@ -27,8 +28,8 @@ import {
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 
-const ERR_PATIENT_NOT_FOUND = 'Không tìm thấy thông tin bệnh nhân';
-const ERR_PATIENT_FORBIDDEN = 'Bạn không có quyền truy cập hồ sơ bệnh nhân này';
+const ERR_PATIENT_NOT_FOUND = 'error.patients.not_found';
+const ERR_PATIENT_FORBIDDEN = 'error.patients.forbidden_access';
 
 export interface FindPatientParamDto {
   id: bigint;
@@ -238,12 +239,10 @@ export class PatientsService {
   /**
    * 1. GET /api/patients: Danh sách bệnh nhân phân trang & tìm kiếm
    */
-  async findAll({ query, currentUser }: FindAllPatientsParamDto): Promise<{
-    items: PatientResponseDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  async findAll({
+    query,
+    currentUser,
+  }: FindAllPatientsParamDto): Promise<PaginatedResult<PatientResponseDto>> {
     const page = Math.max(Number(query?.page) || 1, 1);
     const limit = Math.min(Math.max(Number(query?.limit) || 1000, 1), 1000);
     const skip = (page - 1) * limit;
@@ -259,12 +258,7 @@ export class PatientsService {
     });
 
     if (this.cacheService && cacheKey) {
-      const cached = await this.cacheService.get<{
-        items: PatientResponseDto[];
-        total: number;
-        page: number;
-        limit: number;
-      }>(cacheKey);
+      const cached = await this.cacheService.get<PaginatedResult<PatientResponseDto>>(cacheKey);
       if (cached) {
         return cached;
       }
@@ -600,12 +594,7 @@ export class PatientsService {
     id,
     query,
     currentUser,
-  }: GetAnthropometryHistoryParamDto): Promise<{
-    items: AnthropometryResponseDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  }: GetAnthropometryHistoryParamDto): Promise<PaginatedResult<AnthropometryResponseDto>> {
     const patientId = BigInt(id);
     await this.findPatientOrThrow({ id: patientId, currentUser });
 
@@ -760,12 +749,11 @@ export class PatientsService {
   /**
    * 9. GET /api/patients/:id/medical-records: Lấy danh sách hồ sơ bệnh án lâm sàng
    */
-  async getMedicalRecords({ id, query, currentUser }: GetMedicalRecordsParamDto): Promise<{
-    items: MedicalRecordResponseDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  async getMedicalRecords({
+    id,
+    query,
+    currentUser,
+  }: GetMedicalRecordsParamDto): Promise<PaginatedResult<MedicalRecordResponseDto>> {
     const patientId = BigInt(id);
     await this.findPatientOrThrow({ id: patientId, currentUser });
 

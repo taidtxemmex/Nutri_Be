@@ -18,7 +18,7 @@ export class CreateAnthropometryDto {
     example: '2026-10-27',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Ngày đo không hợp lệ (YYYY-MM-DD)' })
+  @IsDateString({}, { message: 'validation.patients.anthropometry_date_format' })
   measuredDate?: string;
 
   @ApiPropertyOptional({
@@ -26,29 +26,29 @@ export class CreateAnthropometryDto {
     example: '2026-10-27',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Ngày đo không hợp lệ (YYYY-MM-DD)' })
+  @IsDateString({}, { message: 'validation.patients.anthropometry_date_format' })
   ngayDo?: string;
 
   @ApiProperty({
     description: 'Cân nặng (kg)',
     example: 68.5,
   })
-  @IsNotEmpty({ message: 'Cân nặng không được để trống' })
+  @IsNotEmpty({ message: 'validation.patients.weight_required' })
   @Type(() => Number)
-  @IsNumber({}, { message: 'Cân nặng phải là số' })
-  @Min(0.01, { message: 'Cân nặng phải lớn hơn hoặc bằng 0.01 kg' })
-  @Max(500, { message: 'Cân nặng không được vượt quá 500 kg' })
+  @IsNumber({}, { message: 'validation.patients.weight_number' })
+  @Min(0.01, { message: 'validation.patients.weight_min' })
+  @Max(500, { message: 'validation.patients.weight_max' })
   weight: number;
 
   @ApiProperty({
     description: 'Chiều cao (cm hoặc m)',
     example: 172.0,
   })
-  @IsNotEmpty({ message: 'Chiều cao không được để trống' })
+  @IsNotEmpty({ message: 'validation.patients.height_required' })
   @Type(() => Number)
-  @IsNumber({}, { message: 'Chiều cao phải là số' })
-  @Min(0.01, { message: 'Chiều cao phải lớn hơn hoặc bằng 0.01' })
-  @Max(300, { message: 'Chiều cao không được vượt quá 300 cm' })
+  @IsNumber({}, { message: 'validation.patients.height_number' })
+  @Min(0.01, { message: 'validation.patients.height_min' })
+  @Max(300, { message: 'validation.patients.height_max' })
   height: number;
 
   @ApiPropertyOptional({
@@ -57,9 +57,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'Huyết áp tâm thu phải là số nguyên' })
-  @Min(30, { message: 'Huyết áp tâm thu phải lớn hơn hoặc bằng 30 mmHg' })
-  @Max(300, { message: 'Huyết áp tâm thu không được vượt quá 300 mmHg' })
+  @IsInt({ message: 'validation.patients.systolic_bp_int' })
+  @Min(30, { message: 'validation.patients.systolic_bp_min' })
+  @Max(300, { message: 'validation.patients.systolic_bp_max' })
   systolicBloodPressure?: number;
 
   @ApiPropertyOptional({
@@ -68,9 +68,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'Huyết áp tâm trương phải là số nguyên' })
-  @Min(20, { message: 'Huyết áp tâm trương phải lớn hơn hoặc bằng 20 mmHg' })
-  @Max(200, { message: 'Huyết áp tâm trương không được vượt quá 200 mmHg' })
+  @IsInt({ message: 'validation.patients.diastolic_bp_int' })
+  @Min(20, { message: 'validation.patients.diastolic_bp_min' })
+  @Max(200, { message: 'validation.patients.diastolic_bp_max' })
   diastolicBloodPressure?: number;
 
   @ApiPropertyOptional({
@@ -79,9 +79,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Vòng eo phải là số' })
-  @Min(10, { message: 'Vòng eo phải lớn hơn hoặc bằng 10 cm' })
-  @Max(300, { message: 'Vòng eo không được vượt quá 300 cm' })
+  @IsNumber({}, { message: 'validation.patients.waist_number' })
+  @Min(10, { message: 'validation.patients.waist_min' })
+  @Max(300, { message: 'validation.patients.waist_max' })
   waistCircumference?: number;
 
   @ApiPropertyOptional({
@@ -90,9 +90,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Vòng mông phải là số' })
-  @Min(10, { message: 'Vòng mông phải lớn hơn hoặc bằng 10 cm' })
-  @Max(300, { message: 'Vòng mông không được vượt quá 300 cm' })
+  @IsNumber({}, { message: 'validation.patients.hip_number' })
+  @Min(10, { message: 'validation.patients.hip_min' })
+  @Max(300, { message: 'validation.patients.hip_max' })
   hipCircumference?: number;
 
   @ApiPropertyOptional({
@@ -101,9 +101,9 @@ export class CreateAnthropometryDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsNumber({}, { message: 'Hệ số hoạt động phải là số' })
-  @Min(1.0, { message: 'Hệ số hoạt động phải lớn hơn hoặc bằng 1.0' })
-  @Max(2.5, { message: 'Hệ số hoạt động không được vượt quá 2.5' })
+  @IsNumber({}, { message: 'validation.patients.activity_factor_number' })
+  @Min(1.0, { message: 'validation.patients.activity_factor_min_1' })
+  @Max(2.5, { message: 'validation.patients.activity_factor_max_2_5' })
   activityFactor?: number;
 
   @ApiPropertyOptional({
@@ -111,7 +111,7 @@ export class CreateAnthropometryDto {
     example: 'Tái khám định kỳ theo hẹn',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(1000, { message: 'Ghi chú không được vượt quá 1000 ký tự' })
+  @IsString({ message: 'validation.patients.notes_string' })
+  @MaxLength(1000, { message: 'validation.patients.notes_max_1000' })
   notes?: string;
 }

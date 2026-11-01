@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum, IsBoolean, IsObject, MaxLength } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsBoolean,
+  IsObject,
+  IsNotEmpty,
+  MaxLength,
+} from 'class-validator';
 import { NutritionLimitWarning } from '../../../config/enums/domain.enum';
 
 export class CreateNutritionLimitSetDto {
@@ -12,8 +20,8 @@ export class CreateNutritionLimitSetDto {
     example: 'Giới hạn tiểu đường Type 2',
   })
   @IsOptional()
-  @IsString({ message: 'Tên bộ giới hạn phải là chuỗi' })
-  @MaxLength(255, { message: 'Tên bộ giới hạn tối đa 255 ký tự' })
+  @IsString({ message: 'validation.nutrition_limits.name_string' })
+  @MaxLength(255, { message: 'validation.nutrition_limits.name_max' })
   name?: string;
 
   @ApiPropertyOptional({
@@ -22,19 +30,20 @@ export class CreateNutritionLimitSetDto {
     default: NutritionLimitWarning.OFF,
   })
   @IsOptional()
-  @IsEnum(NutritionLimitWarning)
+  @IsEnum(NutritionLimitWarning, { message: 'validation.nutrition_limits.warning_rule_enum' })
   warningRule?: NutritionLimitWarning;
 
   @ApiPropertyOptional({ description: 'Có cho phép tái sử dụng làm mẫu không', default: false })
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.nutrition_limits.reusable_boolean' })
   reusable?: boolean;
 
   @ApiProperty({
     description: 'Bản đồ giới hạn vi chất (chỉ tiêu -> ngưỡng tối đa/tối thiểu)',
     example: { energy: 2000, protein: 75, fat: 50, carbohydrate: 280, sodium: 2000 },
   })
-  @IsObject()
+  @IsNotEmpty({ message: 'validation.nutrition_limits.limits_required' })
+  @IsObject({ message: 'validation.nutrition_limits.limits_object' })
   limits: Record<string, any>;
 }
 
@@ -48,8 +57,8 @@ export class UpdateNutritionLimitSetDto {
     example: 'Giới hạn tiểu đường Type 2 (Cập nhật)',
   })
   @IsOptional()
-  @IsString({ message: 'Tên bộ giới hạn phải là chuỗi' })
-  @MaxLength(255, { message: 'Tên bộ giới hạn tối đa 255 ký tự' })
+  @IsString({ message: 'validation.nutrition_limits.name_string' })
+  @MaxLength(255, { message: 'validation.nutrition_limits.name_max' })
   name?: string;
 
   @ApiPropertyOptional({
@@ -57,19 +66,19 @@ export class UpdateNutritionLimitSetDto {
     enum: NutritionLimitWarning,
   })
   @IsOptional()
-  @IsEnum(NutritionLimitWarning)
+  @IsEnum(NutritionLimitWarning, { message: 'validation.nutrition_limits.warning_rule_enum' })
   warningRule?: NutritionLimitWarning;
 
   @ApiPropertyOptional({ description: 'Có cho phép tái sử dụng làm mẫu không' })
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.nutrition_limits.reusable_boolean' })
   reusable?: boolean;
 
   @ApiPropertyOptional({
     description: 'Bản đồ giới hạn vi chất',
   })
   @IsOptional()
-  @IsObject()
+  @IsObject({ message: 'validation.nutrition_limits.limits_object' })
   limits?: Record<string, any>;
 }
 

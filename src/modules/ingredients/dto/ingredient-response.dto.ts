@@ -36,6 +36,18 @@ export class IngredientListItemDto {
 
   @ApiPropertyOptional({ example: 100, description: 'Tỷ lệ ăn được (%)' })
   edible?: number | null;
+
+  @ApiPropertyOptional({
+    example: '/uploads/public/ingredients/2026/11/gao.jpg',
+    description: 'Đường dẫn ảnh nguyên liệu',
+  })
+  imageUrl?: string | null;
+
+  @ApiPropertyOptional({
+    example: '/uploads/public/ingredients/2026/11/gao.jpg',
+    description: 'Alias snake_case cho imageUrl',
+  })
+  image_url?: string | null;
 }
 
 export class IngredientDetailDto extends IngredientListItemDto {

@@ -1,10 +1,26 @@
-import { IsEmail, IsNotEmpty, MaxLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength, Matches } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EMAIL_OR_USERNAME_REGEX } from '../../../config/constants/regex.constants';
 
 export class ForgotPasswordDto {
-  @ApiProperty({ example: 'bsminhtri@gmail.com', description: 'Địa chỉ email đã đăng ký' })
-  @IsNotEmpty({ message: 'Email không được để trống' })
-  @IsEmail({}, { message: 'Định dạng email không hợp lệ' })
-  @MaxLength(255, { message: 'Email không được vượt quá 255 ký tự' })
+  @ApiProperty({
+    example: 'bsminhtri@gmail.com',
+    description: 'Địa chỉ email hoặc tên đăng nhập đã đăng ký',
+  })
+  @IsNotEmpty({ message: 'validation.auth.email_or_username_required' })
+  @IsString({ message: 'validation.auth.email_or_username_string' })
+  @MaxLength(255, { message: 'validation.auth.email_or_username_max' })
+  @Matches(EMAIL_OR_USERNAME_REGEX, {
+    message: 'validation.auth.email_or_username_pattern',
+  })
   email: string;
+
+  @ApiPropertyOptional({
+    example: 'https://truenutri.pages.dev',
+    description: 'Địa chỉ frontend nhận link đặt lại mật khẩu (tùy chọn)',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.auth.redirect_url_string' })
+  @MaxLength(500, { message: 'validation.auth.redirect_url_max' })
+  redirectUrl?: string;
 }

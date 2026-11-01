@@ -39,9 +39,7 @@ export function createCorsOptions(): CorsOptions {
   const isProduction = process.env.NODE_ENV === 'production';
 
   // Gom FRONTEND_URL làm biến trung tâm cho CORS (hỗ trợ nhiều domain phân tách bằng dấu phẩy)
-  const rawOrigins = [process.env.FRONTEND_URL, process.env.CORS_ORIGINS]
-    .filter(Boolean)
-    .join(',');
+  const rawOrigins = [process.env.FRONTEND_URL, process.env.CORS_ORIGINS].filter(Boolean).join(',');
 
   const envOrigins = rawOrigins
     .split(',')

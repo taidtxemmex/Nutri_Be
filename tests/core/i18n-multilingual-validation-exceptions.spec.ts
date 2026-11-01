@@ -25,6 +25,9 @@ import { I18nService } from '../../src/core/i18n/i18n.service';
 import { I18nLocaleMiddleware } from '../../src/common/middlewares/i18n-locale.middleware';
 import { CustomValidationPipe } from '../../src/common/pipes/custom-validation.pipe';
 import { GlobalExceptionFilter } from '../../src/common/filters/global-exception.filter';
+import { CreateCoefficientDto } from '../../src/modules/coefficients/dto';
+import { CreateDishDto } from '../../src/modules/dishes/dto';
+import { LoginDto } from '../../src/modules/auth/dto';
 
 // 1. Khởi tạo Test DTOs
 export class CustomMessageDto {
@@ -53,6 +56,24 @@ export class TestI18nController {
   @Post('dto-default')
   @HttpCode(HttpStatus.OK)
   testDefaultDto(@Body() dto: DefaultConstraintDto) {
+    return { data: dto };
+  }
+
+  @Post('dto-coefficient')
+  @HttpCode(HttpStatus.OK)
+  testCoefficientDto(@Body() dto: CreateCoefficientDto) {
+    return { data: dto };
+  }
+
+  @Post('dto-dish')
+  @HttpCode(HttpStatus.OK)
+  testDishDto(@Body() dto: CreateDishDto) {
+    return { data: dto };
+  }
+
+  @Post('dto-auth')
+  @HttpCode(HttpStatus.OK)
+  testAuthDto(@Body() dto: LoginDto) {
     return { data: dto };
   }
 
@@ -527,6 +548,131 @@ describe('Multilingual Validation & System Exceptions E2E Tests (vi, en, zh)', (
           timestamp: expect.any(String),
           traceId: expect.any(String),
         },
+      });
+    });
+  });
+
+  // =========================================================================
+  // SUITE 5: DOMAIN DTOS MULTILINGUAL VALIDATION (COEFFICIENTS, DISHES, AUTH)
+  // =========================================================================
+  describe('5. Domain DTOs Multilingual Validation (coefficients, dishes, auth)', () => {
+    describe('Coefficients DTO validation', () => {
+      it('Dịch lỗi validation sang Tiếng Việt (mặc định)', async () => {
+        const res = await request(app.getHttpServer()).post('/test-i18n/dto-coefficient').send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const methodErr = details.find(
+          (d: any) => d.field === 'processingMethod' && d.code === 'ISNOTEMPTY',
+        );
+        expect(methodErr).toBeDefined();
+        expect(methodErr.message).toBe('Phương pháp chế biến không được để trống.');
+      });
+
+      it('Dịch lỗi validation sang Tiếng Anh khi Accept-Language: en', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/test-i18n/dto-coefficient')
+          .set('Accept-Language', 'en')
+          .send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const methodErr = details.find(
+          (d: any) => d.field === 'processingMethod' && d.code === 'ISNOTEMPTY',
+        );
+        expect(methodErr).toBeDefined();
+        expect(methodErr.message).toBe('Cooking method is required.');
+      });
+
+      it('Dịch lỗi validation sang Tiếng Trung khi Accept-Language: zh', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/test-i18n/dto-coefficient')
+          .set('Accept-Language', 'zh')
+          .send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const methodErr = details.find(
+          (d: any) => d.field === 'processingMethod' && d.code === 'ISNOTEMPTY',
+        );
+        expect(methodErr).toBeDefined();
+        expect(methodErr.message).toBe('烹饪方法不能为空。');
+      });
+    });
+
+    describe('Dishes DTO validation', () => {
+      it('Dịch lỗi validation sang Tiếng Việt khi lang=vi', async () => {
+        const res = await request(app.getHttpServer()).post('/test-i18n/dto-dish?lang=vi').send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const nameErr = details.find((d: any) => d.field === 'name' && d.code === 'ISNOTEMPTY');
+        expect(nameErr).toBeDefined();
+        expect(nameErr.message).toBe('Tên món ăn không được để trống.');
+      });
+
+      it('Dịch lỗi validation sang Tiếng Anh khi lang=en', async () => {
+        const res = await request(app.getHttpServer()).post('/test-i18n/dto-dish?lang=en').send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const nameErr = details.find((d: any) => d.field === 'name' && d.code === 'ISNOTEMPTY');
+        expect(nameErr).toBeDefined();
+        expect(nameErr.message).toBe('Dish name is required.');
+      });
+
+      it('Dịch lỗi validation sang Tiếng Trung khi lang=zh', async () => {
+        const res = await request(app.getHttpServer()).post('/test-i18n/dto-dish?lang=zh').send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const nameErr = details.find((d: any) => d.field === 'name' && d.code === 'ISNOTEMPTY');
+        expect(nameErr).toBeDefined();
+        expect(nameErr.message).toBe('菜品名称不能为空。');
+      });
+    });
+
+    describe('Auth DTO validation', () => {
+      it('Dịch lỗi validation Login sang Tiếng Việt (mặc định)', async () => {
+        const res = await request(app.getHttpServer()).post('/test-i18n/dto-auth').send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const usernameErr = details.find(
+          (d: any) => d.field === 'username' && d.code === 'ISNOTEMPTY',
+        );
+        expect(usernameErr).toBeDefined();
+        expect(usernameErr.message).toBe('Tên đăng nhập không được để trống');
+      });
+
+      it('Dịch lỗi validation Login sang Tiếng Anh khi Accept-Language: en', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/test-i18n/dto-auth')
+          .set('Accept-Language', 'en')
+          .send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const usernameErr = details.find(
+          (d: any) => d.field === 'username' && d.code === 'ISNOTEMPTY',
+        );
+        expect(usernameErr).toBeDefined();
+        expect(usernameErr.message).toBe('Username should not be empty');
+      });
+
+      it('Dịch lỗi validation Login sang Tiếng Trung khi Accept-Language: zh', async () => {
+        const res = await request(app.getHttpServer())
+          .post('/test-i18n/dto-auth')
+          .set('Accept-Language', 'zh')
+          .send({});
+
+        expect(res.status).toBe(400);
+        const details = res.body.error.details;
+        const usernameErr = details.find(
+          (d: any) => d.field === 'username' && d.code === 'ISNOTEMPTY',
+        );
+        expect(usernameErr).toBeDefined();
+        expect(usernameErr.message).toMatch(/用户名\s*不能为空/);
       });
     });
   });

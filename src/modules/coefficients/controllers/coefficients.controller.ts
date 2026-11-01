@@ -3,6 +3,7 @@ import { ApiOperation, ApiParam } from '@nestjs/swagger';
 import { CoefficientsService } from '../services/coefficients.service';
 import { CreateCoefficientDto, UpdateCoefficientDto, CoefficientResponseDto } from '../dto';
 import { ApiController, ApiStandardResponse, CurrentUser } from '../../../common/decorators';
+import { AuthenticatedUser } from '../../auth/interfaces/jwt-payload.interface';
 
 @ApiController('Coefficients', 'coefficients', { auth: true })
 export class CoefficientsController {
@@ -19,7 +20,7 @@ export class CoefficientsController {
   })
   async create(
     @Body() dto: CreateCoefficientDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<CoefficientResponseDto> {
     return this.coefficientsService.create({ dto, currentUser: user });
   }
@@ -31,7 +32,7 @@ export class CoefficientsController {
     isArray: true,
     description: 'Lấy danh sách hệ số thành công',
   })
-  async getAll(@CurrentUser() user: any): Promise<CoefficientResponseDto[]> {
+  async getAll(@CurrentUser() user: AuthenticatedUser): Promise<CoefficientResponseDto[]> {
     return this.coefficientsService.findAll({ currentUser: user });
   }
 
@@ -53,7 +54,7 @@ export class CoefficientsController {
     isArray: true,
     description: 'Lấy danh sách hệ số cá nhân thành công',
   })
-  async getMy(@CurrentUser() user: any): Promise<CoefficientResponseDto[]> {
+  async getMy(@CurrentUser() user: AuthenticatedUser): Promise<CoefficientResponseDto[]> {
     return this.coefficientsService.findMy({ currentUser: user });
   }
 
@@ -78,7 +79,7 @@ export class CoefficientsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateCoefficientDto,
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<CoefficientResponseDto> {
     return this.coefficientsService.update({ id, dto, currentUser: user });
   }
@@ -89,7 +90,10 @@ export class CoefficientsController {
   @ApiStandardResponse({
     description: 'Xóa hệ số thành công',
   })
-  async delete(@Param('id') id: string, @CurrentUser() user: any): Promise<{ message: string }> {
+  async delete(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<{ message: string }> {
     return this.coefficientsService.delete({ id, currentUser: user });
   }
 }

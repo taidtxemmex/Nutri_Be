@@ -1,4 +1,4 @@
-import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { NutritionCalculatorService, MealInput, MenuInput } from '../../../core/nutrition-engine';
@@ -20,6 +20,7 @@ import {
   CloneMenuParamsDto,
   ResolveDishForMenuParamsDto,
 } from '../dto';
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
 import { MenuType, DishStatus } from '../../../config/enums/domain.enum';
 import { isAdminRole } from '../../../config/enums/role.enum';
 import {
@@ -31,7 +32,6 @@ import {
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import { PatientsService } from '../../patients/services/patients.service';
-import { Optional } from '@nestjs/common';
 
 export interface UpdateMenuEnergyDisplayParamDto {
   menuId: bigint;
@@ -201,12 +201,10 @@ export class MenusService {
   /**
    * 1. GET /api/menus & /api/menu: Lấy danh sách thực đơn phân trang (Anti-Overfetching)
    */
-  async getAll({ query, currentUser }: GetAllMenusParamsDto): Promise<{
-    items: MenuListDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  async getAll({
+    query,
+    currentUser,
+  }: GetAllMenusParamsDto): Promise<PaginatedResult<MenuListDto>> {
     const page = Math.max(1, Number(query?.page) || 1);
     const limit = Math.min(1000, Math.max(1, Number(query?.limit) || 1000));
     const skip = (page - 1) * limit;
@@ -249,6 +247,7 @@ export class MenusService {
         select: {
           id: true,
           ten_thuc_don: true,
+          image_url: true,
           loai_thuc_don: true,
           loai_doi_tuong: true,
           ngay_tao: true,
@@ -282,6 +281,8 @@ export class MenusService {
     const items: MenuListDto[] = rows.map((r) => ({
       id: r.id.toString(),
       menuName: r.ten_thuc_don,
+      imageUrl: r.image_url ?? null,
+      image_url: r.image_url ?? null,
       menuType: r.loai_thuc_don,
       targetType: r.loai_doi_tuong,
       createdDate: this.formatDateDdMmYyyy(r.ngay_tao),
@@ -487,6 +488,8 @@ export class MenusService {
     return {
       id: menu.id.toString(),
       menuName: menu.ten_thuc_don,
+      imageUrl: menu.image_url ?? null,
+      image_url: menu.image_url ?? null,
       menuType: menu.loai_thuc_don,
       targetType: menu.loai_doi_tuong,
       createdDate: this.formatDateDdMmYyyy(menu.ngay_tao),
@@ -612,6 +615,8 @@ export class MenusService {
     return {
       id: menu.id.toString(),
       menuName: menu.ten_thuc_don,
+      imageUrl: menu.image_url ?? null,
+      image_url: menu.image_url ?? null,
       menuType: menu.loai_thuc_don,
       targetType: menu.loai_doi_tuong,
       patientId: menu.benh_nhan_id ? menu.benh_nhan_id.toString() : null,
@@ -899,10 +904,12 @@ export class MenusService {
     // Transaction lồng 5 cấp
     const createdMenu = await this.prisma.$transaction(
       async (tx) => {
+        const menuImg = dto.image_url !== undefined ? dto.image_url : dto.imageUrl;
         const menu = await tx.thuc_don.create({
           data: {
             nguoi_dung_id: currentUser.id,
             ten_thuc_don: dto.menuName.trim(),
+            image_url: menuImg || null,
             loai_thuc_don: dto.menuType,
             loai_doi_tuong: dto.targetType,
             benh_nhan_id: dto.patientId ? BigInt(dto.patientId) : null,
@@ -982,7 +989,13 @@ export class MenusService {
 
     const existingMenu = await this.prisma.thuc_don.findFirst({
       where: { id: menuId, deleted_at: null },
-      select: { id: true, nguoi_dung_id: true, ten_thuc_don: true, loai_thuc_don: true },
+      select: {
+        id: true,
+        nguoi_dung_id: true,
+        ten_thuc_don: true,
+        loai_thuc_don: true,
+        image_url: true,
+      },
     });
 
     if (!existingMenu) {
@@ -1021,11 +1034,13 @@ export class MenusService {
     const updatedMenu = await this.prisma.$transaction(
       async (tx) => {
         // 1. Cập nhật thông tin cơ bản
+        const menuImg = dto.image_url !== undefined ? dto.image_url : dto.imageUrl;
         const menu = await tx.thuc_don.update({
           where: { id: menuId },
           data: {
             ten_thuc_don:
               dto.menuName !== undefined ? dto.menuName.trim() : existingMenu.ten_thuc_don,
+            image_url: menuImg !== undefined ? menuImg || null : undefined,
             loai_thuc_don: dto.menuType !== undefined ? dto.menuType : existingMenu.loai_thuc_don,
             loai_doi_tuong: dto.targetType !== undefined ? dto.targetType : undefined,
             benh_nhan_id:
@@ -1345,6 +1360,7 @@ export class MenusService {
           data: {
             nguoi_dung_id: currentUser.id,
             ten_thuc_don: `[Bản sao] ${original.ten_thuc_don}`,
+            image_url: original.image_url,
             loai_thuc_don: original.loai_thuc_don,
             loai_doi_tuong: original.loai_doi_tuong,
             benh_nhan_id: targetPatientId,

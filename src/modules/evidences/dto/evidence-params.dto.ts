@@ -1,9 +1,7 @@
 import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { UserContext } from '../../../common/interfaces/user-context.interface';
 
-export interface EvidenceUserContext {
-  id: string;
-  role?: string;
-}
+export type EvidenceUserContext = UserContext;
 
 export class GeneratePreviewUrlParamsDto {
   id: string | number;
@@ -16,20 +14,20 @@ export class GenerateDownloadUrlParamsDto {
 }
 
 export class GeneratePreviewObjectParamsDto {
-  @IsString({ message: 'objectKey phải là chuỗi' })
-  @IsNotEmpty({ message: 'objectKey không được để trống' })
-  @MaxLength(255, { message: 'objectKey tối đa 255 ký tự' })
+  @IsString({ message: 'validation.evidences.object_key_string' })
+  @IsNotEmpty({ message: 'validation.evidences.object_key_required' })
+  @MaxLength(255, { message: 'validation.evidences.object_key_max_255' })
   objectKey: string;
 }
 
 export class GenerateDownloadObjectParamsDto {
-  @IsString({ message: 'objectKey phải là chuỗi' })
-  @IsNotEmpty({ message: 'objectKey không được để trống' })
-  @MaxLength(255, { message: 'objectKey tối đa 255 ký tự' })
+  @IsString({ message: 'validation.evidences.object_key_string' })
+  @IsNotEmpty({ message: 'validation.evidences.object_key_required' })
+  @MaxLength(255, { message: 'validation.evidences.object_key_max_255' })
   objectKey: string;
 
   @IsOptional()
-  @IsString({ message: 'originalFileName phải là chuỗi' })
-  @MaxLength(255, { message: 'originalFileName tối đa 255 ký tự' })
+  @IsString({ message: 'validation.evidences.original_filename_prop_string' })
+  @MaxLength(255, { message: 'validation.evidences.original_filename_prop_max_255' })
   originalFileName?: string;
 }

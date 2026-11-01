@@ -19,6 +19,7 @@ import {
 import { RdaComparisonEngine, RdaComparisonResult } from '../engines/rda-comparison.engine';
 import { IntakeCalculationEngine } from '../engines/intake-calculation.engine';
 import { DemographicProfile } from '../engines/rda-reference-data';
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
 import { isAdminRole } from '../../../config/enums/role.enum';
 import {
   CACHE_TAG_PATIENTS,
@@ -28,11 +29,9 @@ import {
   buildPatientDetailCacheKey,
 } from '../../../config/constants/cache.constants';
 import { PatientsService } from '../../patients/services/patients.service';
+import { CalculateAgeParamDto } from '../../../common/interfaces/date-calculation.interface';
 
-export interface CalculateAgeParamDto {
-  dateOfBirth?: Date | null;
-  onlyBirthYear?: boolean;
-}
+export { CalculateAgeParamDto };
 
 @Injectable()
 export class DailyIntakesService {
@@ -64,10 +63,14 @@ export class DailyIntakesService {
       paramOrDob &&
       typeof paramOrDob === 'object' &&
       !(paramOrDob instanceof Date) &&
-      ('dateOfBirth' in paramOrDob || 'onlyBirthYear' in paramOrDob)
+      ('dateOfBirth' in paramOrDob ||
+        'onlyBirthYear' in paramOrDob ||
+        'dobInput' in paramOrDob ||
+        'birthYearOnly' in paramOrDob)
     ) {
-      dateOfBirth = paramOrDob.dateOfBirth;
-      onlyBirthYear = paramOrDob.onlyBirthYear;
+      const rawDate = paramOrDob.dateOfBirth ?? paramOrDob.dobInput;
+      dateOfBirth = rawDate ? new Date(rawDate) : undefined;
+      onlyBirthYear = paramOrDob.onlyBirthYear ?? paramOrDob.birthYearOnly;
     } else {
       dateOfBirth = paramOrDob as Date | null | undefined;
       onlyBirthYear = legacyOnlyBirthYear;
@@ -109,7 +112,7 @@ export class DailyIntakesService {
             ingredient: rawIngredient,
             rawWeightInput: weightVal,
             options: {
-              isNetWeight: true, // khoi_luong_song_sach trong DB đã là khối lượng sống sạch (Net Weight / rawClean)
+              isNetWeight: false, // Tính toán khối lượng sạch dựa trên tỷ lệ ăn được (edible) của nguyên liệu
               preserveDecimals: true,
             },
           });
@@ -279,12 +282,10 @@ export class DailyIntakesService {
   /**
    * 2. GET /api/daily-intakes: Danh sách khẩu phần theo bệnh nhân/ngày, phân trang
    */
-  async getAll({ query, currentUser }: GetAllDailyIntakesParamDto): Promise<{
-    items: DailyIntakeListDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  async getAll({
+    query,
+    currentUser,
+  }: GetAllDailyIntakesParamDto): Promise<PaginatedResult<DailyIntakeListDto>> {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(100, Math.max(1, Number(query.limit) || 10));
     const skip = (page - 1) * limit;

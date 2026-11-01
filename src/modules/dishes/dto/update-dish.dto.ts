@@ -18,10 +18,28 @@ export class UpdateDishDto {
   id?: number | string;
 
   @ApiPropertyOptional({ description: 'Tên món ăn', example: 'Cơm rang dưa bò đặc biệt' })
-  @IsString({ message: 'Tên món ăn phải là chuỗi' })
-  @MaxLength(255, { message: 'Tên món ăn không được vượt quá 255 ký tự' })
+  @IsString({ message: 'validation.dishes.name_string' })
+  @MaxLength(255, { message: 'validation.dishes.name_max' })
   @IsOptional()
   name?: string;
+
+  @ApiPropertyOptional({
+    description: 'Đường dẫn ảnh món ăn (relative path, không chứa domain)',
+    example: '/uploads/public/dishes/2026/11/abc-dish.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.dishes.image_url_string' })
+  @MaxLength(500, { message: 'validation.dishes.image_url_max' })
+  imageUrl?: string;
+
+  @ApiPropertyOptional({
+    description: 'Alias snake_case cho imageUrl',
+    example: '/uploads/public/dishes/2026/11/abc-dish.jpg',
+  })
+  @IsOptional()
+  @IsString({ message: 'validation.dishes.image_url_string' })
+  @MaxLength(500, { message: 'validation.dishes.image_url_max' })
+  image_url?: string;
 
   @ApiPropertyOptional({ description: 'Trạng thái món ăn' })
   @IsOptional()
@@ -45,8 +63,8 @@ export class UpdateDishDto {
     description: 'Danh sách nguyên liệu thành phần',
     type: [DishIngredientInputDto],
   })
-  @IsArray({ message: 'Danh sách nguyên liệu phải là mảng' })
-  @ArrayMaxSize(100, { message: 'Danh sách nguyên liệu không được vượt quá 100 mục' })
+  @IsArray({ message: 'validation.dishes.details_array' })
+  @ArrayMaxSize(100, { message: 'validation.dishes.ingredients_max_100' })
   @ValidateNested({ each: true })
   @Type(() => DishIngredientInputDto)
   @IsOptional()

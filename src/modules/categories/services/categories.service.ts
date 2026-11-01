@@ -24,12 +24,9 @@ import {
   DeleteCategoryParamsDto,
 } from '../dto';
 
-export interface PaginatedCategoriesResult {
-  items: CategoryResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-}
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
+
+export type PaginatedCategoriesResult = PaginatedResult<CategoryResponseDto>;
 
 @Injectable()
 export class CategoriesService {

@@ -7,7 +7,7 @@ import { SKIP_TRANSFORM_KEY } from '../decorators/skip-transform.decorator';
 
 export interface StandardResponse<T> {
   data: T;
-  meta: Record<string, any>;
+  meta: Record<string, unknown>;
 }
 
 const LEGACY_RAW_ARRAY_PATTERNS: readonly RegExp[] = [
@@ -28,7 +28,7 @@ const LEGACY_RAW_ARRAY_PATTERNS: readonly RegExp[] = [
 @Injectable()
 export class TransformResponseInterceptor<T> implements NestInterceptor<
   T,
-  StandardResponse<T> | T
+  StandardResponse<T> | T | any
 > {
   private reflector = new Reflector();
 
@@ -43,7 +43,10 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
     return LEGACY_RAW_ARRAY_PATTERNS.some((pattern) => pattern.test(cleanPath));
   }
 
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<StandardResponse<T> | T | any> {
     const isSkipTransform = this.reflector.getAllAndOverride<boolean>(SKIP_TRANSFORM_KEY, [
       context.getHandler(),
       context.getClass(),
@@ -56,7 +59,9 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
     const request = context.switchToHttp().getRequest();
     const httpResponse = context.switchToHttp().getResponse();
     const traceId =
-      (request.headers['x-trace-id'] as string) || (request as any).id || crypto.randomUUID();
+      (request.headers['x-trace-id'] as string) ||
+      (request as { id?: string }).id ||
+      crypto.randomUUID();
     if (httpResponse && typeof httpResponse.setHeader === 'function') {
       httpResponse.setHeader('X-Trace-Id', traceId);
     }
@@ -82,8 +87,8 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
 
         // 1b. Legacy Java Raw-Array GET routes (NutriFE expects Array.isArray(res.data))
         if (this.isLegacyRawArrayRoute(reqMethod, reqUrl)) {
-          if (response && Array.isArray((response as any).items)) {
-            return (response as any).items;
+          if (response && Array.isArray((response as { items?: unknown[] }).items)) {
+            return (response as { items: unknown[] }).items;
           }
           if (Array.isArray(response)) {
             return response;
@@ -122,11 +127,11 @@ export class TransformResponseInterceptor<T> implements NestInterceptor<
 
         // 3. Single Entity or Mutation
         if (response && typeof response === 'object' && !Array.isArray(response)) {
+          const resObj = response as Record<string, unknown>;
           return {
             ...response,
-            status:
-              typeof (response as any).status === 'string' ? (response as any).status : statusCode,
-            message: (response as any).message || 'success',
+            status: typeof resObj.status === 'string' ? resObj.status : statusCode,
+            message: (typeof resObj.message === 'string' ? resObj.message : '') || 'success',
             data: response,
             meta: {
               timestamp,

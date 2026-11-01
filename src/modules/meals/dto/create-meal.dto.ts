@@ -25,9 +25,9 @@ export class MealDishItemDto {
     const raw = value ?? (obj as Record<string, unknown>)?.id;
     return raw !== undefined && raw !== null && raw !== '' ? Number(raw) : raw;
   })
-  @IsInt({ message: 'ID món ăn phải là số nguyên' })
-  @Min(1, { message: 'ID món ăn phải lớn hơn 0' })
-  @IsNotEmpty({ message: 'ID món ăn không được để trống' })
+  @IsInt({ message: 'validation.meals.dish_id_int' })
+  @Min(1, { message: 'validation.meals.dish_id_min' })
+  @IsNotEmpty({ message: 'validation.meals.dish_id_required' })
   dishId!: number;
 
   @ApiPropertyOptional({
@@ -38,9 +38,9 @@ export class MealDishItemDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsNumber({}, { message: 'Hệ số phải là số' })
-  @Min(0.0001, { message: 'Hệ số phải lớn hơn 0' })
-  @Max(100.0, { message: 'Hệ số tối đa là 100.0' })
+  @IsNumber({}, { message: 'validation.meals.coefficient_number' })
+  @Min(0.0001, { message: 'validation.meals.coefficient_min' })
+  @Max(100.0, { message: 'validation.meals.coefficient_max' })
   @IsOptional()
   coefficient?: number;
 }
@@ -51,8 +51,8 @@ export class CreateMealDto {
     example: 'Bữa sáng tiêu chuẩn',
   })
   @Transform(({ value, obj }) => value ?? obj?.name)
-  @IsString({ message: 'Tên bữa ăn phải là chuỗi' })
-  @MaxLength(100, { message: 'Tên bữa ăn không được vượt quá 100 ký tự' })
+  @IsString({ message: 'validation.meals.name_string' })
+  @MaxLength(100, { message: 'validation.meals.name_max' })
   @IsOptional()
   mealName?: string;
 
@@ -61,25 +61,25 @@ export class CreateMealDto {
     example: 'Bữa sáng tiêu chuẩn',
   })
   @Transform(({ value, obj }) => value ?? obj?.mealName)
-  @IsString({ message: 'Tên bữa ăn phải là chuỗi' })
-  @MaxLength(100, { message: 'Tên bữa ăn không được vượt quá 100 ký tự' })
+  @IsString({ message: 'validation.meals.name_string' })
+  @MaxLength(100, { message: 'validation.meals.name_max' })
   @IsOptional()
   name?: string;
 
   @ApiPropertyOptional({ description: 'Giờ bắt đầu (từ MealTable.jsx)', example: '07:00' })
-  @IsString()
-  @MaxLength(20)
+  @IsString({ message: 'validation.meals.start_time_string' })
+  @MaxLength(20, { message: 'validation.meals.start_time_max' })
   @IsOptional()
   startTime?: string;
 
   @ApiPropertyOptional({ description: 'Giờ kết thúc (từ MealTable.jsx)', example: '08:00' })
-  @IsString()
-  @MaxLength(20)
+  @IsString({ message: 'validation.meals.end_time_string' })
+  @MaxLength(20, { message: 'validation.meals.end_time_max' })
   @IsOptional()
   endTime?: string;
 
   @ApiPropertyOptional({ description: 'Mô tả bữa ăn (từ MealTable.jsx)' })
-  @IsString()
+  @IsString({ message: 'validation.meals.desc_string' })
   @IsOptional()
   description?: string;
 
@@ -95,8 +95,8 @@ export class CreateMealDto {
     if (end) return end;
     return value === '' ? undefined : value;
   })
-  @IsString({ message: 'Khung giờ ăn phải là chuỗi' })
-  @MaxLength(50, { message: 'Khung giờ ăn không được vượt quá 50 ký tự' })
+  @IsString({ message: 'validation.meals.time_string' })
+  @MaxLength(50, { message: 'validation.meals.time_max' })
   @IsOptional()
   time?: string;
 
@@ -104,20 +104,20 @@ export class CreateMealDto {
     description: 'Trạng thái bữa ăn (RIENG_TU, CHO_DUYET, DA_DUYET)',
     default: 'RIENG_TU',
   })
-  @IsString()
-  @MaxLength(50, { message: 'Trạng thái tối đa 50 ký tự' })
+  @IsString({ message: 'validation.meals.status_string' })
+  @MaxLength(50, { message: 'validation.meals.status_max' })
   @IsOptional()
   status?: string;
 
   @ApiPropertyOptional({ description: 'Bữa ăn công khai hay riêng tư', default: false })
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.meals.is_public_boolean' })
   @IsOptional()
   isPublic?: boolean;
 
   @ApiPropertyOptional({ description: 'Danh sách các món ăn trong bữa', type: [MealDishItemDto] })
   @Transform(({ value }) => (Array.isArray(value) ? value : []))
-  @IsArray({ message: 'Danh sách món ăn phải là mảng' })
-  @ArrayMaxSize(50, { message: 'Danh sách món ăn trong bữa tối đa 50 món' })
+  @IsArray({ message: 'validation.meals.dishes_array' })
+  @ArrayMaxSize(50, { message: 'validation.meals.dishes_max_50' })
   @ValidateNested({ each: true })
   @Type(() => MealDishItemDto)
   @IsOptional()

@@ -15,15 +15,13 @@ import {
   ErrorRowItem,
   BaseExcelStreamer,
   ExcelColumnDefinition,
+  ExcelExportColumn,
   setExcelResponseHeaders,
 } from '../../../core/excel-engine';
 import { streamPrismaInBatches } from '../../../core/excel-engine/prisma-cursor-streamer';
 import { CacheService } from '../../../core/cache/cache.service';
 
-export interface ColumnMetadata {
-  key: string;
-  header: string;
-  unit?: string;
+export interface ColumnMetadata extends ExcelExportColumn {
   isComputed?: boolean;
 }
 
@@ -158,7 +156,7 @@ export class IngredientExcelService {
     if (this.cacheService) {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
-        this.logger.debug('🚀 [Cache Hit] Trả về template nguyên liệu từ CacheService (0ms)');
+        this.logger.debug('🚀 [Cache Hit] Returning ingredient template from CacheService (0ms)');
         return Buffer.from(cached, 'base64');
       }
     }
@@ -280,9 +278,7 @@ export class IngredientExcelService {
 
     if (this.cacheService && buffer.length <= 5 * 1024 * 1024) {
       await this.cacheService.set(cacheKey, buffer.toString('base64'), 1800, 'ingredients');
-      this.logger.debug(
-        '💾 Đã lưu template nguyên liệu vào CacheService (TTL 30m, tag=ingredients)',
-      );
+      this.logger.debug('💾 Saved ingredient template to CacheService (TTL 30m, tag=ingredients)');
     }
 
     return buffer;
@@ -321,7 +317,7 @@ export class IngredientExcelService {
       const cached = await this.cacheService.get<string>(cacheKey);
       if (cached) {
         this.logger.debug(
-          '🚀 [Cache Hit] Trả về dữ liệu xuất nguyên liệu tức thì từ CacheService (0ms)',
+          '🚀 [Cache Hit] Returning exported ingredient data immediately from CacheService (0ms)',
         );
         const buf = Buffer.from(cached, 'base64');
         if (outputStream && typeof (outputStream as any).end === 'function') {
@@ -489,7 +485,7 @@ export class IngredientExcelService {
       const fullBuf = Buffer.concat(chunks);
       if (fullBuf.length <= 10 * 1024 * 1024) {
         await this.cacheService.set(cacheKey, fullBuf.toString('base64'), 2592000, 'ingredients');
-        this.logger.debug('💾 Đã lưu dữ liệu xuất nguyên liệu vào CacheService (tag=ingredients)');
+        this.logger.debug('💾 Saved exported ingredient data to CacheService (tag=ingredients)');
       }
     }
   }

@@ -6,8 +6,8 @@ export class RejectDishDto {
     description: 'Lý do từ chối phê duyệt món ăn',
     example: 'Công thức chưa chuẩn định lượng y khoa',
   })
-  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
-  @MaxLength(500, { message: 'Lý do từ chối không được vượt quá 500 ký tự' })
-  @IsNotEmpty({ message: 'Lý do từ chối không được để trống' })
+  @IsString({ message: 'validation.dishes.reject_reason_string' })
+  @MaxLength(500, { message: 'validation.dishes.reject_reason_max' })
+  @IsNotEmpty({ message: 'validation.dishes.reject_reason_required' })
   reason!: string;
 }

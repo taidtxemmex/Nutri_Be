@@ -96,7 +96,20 @@ export function validateProductionSecrets(): void {
     }
   }
 
-  // 4. Thông báo hoàn tất kiểm tra an ninh khởi động
+  // 4. Kiểm tra Swagger Credentials nếu ENABLE_SWAGGER được bật trong Production (CWE-798)
+  if (isProduction && process.env.ENABLE_SWAGGER === 'true') {
+    const swaggerPass = process.env.SWAGGER_PASSWORD;
+    if (!swaggerPass || swaggerPass === 'NutriDoc@Secured2026') {
+      logger.error(
+        'CRITICAL SECURITY VIOLATION: Default or missing SWAGGER_PASSWORD detected in PRODUCTION while ENABLE_SWAGGER=true!',
+      );
+      throw new Error(
+        'Fatal Security Exception: SWAGGER_PASSWORD must be changed from default value when Swagger is enabled in production.',
+      );
+    }
+  }
+
+  // 5. Thông báo hoàn tất kiểm tra an ninh khởi động
   logger.log(
     `[Security Audit] Secrets validation completed successfully. Mode: ${isProduction ? 'PRODUCTION (STRICT)' : 'NON-PRODUCTION'}`,
   );

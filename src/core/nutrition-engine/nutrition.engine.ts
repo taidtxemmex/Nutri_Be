@@ -26,7 +26,7 @@ export interface RawIngredientInput {
   loaiProtein?: string | null;
   proteinType?: string | null;
   nutrients?: Record<string, number | string | Decimal | null | undefined>;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface CalculationOptions {

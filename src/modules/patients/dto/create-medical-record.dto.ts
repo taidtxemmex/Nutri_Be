@@ -16,7 +16,7 @@ export class CreateMedicalRecordDto {
     example: '2026-10-27',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Ngày khám không hợp lệ (YYYY-MM-DD)' })
+  @IsDateString({}, { message: 'validation.patients.examination_date_format' })
   examDate?: string;
 
   @ApiPropertyOptional({
@@ -24,7 +24,7 @@ export class CreateMedicalRecordDto {
     example: '2026-10-27',
   })
   @IsOptional()
-  @IsDateString({}, { message: 'Ngày khám không hợp lệ (YYYY-MM-DD)' })
+  @IsDateString({}, { message: 'validation.patients.examination_date_format' })
   ngayKham?: string;
 
   @ApiPropertyOptional({
@@ -32,17 +32,17 @@ export class CreateMedicalRecordDto {
     example: 'Mệt mỏi, sụt cân không rõ nguyên nhân',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(500, { message: 'Lý do khám không được vượt quá 500 ký tự' })
+  @IsString({ message: 'validation.patients.reason_string' })
+  @MaxLength(500, { message: 'validation.patients.reason_max' })
   reason?: string;
 
   @ApiProperty({
     description: 'Chẩn đoán chính',
     example: 'Đái tháo đường týp 2 kèm tăng huyết áp',
   })
-  @IsNotEmpty({ message: 'Chẩn đoán chính không được để trống' })
-  @IsString()
-  @MaxLength(500, { message: 'Chẩn đoán chính không được vượt quá 500 ký tự' })
+  @IsNotEmpty({ message: 'validation.patients.primary_diagnosis_required' })
+  @IsString({ message: 'validation.patients.primary_diagnosis_string' })
+  @MaxLength(500, { message: 'validation.patients.primary_diagnosis_max' })
   primaryDiagnosis: string;
 
   @ApiPropertyOptional({
@@ -50,8 +50,8 @@ export class CreateMedicalRecordDto {
     example: 'E11',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(50, { message: 'Mã ICD-10 không được vượt quá 50 ký tự' })
+  @IsString({ message: 'validation.patients.icd10_code_string' })
+  @MaxLength(50, { message: 'validation.patients.icd10_code_max' })
   icd10Code?: string;
 
   @ApiPropertyOptional({
@@ -60,8 +60,8 @@ export class CreateMedicalRecordDto {
   })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'ID nhóm bệnh phải là số nguyên' })
-  @Min(1, { message: 'ID nhóm bệnh phải lớn hơn 0' })
+  @IsInt({ message: 'validation.patients.disease_group_id_int' })
+  @Min(1, { message: 'validation.patients.disease_group_id_min' })
   diseaseGroupId?: number;
 
   @ApiPropertyOptional({
@@ -69,8 +69,8 @@ export class CreateMedicalRecordDto {
     example: 'Ăn nhiều, uống nhiều, tiểu nhiều',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(5000, { message: 'Triệu chứng lâm sàng tối đa 5000 ký tự' })
+  @IsString({ message: 'validation.patients.clinical_symptoms_string' })
+  @MaxLength(5000, { message: 'validation.patients.clinical_symptoms_max' })
   clinicalSymptoms?: string;
 
   @ApiPropertyOptional({
@@ -78,8 +78,8 @@ export class CreateMedicalRecordDto {
     example: 'Tăng huyết áp 5 năm điều trị liên tục',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(5000, { message: 'Tiền sử bệnh lý tối đa 5000 ký tự' })
+  @IsString({ message: 'validation.patients.medical_history_string' })
+  @MaxLength(5000, { message: 'validation.patients.medical_history_max' })
   medicalHistory?: string;
 
   @ApiPropertyOptional({
@@ -87,8 +87,8 @@ export class CreateMedicalRecordDto {
     example: 'Chế độ ăn giảm carbohydrate đơn giản, tăng chất xơ hòa tan',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(5000, { message: 'Hướng điều trị tối đa 5000 ký tự' })
+  @IsString({ message: 'validation.patients.treatment_plan_string' })
+  @MaxLength(5000, { message: 'validation.patients.treatment_plan_max' })
   treatmentPlan?: string;
 
   @ApiPropertyOptional({
@@ -103,7 +103,7 @@ export class CreateMedicalRecordDto {
     example: 'Hẹn tái khám sau 2 tuần',
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(2000, { message: 'Ghi chú tối đa 2000 ký tự' })
+  @IsString({ message: 'validation.patients.notes_string' })
+  @MaxLength(2000, { message: 'validation.patients.notes_max_2000' })
   notes?: string;
 }

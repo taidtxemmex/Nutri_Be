@@ -83,6 +83,7 @@ describe('Ingredient Proposals Master E2E & IDOR / 3-Layer Persistence Validatio
     it('1.1 User A nộp đề xuất -> Trả về 201, trạng thái CHO_DUYET, lưu DB minh_chung & de_xuat_nguyen_lieu', async () => {
       const payload = {
         ingredientName: 'Hạt chia đen hữu cơ',
+        imageUrl: '/uploads/public/ingredients/2026/11/hat-chia.jpg',
         categoryId,
         loaiProtein: 'THUC_VAT',
         edible: 100,
@@ -128,6 +129,7 @@ describe('Ingredient Proposals Master E2E & IDOR / 3-Layer Persistence Validatio
 
       expect(dbProposal).not.toBeNull();
       expect(dbProposal?.ten_nguyen_lieu).toBe('Hạt chia đen hữu cơ');
+      expect(dbProposal?.image_url).toBe('/uploads/public/ingredients/2026/11/hat-chia.jpg');
       expect(dbProposal?.trang_thai).toBe('CHO_DUYET');
       expect(dbProposal?.nguoi_tao_id).toBe(userAUser.id);
       expect(dbProposal?.minh_chung.length).toBe(1);
@@ -185,6 +187,7 @@ describe('Ingredient Proposals Master E2E & IDOR / 3-Layer Persistence Validatio
       const proposal = await helper.getPrisma().de_xuat_nguyen_lieu.create({
         data: {
           ten_nguyen_lieu: 'Hạt lanh vàng hữu cơ',
+          image_url: '/uploads/public/ingredients/2026/11/hat-lanh.jpg',
           danh_muc: categoryId,
           loai_de_xuat: 'THEM_MOI',
           loai_protein: 'THUC_VAT',
@@ -229,6 +232,7 @@ describe('Ingredient Proposals Master E2E & IDOR / 3-Layer Persistence Validatio
       });
       expect(dbMaster).not.toBeNull();
       expect(dbMaster?.ten_nguyen_lieu).toBe('Hạt lanh vàng hữu cơ');
+      expect(dbMaster?.image_url).toBe('/uploads/public/ingredients/2026/11/hat-lanh.jpg');
       expect(dbMaster?.trang_thai).toBe('DA_DUYET');
       expect(Number(dbMaster?.protein)).toBe(18.3);
       expect(Number(dbMaster?.fat)).toBe(42.2);

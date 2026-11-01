@@ -1,5 +1,6 @@
 import { Response } from 'express';
 import { Writable } from 'stream';
+import * as ExcelJS from 'exceljs';
 import {
   BaseExcelStreamer,
   ExcelColumnDefinition,
@@ -326,7 +327,7 @@ export class MenuMarketPlanStreamer extends BaseExcelStreamer {
     const sanitized = ExcelSecurityUtil.sanitizeRow(values);
     for (let c = 1; c <= values.length; c++) {
       const cell = row.getCell(c);
-      cell.value = sanitized[c - 1];
+      cell.value = sanitized[c - 1] as ExcelJS.CellValue;
       cell.font = { name: EXCEL_FONT_FAMILY, size: 10 };
 
       // Căn lề

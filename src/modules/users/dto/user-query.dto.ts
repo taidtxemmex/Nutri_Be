@@ -7,7 +7,7 @@ import { UserRole } from '../../../config/enums/role.enum';
 export class QueryUsersDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({ enum: UserRole, description: 'Lọc theo vai trò người dùng' })
   @IsOptional()
-  @IsEnum(UserRole, { message: 'Vai trò người dùng không hợp lệ' })
+  @IsEnum(UserRole, { message: 'validation.users.role_invalid' })
   role?: UserRole;
 
   @ApiPropertyOptional({ description: 'Lọc theo trạng thái hoạt động' })
@@ -17,6 +17,6 @@ export class QueryUsersDto extends BasePaginationQueryDto {
     if (value === 'false' || value === false || value === 0 || value === '0') return false;
     return undefined;
   })
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.users.status_boolean' })
   active?: boolean;
 }

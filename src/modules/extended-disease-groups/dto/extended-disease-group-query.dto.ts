@@ -7,7 +7,7 @@ export class ExtendedDiseaseGroupQueryDto extends BasePaginationQueryDto {
   @ApiPropertyOptional({ example: 1, description: 'Lọc theo ID nhóm bệnh cha' })
   @IsOptional()
   @Type(() => Number)
-  @IsInt({ message: 'ID nhóm bệnh cha phải là số nguyên' })
-  @Min(1, { message: 'ID nhóm bệnh cha phải lớn hơn 0' })
+  @IsInt({ message: 'validation.extended_disease_groups.parent_id_int' })
+  @Min(1, { message: 'validation.extended_disease_groups.parent_id_min' })
   parentId?: number;
 }

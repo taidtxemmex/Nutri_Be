@@ -17,6 +17,7 @@ import {
   DeleteProposalParamsDto,
 } from '../dto';
 import { MenuDetailResponseDto } from '../../menus/dto';
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
 import { isAdminRole } from '../../../config/enums/role.enum';
 import { MenuExportType, MenuType, MenuProposalStatus } from '../../../config/enums/domain.enum';
 
@@ -336,12 +337,9 @@ export class MenuProposalsService {
   /**
    * 2. GET /api/menu-proposals: Danh sách đề xuất cho Admin (lọc theo statuses)
    */
-  async getAdminProposals({ query = {} }: GetAdminProposalsParamsDto = {}): Promise<{
-    items: MenuProposalListDto[];
-    total: number;
-    page: number;
-    limit: number;
-  }> {
+  async getAdminProposals({ query = {} }: GetAdminProposalsParamsDto = {}): Promise<
+    PaginatedResult<MenuProposalListDto>
+  > {
     const page = Math.max(1, Number(query.page) || 1);
     const limit = Math.min(5000, Math.max(1, Number(query.limit) || 1000));
     const skip = (page - 1) * limit;
@@ -536,7 +534,9 @@ export class MenuProposalsService {
     try {
       snapshotData = JSON.parse(proposal.snapshot_json);
     } catch (e) {
-      this.logger.error(`Lỗi parse snapshot_json cho proposal ID=${proposalId}: ${e.message}`);
+      this.logger.error(
+        `Failed to parse snapshot_json for proposal ID=${proposalId}: ${e.message}`,
+      );
     }
 
     const normalizedWeeks = Array.isArray(snapshotData.weeks)
@@ -1003,7 +1003,9 @@ export class MenuProposalsService {
       try {
         snapshotData = JSON.parse(proposal.snapshot_json);
       } catch (err: any) {
-        this.logger.error(`Lỗi parse snapshot_json cho proposal ID=${proposalId}: ${err.message}`);
+        this.logger.error(
+          `Failed to parse snapshot_json for proposal ID=${proposalId}: ${err.message}`,
+        );
       }
     }
 

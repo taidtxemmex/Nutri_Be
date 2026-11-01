@@ -19,6 +19,7 @@ describe('DishesService', () => {
         findMany: jest.fn(),
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
       chi_tiet_mon_an: {
         createMany: jest.fn(),

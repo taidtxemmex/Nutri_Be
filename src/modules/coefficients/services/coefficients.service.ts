@@ -1,4 +1,5 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../core/database/prisma.service';
 import { CacheService } from '../../../core/cache/cache.service';
 import { CACHE_TTL_PERPETUAL } from '../../../config/constants/cache.constants';
@@ -27,7 +28,15 @@ export class CoefficientsService {
     return isAdminRole(user);
   }
 
-  private mapToDto(item: any): CoefficientResponseDto {
+  private mapToDto(item: {
+    id: bigint | number;
+    nguyen_lieu_id?: bigint | number | null;
+    nguyen_lieu?: { ten_nguyen_lieu?: string | null } | null;
+    phuong_phap_che_bien?: string | null;
+    he_so?: unknown;
+    is_public?: boolean | number | null;
+    nguoi_dung_id?: string | null;
+  }): CoefficientResponseDto {
     return {
       id: item.id.toString(),
       ingredientId: item.nguyen_lieu_id ? Number(item.nguyen_lieu_id) : null,
@@ -57,9 +66,9 @@ export class CoefficientsService {
   }
 
   async create({ dto, currentUser }: CreateCoefficientParamsDto): Promise<CoefficientResponseDto> {
-    const resolvedIngredientId = dto.ingredientId ?? (dto as any).nguyenLieuId;
-    const resolvedProcessingMethod = dto.processingMethod ?? (dto as any).phuongPhapCheBien;
-    const resolvedCoefficient = dto.coefficient ?? (dto as any).heSo;
+    const resolvedIngredientId = dto.ingredientId ?? dto.nguyenLieuId;
+    const resolvedProcessingMethod = dto.processingMethod ?? dto.phuongPhapCheBien;
+    const resolvedCoefficient = dto.coefficient ?? dto.heSo;
 
     this.validateCoefficient(resolvedCoefficient);
 
@@ -148,7 +157,7 @@ export class CoefficientsService {
   > {
     const isAdminUser = this.isAdmin(currentUser);
 
-    const whereClause: any = isAdminUser
+    const whereClause: Prisma.he_so_song_chinWhereInput = isAdminUser
       ? {}
       : currentUser?.id
         ? {
@@ -282,9 +291,9 @@ export class CoefficientsService {
     dto,
     currentUser,
   }: UpdateCoefficientParamsDto): Promise<CoefficientResponseDto> {
-    const resolvedIngredientId = dto.ingredientId ?? (dto as any).nguyenLieuId;
-    const resolvedProcessingMethod = dto.processingMethod ?? (dto as any).phuongPhapCheBien;
-    const resolvedCoefficient = dto.coefficient ?? (dto as any).heSo;
+    const resolvedIngredientId = dto.ingredientId ?? dto.nguyenLieuId;
+    const resolvedProcessingMethod = dto.processingMethod ?? dto.phuongPhapCheBien;
+    const resolvedCoefficient = dto.coefficient ?? dto.heSo;
 
     if (resolvedCoefficient !== undefined) {
       this.validateCoefficient(resolvedCoefficient);
@@ -385,8 +394,9 @@ export class CoefficientsService {
       await this.prisma.he_so_song_chin.delete({
         where: { id: BigInt(id) },
       });
-    } catch (error: any) {
-      this.logger.error(`Lỗi xóa hệ số sống chín ID ${id}: ${error?.message}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Failed to delete raw-to-cooked coefficient ID ${id}: ${errorMessage}`);
       throw new HttpException(
         { code: 'COEF_004', message: 'Không thể xóa hệ số này vì đang được sử dụng' },
         HttpStatus.CONFLICT,

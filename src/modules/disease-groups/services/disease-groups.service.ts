@@ -24,12 +24,9 @@ import {
   DeleteDiseaseGroupParamsDto,
 } from '../dto';
 
-export interface PaginatedDiseaseGroupsResult {
-  items: DiseaseGroupResponseDto[];
-  total: number;
-  page: number;
-  limit: number;
-}
+import { PaginatedResult } from '../../../common/interfaces/pagination.interface';
+
+export type PaginatedDiseaseGroupsResult = PaginatedResult<DiseaseGroupResponseDto>;
 
 @Injectable()
 export class DiseaseGroupsService {

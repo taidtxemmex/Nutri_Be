@@ -126,7 +126,10 @@ export class NutritionLimitSetsService {
     return this.mapToDto(updated);
   }
 
-  async getById({ id }: GetNutritionLimitSetByIdParamsDto): Promise<NutritionLimitSetResponseDto> {
+  async getById({
+    id,
+    currentUser,
+  }: GetNutritionLimitSetByIdParamsDto): Promise<NutritionLimitSetResponseDto> {
     const limitId = BigInt(id);
     const cacheKey = `nutrition_limit:detail:${limitId.toString()}`;
     const existing = await this.cacheService.getOrSet(
@@ -141,6 +144,18 @@ export class NutritionLimitSetsService {
     );
 
     if (!existing) {
+      throw new HttpException(
+        { code: 'NLS_004', message: 'Không tìm thấy bộ giới hạn dinh dưỡng' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    if (
+      existing.tai_su_dung === false &&
+      currentUser &&
+      existing.nguoi_dung_id !== currentUser.id &&
+      !this.isAdmin(currentUser)
+    ) {
       throw new HttpException(
         { code: 'NLS_004', message: 'Không tìm thấy bộ giới hạn dinh dưỡng' },
         HttpStatus.NOT_FOUND,

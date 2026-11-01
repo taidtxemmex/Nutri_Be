@@ -110,6 +110,7 @@ export class ProfilesService {
           dia_chi: true,
           gioi_tinh: true,
           ngay_sinh: true,
+          avatar_url: true,
         },
       },
     });
@@ -124,6 +125,10 @@ export class ProfilesService {
       ? new Date(user.ho_so_ca_nhan.ngay_sinh).toISOString().split('T')[0]
       : '';
 
+    const avatar =
+      user.ho_so_ca_nhan?.avatar_url ||
+      `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.ten_dang_nhap}`;
+
     const result = {
       id: user.id,
       keycloakUserId: user.keycloak_user_id || user.id,
@@ -134,7 +139,8 @@ export class ProfilesService {
       address: user.ho_so_ca_nhan?.dia_chi || '',
       gender: user.ho_so_ca_nhan?.gioi_tinh || '',
       dob: dobStr,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.ten_dang_nhap}`,
+      avatarUrl: avatar,
+      avatar_url: user.ho_so_ca_nhan?.avatar_url || null,
       role: user.vai_tro,
       status: user.active ? 'active' : 'inactive',
       createdAt: user.created_at?.toISOString() || '',
@@ -167,6 +173,7 @@ export class ProfilesService {
     const actualUserId = existingUser.id;
     const dobValue = dto.dob || dto.birthDate;
     const dobDate = dobValue ? new Date(dobValue) : undefined;
+    const avatarUrl = dto.avatarUrl || dto.avatar_url;
 
     await this.prisma.ho_so_ca_nhan.upsert({
       where: { nguoi_dung_id: actualUserId },
@@ -177,6 +184,7 @@ export class ProfilesService {
         dia_chi: dto.address,
         gioi_tinh: dto.gender,
         ngay_sinh: dobDate,
+        avatar_url: avatarUrl,
       },
       update: {
         ...(dto.fullName !== undefined && { ho_ten: dto.fullName }),
@@ -184,6 +192,7 @@ export class ProfilesService {
         ...(dto.address !== undefined && { dia_chi: dto.address }),
         ...(dto.gender !== undefined && { gioi_tinh: dto.gender }),
         ...(dobDate !== undefined && { ngay_sinh: dobDate }),
+        ...(avatarUrl !== undefined && { avatar_url: avatarUrl }),
       },
     });
 

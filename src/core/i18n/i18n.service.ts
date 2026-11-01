@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
+import { LEGACY_KEY_ALIASES } from './legacy-aliases';
 
 export type SupportedLocale = 'vi' | 'en' | 'zh';
 export const DEFAULT_LOCALE: SupportedLocale = 'vi';
@@ -8,14 +9,14 @@ export const DEFAULT_LOCALE: SupportedLocale = 'vi';
 export interface TranslateParamDto {
   key: string;
   locale?: string;
-  args?: Record<string, any>;
+  args?: Record<string, unknown>;
 }
 
 export interface TranslateConstraintParamDto {
   code: string;
   field: string;
   locale?: string;
-  args?: Record<string, any>;
+  args?: Record<string, unknown>;
 }
 
 export interface TranslateFieldParamDto {
@@ -26,7 +27,7 @@ export interface TranslateFieldParamDto {
 export interface TranslateTextOrKeyParamDto {
   textOrKey: string;
   locale?: string;
-  args?: Record<string, any>;
+  args?: Record<string, unknown>;
 }
 
 interface DynamicPattern {
@@ -70,8 +71,8 @@ export class I18nService {
             const raw = fs.readFileSync(filePath, 'utf8');
             this.catalogs[loc] = JSON.parse(raw);
           }
-        } catch (err: any) {
-          this.logger.warn(`Không thể nạp catalog ${loc}: ${err?.message}`);
+        } catch (err: unknown) {
+          this.logger.warn(`Failed to load catalog ${loc}: ${(err as Error)?.message}`);
         }
       }
       if (!this.catalogs[loc]) {
@@ -82,13 +83,44 @@ export class I18nService {
     // Xây dựng bản đồ ánh xạ đảo ngược từ văn bản tiếng Việt sang key
     const viCatalog = this.catalogs[DEFAULT_LOCALE] || {};
     for (const [k, v] of Object.entries(viCatalog)) {
+      if (k.startsWith('//') || !v) {
+        continue;
+      }
       if (typeof v === 'string') {
-        const normalized = v.trim().toLowerCase();
+        const raw = v.trim();
+        const normalized = raw.toLowerCase();
+        const stripped = normalized.replace(/[.!?:;]+$/, '').trim();
+        if (!this.viToKeyMap.has(raw)) {
+          this.viToKeyMap.set(raw, k);
+        }
         if (!this.viToKeyMap.has(normalized)) {
           this.viToKeyMap.set(normalized, k);
         }
+        if (!this.viToKeyMap.has(stripped)) {
+          this.viToKeyMap.set(stripped, k);
+        }
       }
     }
+  }
+
+  private resolveLegacyOrViKey(cleanKey: string): string | undefined {
+    if (!cleanKey) return undefined;
+    if (LEGACY_KEY_ALIASES[cleanKey]) {
+      return LEGACY_KEY_ALIASES[cleanKey];
+    }
+    const normalized = cleanKey.toLowerCase();
+    if (LEGACY_KEY_ALIASES[normalized]) {
+      return LEGACY_KEY_ALIASES[normalized];
+    }
+    const stripped = normalized.replace(/[.!?:;]+$/, '').trim();
+    if (LEGACY_KEY_ALIASES[stripped]) {
+      return LEGACY_KEY_ALIASES[stripped];
+    }
+    return (
+      this.viToKeyMap.get(cleanKey) ||
+      this.viToKeyMap.get(normalized) ||
+      this.viToKeyMap.get(stripped)
+    );
   }
 
   private initDynamicPatterns(): void {
@@ -412,11 +444,11 @@ export class I18nService {
     );
   }
 
-  private interpolate(template: string, args?: Record<string, any>): string {
+  private interpolate(template: string, args?: Record<string, unknown>): string {
     if (!args || typeof args !== 'object') return template;
     let res = template;
     for (const [param, val] of Object.entries(args)) {
-      res = res.replace(new RegExp(`\\{${param}\\}`, 'g'), String(val));
+      res = res.replaceAll(`{${param}}`, String(val));
     }
     return res;
   }
@@ -427,11 +459,11 @@ export class I18nService {
   public translate(
     paramOrKey: TranslateParamDto | string,
     legacyLocale: string = DEFAULT_LOCALE,
-    legacyArgs?: Record<string, any>,
+    legacyArgs?: Record<string, unknown>,
   ): string {
     let key: string;
     let locale: string;
-    let args: Record<string, any> | undefined;
+    let args: Record<string, unknown> | undefined;
 
     if (paramOrKey && typeof paramOrKey === 'object' && 'key' in paramOrKey) {
       key = paramOrKey.key;
@@ -443,7 +475,7 @@ export class I18nService {
       args = legacyArgs;
     }
 
-    if (!key) return '';
+    if (!key || key.startsWith('//')) return '';
 
     // Xóa dấu ngoặc nhọn nếu key truyền dạng "{error.username.invalid}"
     const cleanKey = key.replace(/^\{|\}$/g, '').trim();
@@ -457,11 +489,10 @@ export class I18nService {
     let template = currentCatalog[cleanKey] || viCatalog[cleanKey];
 
     if (!template) {
-      // Thử tra qua reverse mapping nếu key truyền vào thực chất là văn bản tiếng Việt
-      const normalized = cleanKey.toLowerCase();
-      const mappedKey = this.viToKeyMap.get(normalized) || this.viToKeyMap.get(cleanKey);
-      if (mappedKey && currentCatalog[mappedKey]) {
-        template = currentCatalog[mappedKey];
+      // Thử tra qua reverse mapping nếu key truyền vào thực chất là văn bản tiếng Việt hoặc legacy key
+      const mappedKey = this.resolveLegacyOrViKey(cleanKey);
+      if (mappedKey && (currentCatalog[mappedKey] || viCatalog[mappedKey])) {
+        template = currentCatalog[mappedKey] || viCatalog[mappedKey];
       }
     }
 
@@ -478,11 +509,11 @@ export class I18nService {
   public translateTextOrKey(
     paramOrText: TranslateTextOrKeyParamDto | string,
     legacyLocale: string = DEFAULT_LOCALE,
-    legacyArgs?: Record<string, any>,
+    legacyArgs?: Record<string, unknown>,
   ): string {
     let textOrKey: string;
     let locale: string;
-    let args: Record<string, any> | undefined;
+    let args: Record<string, unknown> | undefined;
 
     if (paramOrText && typeof paramOrText === 'object' && 'textOrKey' in paramOrText) {
       textOrKey = paramOrText.textOrKey;
@@ -494,7 +525,7 @@ export class I18nService {
       args = legacyArgs;
     }
 
-    if (!textOrKey || typeof textOrKey !== 'string') return '';
+    if (!textOrKey || typeof textOrKey !== 'string' || textOrKey.startsWith('//')) return '';
 
     const targetLocale = (
       ['vi', 'en', 'zh'].includes(locale) ? locale : DEFAULT_LOCALE
@@ -510,9 +541,8 @@ export class I18nService {
       return this.interpolate(currentCatalog[clean], args);
     }
 
-    // 2. Tra cứu qua reverse map nếu text gốc là tiếng Việt
-    const normalized = clean.toLowerCase();
-    const mappedKey = this.viToKeyMap.get(normalized) || this.viToKeyMap.get(clean);
+    // 2. Tra cứu qua reverse map nếu text gốc là tiếng Việt hoặc legacy key
+    const mappedKey = this.resolveLegacyOrViKey(clean);
     if (mappedKey) {
       const template = currentCatalog[mappedKey] || viCatalog[mappedKey];
       if (template) {
@@ -626,12 +656,11 @@ export class I18nService {
    * Kiểm tra xem key có tồn tại trong từ điển không
    */
   public hasKey(key: string): boolean {
-    if (!key) return false;
+    if (!key || key.startsWith('//')) return false;
     const cleanKey = key.replace(/^\{|\}$/g, '').trim();
     const viCatalog = this.catalogs[DEFAULT_LOCALE] || {};
     if (Boolean(viCatalog[cleanKey])) return true;
-    const normalized = cleanKey.toLowerCase();
-    if (this.viToKeyMap.has(normalized)) return true;
+    if (this.resolveLegacyOrViKey(cleanKey)) return true;
     return this.dynamicPatterns.some((p) => p.regex.test(cleanKey));
   }
 

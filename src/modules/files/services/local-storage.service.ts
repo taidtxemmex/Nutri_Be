@@ -37,9 +37,10 @@ export class LocalStorageService {
       fs.accessSync(selectedDir, fs.constants.W_OK);
       this.baseDir = path.resolve(selectedDir);
       this.logger.log(`📁 LocalStorageService initialized at primary directory: ${this.baseDir}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
       this.logger.warn(
-        `Thư mục ${selectedDir} không ghi được (${err.message}). Tự động fallback về: ${fallbackDir}`,
+        `Thư mục ${selectedDir} không ghi được (${errorMessage}). Tự động fallback về: ${fallbackDir}`,
       );
       if (!fs.existsSync(fallbackDir)) {
         fs.mkdirSync(fallbackDir, { recursive: true });
@@ -108,10 +109,14 @@ export class LocalStorageService {
     }
 
     // Chuẩn hóa tên file gốc và sinh tên file duy nhất khớp chuẩn Java cũ: UUID + "-" + originalFilename
+    // Giới hạn độ dài tên file (max 100 ký tự) để chống lỗi ENAMETOOLONG (NAME_MAX 255 bytes trên Linux ext4)
     const rawOriginalName = path.basename(file.originalname || 'file.bin');
     const safeOriginalName = rawOriginalName.replace(/[/\\?%*:|"<>]/g, '_');
+    const fileExt = path.extname(safeOriginalName);
+    const baseName = path.basename(safeOriginalName, fileExt).slice(0, 100);
+    const boundedOriginalName = `${baseName}${fileExt}`;
     const fileUuid = crypto.randomUUID();
-    const generatedFileName = `${fileUuid}-${safeOriginalName}`;
+    const generatedFileName = `${fileUuid}-${boundedOriginalName}`;
     const fullFilePath = path.join(targetDir, generatedFileName);
 
     // Ghi buffer trực tiếp vào đĩa cứng
@@ -121,7 +126,9 @@ export class LocalStorageService {
     const objectKey = path.posix.join(relativeSubDir.replace(/\\/g, '/'), generatedFileName);
 
     const detectedMime =
-      (file as any).detectedMimeType || file.mimetype || 'application/octet-stream';
+      (file as { detectedMimeType?: string }).detectedMimeType ||
+      file.mimetype ||
+      'application/octet-stream';
     const fileSize = file.buffer.length;
     const resolvedFileName = file.originalname || generatedFileName;
 

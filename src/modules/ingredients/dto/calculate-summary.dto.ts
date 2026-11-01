@@ -16,28 +16,28 @@ import { Type } from 'class-transformer';
 export class CalculateSummaryItemDto {
   @ApiPropertyOptional({ example: 1, description: 'ID nguyên liệu' })
   @IsOptional()
-  @IsInt({ message: 'validation.is_int' })
-  @IsPositive({ message: 'validation.is_positive' })
+  @IsInt({ message: 'validation.ingredients.ingredient_id_int' })
+  @IsPositive({ message: 'validation.ingredients.ingredient_id_positive' })
   ingredientId?: number;
 
   @ApiPropertyOptional({ example: 1, description: 'ID nguyên liệu (alias id)' })
   @IsOptional()
-  @IsInt({ message: 'validation.is_int' })
-  @IsPositive({ message: 'validation.is_positive' })
+  @IsInt({ message: 'validation.ingredients.ingredient_id_int' })
+  @IsPositive({ message: 'validation.ingredients.ingredient_id_positive' })
   id?: number;
 
   @ApiPropertyOptional({ example: 100, description: 'Khối lượng (gam)' })
   @IsOptional()
-  @IsNumber({}, { message: 'validation.is_number' })
-  @IsPositive({ message: 'validation.is_positive' })
-  @Max(10000, { message: 'Khối lượng tối đa 10000 gam' })
+  @IsNumber({}, { message: 'validation.ingredients.weight_number' })
+  @IsPositive({ message: 'validation.ingredients.weight_positive' })
+  @Max(10000, { message: 'validation.ingredients.weight_max' })
   weight?: number;
 
   @ApiPropertyOptional({ example: 100, description: 'Khối lượng (gam, alias weightGrams)' })
   @IsOptional()
-  @IsNumber({}, { message: 'validation.is_number' })
-  @IsPositive({ message: 'validation.is_positive' })
-  @Max(10000, { message: 'Khối lượng tối đa 10000 gam' })
+  @IsNumber({}, { message: 'validation.ingredients.weight_number' })
+  @IsPositive({ message: 'validation.ingredients.weight_positive' })
+  @Max(10000, { message: 'validation.ingredients.weight_max' })
   weightGrams?: number;
 
   @ApiPropertyOptional({
@@ -46,7 +46,7 @@ export class CalculateSummaryItemDto {
     default: true,
   })
   @IsOptional()
-  @IsBoolean({ message: 'validation.is_boolean' })
+  @IsBoolean({ message: 'validation.ingredients.is_net_weight_boolean' })
   isNetWeight?: boolean;
 
   @ApiPropertyOptional({
@@ -55,9 +55,9 @@ export class CalculateSummaryItemDto {
     default: 1,
   })
   @IsOptional()
-  @IsNumber({}, { message: 'validation.is_number' })
-  @IsPositive({ message: 'validation.is_positive' })
-  @Max(10, { message: 'Hệ số sống chín tối đa 10' })
+  @IsNumber({}, { message: 'validation.ingredients.coefficient_number' })
+  @IsPositive({ message: 'validation.ingredients.coefficient_positive' })
+  @Max(10, { message: 'validation.ingredients.coefficient_max' })
   coefficient?: number;
 }
 
@@ -66,9 +66,9 @@ export class CalculateSummaryDto {
     type: [CalculateSummaryItemDto],
     description: 'Danh sách các thành phần nguyên liệu cần tính dinh dưỡng',
   })
-  @IsArray({ message: 'validation.is_array' })
-  @ArrayMinSize(1, { message: 'validation.array_min_size' })
-  @ArrayMaxSize(500, { message: 'validation.array_max_size' })
+  @IsArray({ message: 'validation.ingredients.items_array' })
+  @ArrayMinSize(1, { message: 'validation.ingredients.items_min_size' })
+  @ArrayMaxSize(500, { message: 'validation.ingredients.items_max_size' })
   @ValidateNested({ each: true })
   @Type(() => CalculateSummaryItemDto)
   items: CalculateSummaryItemDto[];

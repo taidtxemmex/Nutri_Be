@@ -20,15 +20,15 @@ export class ResolveDishDto {
 
   @ApiPropertyOptional({ description: 'Tên món ăn (nếu tạo nhanh)' })
   @IsOptional()
-  @IsString()
-  @MaxLength(255, { message: 'Tên món ăn không được vượt quá 255 ký tự' })
+  @IsString({ message: 'validation.menus.dish_name_string' })
+  @MaxLength(255, { message: 'validation.menus.dish_name_max' })
   name?: string;
 
   @ApiPropertyOptional({ description: 'Hệ số sống/chín', default: 1.0 })
   @IsOptional()
-  @IsNumber()
-  @Min(0, { message: 'Hệ số sống chín phải lớn hơn hoặc bằng 0' })
-  @Max(100, { message: 'Hệ số sống chín không được vượt quá 100' })
+  @IsNumber({}, { message: 'validation.menus.coefficient_number' })
+  @Min(0, { message: 'validation.menus.coefficient_min' })
+  @Max(100, { message: 'validation.menus.coefficient_max' })
   coefficient?: number = 1.0;
 
   @ApiPropertyOptional({
@@ -36,8 +36,8 @@ export class ResolveDishDto {
     type: [MenuDishDetailDto],
   })
   @IsOptional()
-  @IsArray()
-  @ArrayMaxSize(100, { message: 'Danh sách nguyên liệu tối đa 100 mục' })
+  @IsArray({ message: 'validation.menus.details_is_array' })
+  @ArrayMaxSize(100, { message: 'validation.menus.details_max_100' })
   @ValidateNested({ each: true })
   @Type(() => MenuDishDetailDto)
   details?: MenuDishDetailDto[];

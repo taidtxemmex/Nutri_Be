@@ -7,7 +7,7 @@ export class RejectIngredientProposalDto {
     example: 'Không đạt tiêu chí kiểm định lâm sàng',
   })
   @IsOptional()
-  @IsString({ message: 'Lý do từ chối phải là chuỗi' })
-  @MaxLength(500, { message: 'Lý do từ chối không được vượt quá 500 ký tự' })
+  @IsString({ message: 'validation.ingredient_proposals.reject_reason_string' })
+  @MaxLength(500, { message: 'validation.ingredient_proposals.reject_reason_max' })
   reason?: string;
 }

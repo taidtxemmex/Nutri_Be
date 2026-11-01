@@ -231,4 +231,153 @@ describe('Files Security Upload E2E (Task 7.3 - MIME Spoofing & Layer 3 Disk Sta
       expect(res.body.error).toBeDefined();
     });
   });
+
+  describe('4. Specialized Image Upload Endpoints (Avatar, Dish, Ingredient, Menu)', () => {
+    it('4.1 should successfully upload avatar, update ho_so_ca_nhan, and assert Layer 3 DB & Disk state', async () => {
+      const prisma = helper.getPrisma();
+      const suffix = `${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+      const user = await helper.createTestUser({
+        username: `avatar_user_${suffix}`,
+        password: 'Password123!',
+        fullName: 'Người Dùng Avatar',
+      });
+
+      const res = await request(helper.getHttpServer())
+        .post('/api/files/avatar')
+        .set('Authorization', `Bearer ${user.token}`)
+        .attach('file', validPngBuffer, 'my_avatar.png')
+        .expect(200);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.success).toBe(true);
+      expect(res.body.data.avatarUrl).toBeDefined();
+      expect(res.body.data.avatar_url).toBeDefined();
+      expect(res.body.data.avatarUrl).toBe(res.body.data.avatar_url);
+      expect(res.body.data.message).toBe('Cập nhật ảnh đại diện thành công');
+
+      // TUYỆT ĐỐI KHÔNG chứa domain (relative path check)
+      const avatarUrl = res.body.data.avatarUrl;
+      expect(avatarUrl.startsWith('/uploads/public/avatars/')).toBe(true);
+      expect(avatarUrl).not.toContain('http://');
+      expect(avatarUrl).not.toContain('https://');
+
+      // Layer 3 Assertion: Cơ sở dữ liệu bảng ho_so_ca_nhan được cập nhật chính xác
+      const profile = await prisma.ho_so_ca_nhan.findUnique({
+        where: { nguoi_dung_id: user.user.id },
+      });
+      expect(profile).not.toBeNull();
+      expect(profile?.avatar_url).toBe(avatarUrl);
+
+      // Layer 3 Assertion: Tệp tin thực sự được ghi an toàn trên đĩa cứng
+      const relativeDiskPath = avatarUrl.replace(/^\/uploads\//, '');
+      const savedPath = path.resolve(baseUploadDir, relativeDiskPath);
+      expect(fs.existsSync(savedPath)).toBe(true);
+
+      // Dọn dẹp tệp thử nghiệm
+      if (fs.existsSync(savedPath)) {
+        fs.unlinkSync(savedPath);
+      }
+    });
+
+    it('4.2 should REJECT avatar upload when unauthenticated with 401 Unauthorized', async () => {
+      await request(helper.getHttpServer())
+        .post('/api/files/avatar')
+        .attach('file', validPngBuffer, 'unauth_avatar.png')
+        .expect(401);
+    });
+
+    it('4.3 should REJECT avatar upload with non-image PDF file with 400 Bad Request', async () => {
+      const validPdfBuffer = Buffer.from(
+        '%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<\n/Type /Catalog\n>>\nendobj\ntrailer\n<<\n>>\n%%EOF',
+      );
+
+      const res = await request(helper.getHttpServer())
+        .post('/api/files/avatar')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', validPdfBuffer, 'document.pdf')
+        .expect(400);
+
+      expect(res.body.error).toBeDefined();
+    });
+
+    it('4.4 should successfully upload dish image to public/dishes and return relative URL', async () => {
+      const res = await request(helper.getHttpServer())
+        .post('/api/files/dish-image')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', validJpegBuffer, 'mon_an_ngon.jpg')
+        .expect(200);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.success).toBe(true);
+      expect(res.body.data.imageUrl).toBeDefined();
+      expect(res.body.data.image_url).toBeDefined();
+      expect(res.body.data.imageUrl).toBe(res.body.data.image_url);
+
+      const imageUrl = res.body.data.imageUrl;
+      expect(imageUrl.startsWith('/uploads/public/dishes/')).toBe(true);
+      expect(imageUrl).not.toContain('http://');
+      expect(imageUrl).not.toContain('https://');
+
+      // Layer 3 Assertion: Tệp tin thực sự được ghi trong thư mục dishes
+      const relativeDiskPath = imageUrl.replace(/^\/uploads\//, '');
+      const savedPath = path.resolve(baseUploadDir, relativeDiskPath);
+      expect(fs.existsSync(savedPath)).toBe(true);
+
+      if (fs.existsSync(savedPath)) {
+        fs.unlinkSync(savedPath);
+      }
+    });
+
+    it('4.5 should successfully upload ingredient image to public/ingredients and return relative URL', async () => {
+      const res = await request(helper.getHttpServer())
+        .post('/api/files/ingredient-image')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', validPngBuffer, 'nguyen_lieu.png')
+        .expect(200);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.success).toBe(true);
+      expect(res.body.data.imageUrl).toBeDefined();
+      expect(res.body.data.image_url).toBe(res.body.data.imageUrl);
+
+      const imageUrl = res.body.data.imageUrl;
+      expect(imageUrl.startsWith('/uploads/public/ingredients/')).toBe(true);
+      expect(imageUrl).not.toContain('http://');
+      expect(imageUrl).not.toContain('https://');
+
+      const relativeDiskPath = imageUrl.replace(/^\/uploads\//, '');
+      const savedPath = path.resolve(baseUploadDir, relativeDiskPath);
+      expect(fs.existsSync(savedPath)).toBe(true);
+
+      if (fs.existsSync(savedPath)) {
+        fs.unlinkSync(savedPath);
+      }
+    });
+
+    it('4.6 should successfully upload menu image to public/menus and return relative URL', async () => {
+      const res = await request(helper.getHttpServer())
+        .post('/api/files/menu-image')
+        .set('Authorization', `Bearer ${authToken}`)
+        .attach('file', validJpegBuffer, 'thuc_don_tuan.jpg')
+        .expect(200);
+
+      expect(res.body.data).toBeDefined();
+      expect(res.body.data.success).toBe(true);
+      expect(res.body.data.imageUrl).toBeDefined();
+      expect(res.body.data.image_url).toBe(res.body.data.imageUrl);
+
+      const imageUrl = res.body.data.imageUrl;
+      expect(imageUrl.startsWith('/uploads/public/menus/')).toBe(true);
+      expect(imageUrl).not.toContain('http://');
+      expect(imageUrl).not.toContain('https://');
+
+      const relativeDiskPath = imageUrl.replace(/^\/uploads\//, '');
+      const savedPath = path.resolve(baseUploadDir, relativeDiskPath);
+      expect(fs.existsSync(savedPath)).toBe(true);
+
+      if (fs.existsSync(savedPath)) {
+        fs.unlinkSync(savedPath);
+      }
+    });
+  });
 });
