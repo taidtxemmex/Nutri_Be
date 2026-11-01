@@ -1,0 +1,4920 @@
+{
+  "info": {
+    "_postman_id": "b62ca531-9876-4d22-9911-nutribackendapi",
+    "name": "Nutri Clinical Nutrition Backend API (Full 132 APIs - 25 Controllers)",
+    "description": "Bộ sưu tập Postman Collection chuẩn mực bao gồm toàn bộ 132 RESTful endpoints phân chia thành đúng 25 Controllers theo tài liệu Kiểm toán Parity. Tích hợp sẵn Pre-request Scripts tự động gắn Bearer Token và mẫu JSON Request Body.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global Pre-request Script: Tự động gắn Bearer Token nếu chưa có",
+          "const token = pm.variables.get(\"token\");",
+          "if (token && !pm.request.headers.has(\"Authorization\")) {",
+          "    pm.request.headers.add({",
+          "        key: \"Authorization\",",
+          "        value: \"Bearer \" + token",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "AuthController (7 APIs)",
+      "description": "Nhóm API thuộc AuthController (Gồm 7 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 1] 1. Đăng ký tài khoản (Register)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "**STT 1** - Đăng ký tài khoản người dùng mới vào hệ thống\n- Phân quyền: **Public**\n- Phương thức: **POST /api/auth/register**",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"doctor_test@truenutri.vn\",\n  \"email\": \"doctor_test@truenutri.vn\",\n  \"password\": \"Password123@\",\n  \"fullName\": \"Bác Sĩ Dinh Dưỡng Test\",\n  \"phoneNumber\": \"0987654321\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 2] 2. Xác thực mã OTP email (Verify Email)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-email"
+              ]
+            },
+            "description": "**STT 2** - Xác thực mã OTP qua email để kích hoạt tài khoản\n- Phân quyền: **Public**\n- Phương thức: **POST /api/auth/verify-email**",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"doctor_test@truenutri.vn\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 3] 3. Đăng nhập tài khoản (Login)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "**STT 3** - Đăng nhập tài khoản, cấp JWT Access Token & Refresh Token\n- Phân quyền: **Public**\n- Phương thức: **POST /api/auth/login**",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"doctor_test@truenutri.vn\",\n  \"password\": \"Password123@\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Tự động lưu Token vào Environment khi đăng nhập thành công",
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    const token = res.data ? res.data.accessToken : res.accessToken;",
+                  "    const refreshToken = res.data ? res.data.refreshToken : res.refreshToken;",
+                  "    if (token) {",
+                  "        pm.environment.set(\"token\", token);",
+                  "        console.log(\"Access Token updated:\", token);",
+                  "    }",
+                  "    if (refreshToken) {",
+                  "        pm.environment.set(\"refreshToken\", refreshToken);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "[STT 4] 4. Làm mới Access Token (Refresh Token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "**STT 4** - Làm mới Access Token bằng Refresh Token còn hạn\n- Phân quyền: **User**\n- Phương thức: **POST /api/auth/refresh**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 5] 5. Đăng xuất tài khoản (Logout)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "**STT 5** - Đăng xuất người dùng, vô hiệu hóa Refresh Token\n- Phân quyền: **User**\n- Phương thức: **POST /api/auth/logout**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 6] 6. Trao đổi mã Google OAuth2 (OAuth2 Exchange)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth2/exchange",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "oauth2",
+                "exchange"
+              ]
+            },
+            "description": "**STT 6** - Trao đổi mã xác thực Google OAuth2 lấy Token đăng nhập\n- Phân quyền: **Public**\n- Phương thức: **POST /api/auth/oauth2/exchange**",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"4/0AY0e-g7ExampleGoogleAuthCode\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 7] 7. Quên mật khẩu (Forgot Password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "**STT 7** - Gửi yêu cầu email khôi phục / đặt lại mật khẩu\n- Phân quyền: **Public**\n- Phương thức: **POST /api/auth/forgot-password**",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"doctor_test@truenutri.vn\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "CategoryController (5 APIs)",
+      "description": "Nhóm API thuộc CategoryController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 8] 8. Tạo mới danh mục nhóm thực phẩm",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/category",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "category"
+              ]
+            },
+            "description": "**STT 8** - Tạo mới danh mục nhóm thực phẩm\n- Phân quyền: **Admin**\n- Phương thức: **POST /api/category**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nhom\": \"Ngũ cốc và sản phẩm chế biến\",\n  \"ma_nhom\": \"NC01\",\n  \"mo_ta\": \"Các loại ngũ cốc giàu tinh bột\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 9] 9. Cập nhật danh mục nhóm thực phẩm",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/category/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "category",
+                ":id"
+              ]
+            },
+            "description": "**STT 9** - Cập nhật thông tin danh mục nhóm thực phẩm theo ID\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/category/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nhom\": \"Ngũ cốc nguyên hạt dinh dưỡng cao\",\n  \"mo_ta\": \"Bổ sung thêm yến mạch, gạo lứt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 10] 10. Danh sách toàn bộ nhóm thực phẩm",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/category?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "category"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Tham số search"
+                }
+              ]
+            },
+            "description": "**STT 10** - Lấy danh sách toàn bộ nhóm thực phẩm (có cache 24h)\n- Phân quyền: **Public**\n- Phương thức: **GET /api/category**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 11] 11. Chi tiết một nhóm thực phẩm theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/category/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "category",
+                ":id"
+              ]
+            },
+            "description": "**STT 11** - Lấy chi tiết thông tin một nhóm thực phẩm theo ID\n- Phân quyền: **Public**\n- Phương thức: **GET /api/category/1**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 12] 12. Xóa danh mục nhóm thực phẩm theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/category/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "category",
+                ":id"
+              ]
+            },
+            "description": "**STT 12** - Xóa danh mục nhóm thực phẩm theo ID\n- Phân quyền: **Admin**\n- Phương thức: **DELETE /api/category/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ChatbotController (1 APIs)",
+      "description": "Nhóm API thuộc ChatbotController (Gồm 1 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 13] 13. Tư vấn Chatbot AI (Deprecated 410 Gone)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/chatbot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "chatbot"
+              ]
+            },
+            "description": "**STT 13** - Chatbot AI cũ đã dừng hỗ trợ -> Trả về HTTP 410 Gone\n- Phân quyền: **User**\n- Phương thức: **POST /api/chatbot**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"Xin chào, tư vấn thực đơn cho người tiểu đường\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "CoefficientController (7 APIs)",
+      "description": "Nhóm API thuộc CoefficientController (Gồm 7 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 14] 14. Thêm mới hệ số sống/chín",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients"
+              ]
+            },
+            "description": "**STT 14** - Thêm mới hệ số quy đổi sống/chín cho nguyên liệu\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/coefficients**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Hệ số luộc chín rau củ\",\n  \"rate\": 0.85,\n  \"isPublic\": true,\n  \"description\": \"Quy đổi khối lượng hao hụt khi luộc\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 15] 15. Danh sách tất cả hệ số sống/chín",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients"
+              ]
+            },
+            "description": "**STT 15** - Lấy danh sách tất cả các hệ số sống/chín\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/coefficients**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 16] 16. Chi tiết hệ số sống/chín theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients",
+                ":id"
+              ]
+            },
+            "description": "**STT 16** - Lấy chi tiết hệ số sống/chín theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/coefficients/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 17] 17. Cập nhật hệ số sống/chín theo ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients",
+                ":id"
+              ]
+            },
+            "description": "**STT 17** - Cập nhật hệ số sống/chín theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/coefficients/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rate\": 0.88,\n  \"description\": \"Hiệu chỉnh tỷ lệ hao hụt theo thực nghiệm mới\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 18] 18. Xóa hệ số sống/chín theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients",
+                ":id"
+              ]
+            },
+            "description": "**STT 18** - Xóa hệ số sống/chín theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **DELETE /api/coefficients/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 19] 19. Lấy danh sách hệ số sống/chín công khai",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients/public",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients",
+                "public"
+              ]
+            },
+            "description": "**STT 19** - Lấy danh sách hệ số sống/chín dùng chung toàn hệ thống\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/coefficients/public**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 20] 20. Lấy danh sách hệ số sống/chín cá nhân",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/coefficients/my",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "coefficients",
+                "my"
+              ]
+            },
+            "description": "**STT 20** - Lấy danh sách hệ số sống/chín do chính người dùng định nghĩa\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/coefficients/my**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "DailyIntakeController (8 APIs)",
+      "description": "Nhóm API thuộc DailyIntakeController (Gồm 8 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 21] 21. Tạo nhật ký khẩu phần 24h lâm sàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes"
+              ]
+            },
+            "description": "**STT 21** - Tạo nhật ký khẩu phần 24h lâm sàng cho bệnh nhân\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/daily-intakes**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"patientId\": \"1\",\n  \"date\": \"2026-10-27\",\n  \"note\": \"Khẩu phần ăn ngày thứ 3 sau nhập viện\",\n  \"inputMethod\": \"BY_DISH\",\n  \"meals\": [\n    {\n      \"mealCode\": \"SANG\",\n      \"dishes\": [\n        {\n          \"dishId\": \"1\",\n          \"weightGram\": 150\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 22] 22. Lấy khẩu phần 24h theo bệnh nhân và ngày",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes?patientId=1&date=2026-10-27",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes"
+              ],
+              "query": [
+                {
+                  "key": "patientId",
+                  "value": "1",
+                  "description": "Tham số patientId"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-10-27",
+                  "description": "Tham số date"
+                }
+              ]
+            },
+            "description": "**STT 22** - Lấy khẩu phần 24h theo patientId và ngày khảo sát date\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/daily-intakes**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 23] 23. Lấy chi tiết bản ghi khẩu phần 24h",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                ":id"
+              ]
+            },
+            "description": "**STT 23** - Lấy chi tiết bản ghi khẩu phần 24h theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/daily-intakes/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 24] 24. Cập nhật nhật ký khẩu phần 24h",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                ":id"
+              ]
+            },
+            "description": "**STT 24** - Cập nhật nhật ký khẩu phần 24h theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/daily-intakes/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Bệnh nhân ăn bổ sung thêm sữa hạt\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 25] 25. Xóa bản ghi khẩu phần 24h",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                ":id"
+              ]
+            },
+            "description": "**STT 25** - Xóa bản ghi khẩu phần 24h (Cascade Delete món & nguyên liệu)\n- Phân quyền: **Doctor**\n- Phương thức: **DELETE /api/daily-intakes/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 26] 26. Lấy lịch sử khẩu phần của bệnh nhân",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/patient/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                "patient",
+                ":id"
+              ]
+            },
+            "description": "**STT 26** - Lấy lịch sử tất cả các ngày ghi khẩu phần của bệnh nhân\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/daily-intakes/patient/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 27] 27. Tải template Excel import khẩu phần",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/import-template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                "import-template"
+              ]
+            },
+            "description": "**STT 27** - Tải template Excel import khẩu phần (theo bữa hoặc nguyên liệu)\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/daily-intakes/import-template**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 28] 28. Import khẩu phần 24h từ file Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/import?patientId=1&date=2026-10-27&overwrite=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                "import"
+              ],
+              "query": [
+                {
+                  "key": "patientId",
+                  "value": "1",
+                  "description": "Tham số patientId"
+                },
+                {
+                  "key": "date",
+                  "value": "2026-10-27",
+                  "description": "Tham số date"
+                },
+                {
+                  "key": "overwrite",
+                  "value": "false",
+                  "description": "Tham số overwrite"
+                }
+              ]
+            },
+            "description": "**STT 28** - Import khẩu phần ăn 24h từ file Excel kèm báo lỗi\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/daily-intakes/import**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "DailyIntakeExportController (1 APIs)",
+      "description": "Nhóm API thuộc DailyIntakeExportController (Gồm 1 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 29] 29. Xuất báo cáo khẩu phần 24h Excel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/daily-intakes/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "daily-intakes",
+                "export"
+              ]
+            },
+            "description": "**STT 29** - Xuất báo cáo RDA vi chất 24h và khối lượng nhóm thực phẩm (ExcelJS)\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/daily-intakes/export**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"templateType\": \"TOTAL_FOOD_GROUP_MULTI_PATIENTS\",\n  \"patientIds\": [\n    1,\n    2\n  ],\n  \"fromDate\": \"2026-10-01\",\n  \"toDate\": \"2026-10-27\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "DiseaseGroupController (5 APIs)",
+      "description": "Nhóm API thuộc DiseaseGroupController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 30] 30. Tạo mới nhóm bệnh gốc (ICD)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/disease-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "disease-groups"
+              ]
+            },
+            "description": "**STT 30** - Tạo nhóm bệnh lý gốc chuẩn y khoa\n- Phân quyền: **Admin**\n- Phương thức: **POST /api/disease-groups**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nhom\": \"Bệnh lý Chuyển hóa & Nội tiết\",\n  \"ma_nhom\": \"ICD-E10-E14\",\n  \"mo_ta\": \"Nhóm bệnh tiểu đường, rối loạn lipid máu\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 31] 31. Danh sách tất cả nhóm bệnh gốc",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/disease-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "disease-groups"
+              ]
+            },
+            "description": "**STT 31** - Lấy danh sách tất cả các nhóm bệnh gốc\n- Phân quyền: **Public**\n- Phương thức: **GET /api/disease-groups**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 32] 32. Chi tiết nhóm bệnh lý theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/disease-groups/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "disease-groups",
+                ":id"
+              ]
+            },
+            "description": "**STT 32** - Lấy chi tiết thông tin một nhóm bệnh lý theo ID\n- Phân quyền: **Public**\n- Phương thức: **GET /api/disease-groups/1**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 33] 33. Cập nhật nhóm bệnh lý gốc",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/disease-groups/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "disease-groups",
+                ":id"
+              ]
+            },
+            "description": "**STT 33** - Cập nhật thông tin nhóm bệnh lý gốc theo ID\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/disease-groups/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nhom\": \"Bệnh lý Chuyển hóa, Nội tiết & Tim mạch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 34] 34. Xóa nhóm bệnh lý gốc theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/disease-groups/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "disease-groups",
+                ":id"
+              ]
+            },
+            "description": "**STT 34** - Xóa nhóm bệnh lý gốc theo ID\n- Phân quyền: **Admin**\n- Phương thức: **DELETE /api/disease-groups/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "DishController (15 APIs)",
+      "description": "Nhóm API thuộc DishController (Gồm 15 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 35] 35. Danh sách món ăn cá nhân (kèm lọc trạng thái)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish?page=1&limit=20&statuses=APPROVED,PENDING",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                },
+                {
+                  "key": "statuses",
+                  "value": "APPROVED,PENDING",
+                  "description": "Tham số statuses"
+                }
+              ]
+            },
+            "description": "**STT 35** - Lấy danh sách món ăn cá nhân lọc theo trạng thái (statuses)\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/dish**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 36] 36. Tải file Excel mẫu import món ăn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/import-template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                "import-template"
+              ]
+            },
+            "description": "**STT 36** - Tải file Excel mẫu import công thức món ăn\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/dish/import-template**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 37] 37. Import danh sách món ăn từ Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                "import"
+              ]
+            },
+            "description": "**STT 37** - Import danh sách món ăn từ file Excel\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/dish/import**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 38] 38. Gợi ý tự động tìm kiếm nhanh món ăn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/autocomplete?keyword=canh chua",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                "autocomplete"
+              ],
+              "query": [
+                {
+                  "key": "keyword",
+                  "value": "canh chua",
+                  "description": "Tham số keyword"
+                }
+              ]
+            },
+            "description": "**STT 38** - Tự động gợi ý tìm kiếm nhanh món ăn theo từ khóa\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/dish/autocomplete**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 39] 39. Chi tiết nguyên liệu & 86 vi chất món ăn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id"
+              ]
+            },
+            "description": "**STT 39** - Lấy chi tiết nguyên liệu, khối lượng và 86 vi chất của món ăn\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/dish/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 40] 40. Tạo mới món ăn (RecipeHash SHA-256)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish"
+              ]
+            },
+            "description": "**STT 40** - Tạo mới món ăn (tự động tính canonical RecipeHash SHA-256)\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/dish**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_mon\": \"Cháo yến mạch ức gà xé\",\n  \"mo_ta\": \"Cháo dinh dưỡng cho bệnh nhân tiểu đường\",\n  \"ingredients\": [\n    {\n      \"ingredientId\": 1,\n      \"weight\": 50\n    },\n    {\n      \"ingredientId\": 2,\n      \"weight\": 100\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 41] 41. Cập nhật thông tin và công thức món ăn",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id"
+              ]
+            },
+            "description": "**STT 41** - Cập nhật thông tin và công thức thành phần món ăn theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/dish/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_mon\": \"Cháo yến mạch ức gà xé hạt sen\",\n  \"ingredients\": [\n    {\n      \"ingredientId\": 1,\n      \"weight\": 60\n    },\n    {\n      \"ingredientId\": 2,\n      \"weight\": 100\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 42] 42. Nhân bản sao chép món ăn (Clone)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1/clone",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id",
+                "clone"
+              ]
+            },
+            "description": "**STT 42** - Sao chép nhân bản một món ăn thành bản ghi mới của người dùng\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/dish/1/clone**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 43] 43. Xóa món ăn của cá nhân",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id"
+              ]
+            },
+            "description": "**STT 43** - Xóa món ăn của cá nhân theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **DELETE /api/dish/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 44] 44. Xuất danh sách món ăn ra Excel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                "export"
+              ]
+            },
+            "description": "**STT 44** - Xuất danh sách món ăn đã chọn ra file Excel\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/dish/export**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dishIds\": [\n    1,\n    2,\n    3\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 45] 45. Gửi đề xuất món ăn lên làm món công khai",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1/propose",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id",
+                "propose"
+              ]
+            },
+            "description": "**STT 45** - Gửi đề xuất món ăn lên làm món công khai hệ thống\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/dish/1/propose**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 46] 46. Quản trị viên duyệt đề xuất món ăn",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id",
+                "approve"
+              ]
+            },
+            "description": "**STT 46** - Quản trị viên duyệt đề xuất món ăn thành món công khai\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/dish/1/approve**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 47] 47. Quản trị viên từ chối đề xuất món ăn",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/1/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                ":id",
+                "reject"
+              ]
+            },
+            "description": "**STT 47** - Quản trị viên từ chối đề xuất món ăn kèm lý do\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/dish/1/reject**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Công thức chưa có định lượng chính xác\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 48] 48. Lấy danh sách món ăn công khai hệ thống",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/public?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                "public"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                }
+              ]
+            },
+            "description": "**STT 48** - Lấy danh sách các món ăn đã được kiểm duyệt công khai\n- Phân quyền: **Public**\n- Phương thức: **GET /api/dish/public**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 49] 49. Quản trị viên lấy danh sách toàn bộ món ăn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/dish/admin?page=1&limit=20&status=PENDING",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "dish",
+                "admin"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                },
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "description": "Tham số status"
+                }
+              ]
+            },
+            "description": "**STT 49** - Quản trị viên lấy danh sách toàn bộ món ăn để xét duyệt\n- Phân quyền: **Admin**\n- Phương thức: **GET /api/dish/admin**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "EvidenceController (2 APIs)",
+      "description": "Nhóm API thuộc EvidenceController (Gồm 2 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 50] 50. Xem trước minh chứng y tế (Preview)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/evidences/1/preview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "evidences",
+                ":id",
+                "preview"
+              ]
+            },
+            "description": "**STT 50** - Lấy URL xem trước file chứng từ/ảnh minh chứng y tế\n- Phân quyền: **User**\n- Phương thức: **GET /api/evidences/1/preview**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 51] 51. Tải xuống minh chứng y tế (Download)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/evidences/1/download",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "evidences",
+                ":id",
+                "download"
+              ]
+            },
+            "description": "**STT 51** - Lấy URL tải xuống file chứng từ/minh chứng thanh toán\n- Phân quyền: **User**\n- Phương thức: **GET /api/evidences/1/download**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ExportController (1 APIs)",
+      "description": "Nhóm API thuộc ExportController (Gồm 1 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 52] 52. Xuất 86 vi chất nguyên liệu ra Excel",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/export/ingredients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "export",
+                "ingredients"
+              ]
+            },
+            "description": "**STT 52** - Xuất danh sách 86 chỉ tiêu vi chất nguyên liệu ra file Excel\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/export/ingredients**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ingredientIds\": [\n    1,\n    2,\n    3,\n    4,\n    5\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ExtendedDiseaseGroupController (7 APIs)",
+      "description": "Nhóm API thuộc ExtendedDiseaseGroupController (Gồm 7 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 53] 53. Tạo mới nhóm bệnh mở rộng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups"
+              ]
+            },
+            "description": "**STT 53** - Tạo mới nhóm bệnh lý mở rộng / chuyên sâu của bác sĩ\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/extended-disease-groups**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nhom\": \"Đái tháo đường thai kỳ\",\n  \"disease_group_id\": 1,\n  \"mo_ta\": \"Theo dõi đường huyết chặt chẽ trong thai kỳ\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 54] 54. Danh sách toàn bộ nhóm bệnh mở rộng",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups"
+              ]
+            },
+            "description": "**STT 54** - Lấy danh sách toàn bộ nhóm bệnh lý mở rộng\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/extended-disease-groups**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 55] 55. Chi tiết nhóm bệnh mở rộng theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups",
+                ":id"
+              ]
+            },
+            "description": "**STT 55** - Lấy chi tiết nhóm bệnh lý mở rộng theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/extended-disease-groups/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 56] 56. Cập nhật nhóm bệnh mở rộng theo ID",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups",
+                ":id"
+              ]
+            },
+            "description": "**STT 56** - Cập nhật thông tin nhóm bệnh lý mở rộng theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/extended-disease-groups/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nhom\": \"Đái tháo đường thai kỳ type A1/A2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 57] 57. Xóa nhóm bệnh mở rộng theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups",
+                ":id"
+              ]
+            },
+            "description": "**STT 57** - Xóa nhóm bệnh lý mở rộng theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **DELETE /api/extended-disease-groups/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 58] 58. Tải template Excel import nhóm bệnh mở rộng",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups/import-template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups",
+                "import-template"
+              ]
+            },
+            "description": "**STT 58** - Tải template Excel import nhóm bệnh mở rộng\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/extended-disease-groups/import-template**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 59] 59. Import danh sách nhóm bệnh mở rộng từ Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/extended-disease-groups/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "extended-disease-groups",
+                "import"
+              ]
+            },
+            "description": "**STT 59** - Import danh sách nhóm bệnh mở rộng từ file Excel\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/extended-disease-groups/import**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "FileController (1 APIs)",
+      "description": "Nhóm API thuộc FileController (Gồm 1 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 60] 60. Tải tệp lên máy chủ (Upload File)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/files",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "files"
+              ]
+            },
+            "description": "**STT 60** - Upload file đa phương tiện (Multer + Magic Bytes validation)\n- Phân quyền: **User**\n- Phương thức: **POST /api/files**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "IngredientController (9 APIs)",
+      "description": "Nhóm API thuộc IngredientController (Gồm 9 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 61] 61. Thêm mới nguyên liệu kèm 86 vi chất",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient"
+              ]
+            },
+            "description": "**STT 61** - Thêm mới nguyên liệu thực phẩm kèm chỉ số 86 vi chất\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/ingredient**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nguyen_lieu\": \"Gạo lứt đỏ Điện Biên\",\n  \"ma_nguyen_lieu\": \"GLD-01\",\n  \"category_id\": 1,\n  \"nang_luong_kcal\": 345.5,\n  \"chat_dam_g\": 7.5,\n  \"chat_beo_g\": 2.7,\n  \"chat_bot_duong_g\": 72.8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 62] 62. Danh sách rút gọn nguyên liệu (Summary)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                "summary"
+              ]
+            },
+            "description": "**STT 62** - Lấy danh sách rút gọn (chỉ ID và Tên) chống overfetching\n- Phân quyền: **Public**\n- Phương thức: **GET /api/ingredient/summary**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 63] 63. Danh sách nguyên liệu phân trang",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Tham số search"
+                }
+              ]
+            },
+            "description": "**STT 63** - Lấy danh sách nguyên liệu có phân trang (page, size)\n- Phân quyền: **Public**\n- Phương thức: **GET /api/ingredient**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 64] 64. Lấy toàn bộ nguyên liệu (Client Filter)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/all",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                "all"
+              ]
+            },
+            "description": "**STT 64** - Lấy toàn bộ nguyên liệu (phục vụ bộ lọc Client FE)\n- Phân quyền: **Public**\n- Phương thức: **GET /api/ingredient/all**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 65] 65. Chi tiết 86 chỉ tiêu vi chất nguyên liệu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                ":id"
+              ]
+            },
+            "description": "**STT 65** - Lấy chi tiết đầy đủ 86 chỉ tiêu dinh dưỡng theo ID\n- Phân quyền: **Public**\n- Phương thức: **GET /api/ingredient/1**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 66] 66. Cập nhật thông tin và vi chất nguyên liệu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                ":id"
+              ]
+            },
+            "description": "**STT 66** - Cập nhật thông tin và bảng vi chất của nguyên liệu theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/ingredient/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nguyen_lieu\": \"Gạo lứt huyết rồng hữu cơ\",\n  \"nang_luong_kcal\": 350\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 67] 67. Xóa nguyên liệu thực phẩm theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                ":id"
+              ]
+            },
+            "description": "**STT 67** - Xóa nguyên liệu thực phẩm theo ID\n- Phân quyền: **Admin**\n- Phương thức: **DELETE /api/ingredient/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 68] 68. Tải file Excel mẫu import nguyên liệu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                "template"
+              ]
+            },
+            "description": "**STT 68** - Tải file Excel mẫu import nguyên liệu (chọn cột chỉ tiêu)\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/ingredient/template**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 69] 69. Import nguyên liệu từ file Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient",
+                "import"
+              ]
+            },
+            "description": "**STT 69** - Import danh sách nguyên liệu từ file Excel kèm kiểm tra lỗi\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/ingredient/import**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "IngredientProposalController (5 APIs)",
+      "description": "Nhóm API thuộc IngredientProposalController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 70] 70. Tạo đề xuất nguyên liệu mới",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient-proposals",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient-proposals"
+              ]
+            },
+            "description": "**STT 70** - Tạo đề xuất bổ sung nguyên liệu mới kèm minh chứng y tế\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/ingredient-proposals**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_nguyen_lieu\": \"Tảo xoắn Spirulina hữu cơ\",\n  \"mo_ta\": \"Bổ sung nguồn đạm thực vật và khoáng chất cao\",\n  \"evidence_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 71] 71. Quản trị viên lấy danh sách đề xuất nguyên liệu",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient-proposals?status=PENDING&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient-proposals"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "description": "Tham số status"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                }
+              ]
+            },
+            "description": "**STT 71** - Quản trị viên lấy danh sách đề xuất nguyên liệu theo trạng thái\n- Phân quyền: **Admin**\n- Phương thức: **GET /api/ingredient-proposals**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 72] 72. Chi tiết một đề xuất nguyên liệu theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient-proposals/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient-proposals",
+                ":id"
+              ]
+            },
+            "description": "**STT 72** - Lấy thông tin chi tiết một đề xuất nguyên liệu theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/ingredient-proposals/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 73] 73. Quản trị viên duyệt đề xuất nguyên liệu",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient-proposals/1/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient-proposals",
+                ":id",
+                "approve"
+              ]
+            },
+            "description": "**STT 73** - Quản trị viên duyệt đề xuất -> sinh nguyên liệu chính thức\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/ingredient-proposals/1/approve**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 74] 74. Quản trị viên từ chối đề xuất nguyên liệu",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/ingredient-proposals/1/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ingredient-proposals",
+                ":id",
+                "reject"
+              ]
+            },
+            "description": "**STT 74** - Quản trị viên từ chối đề xuất nguyên liệu kèm lý do\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/ingredient-proposals/1/reject**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Thiếu chứng nhận kiểm nghiệm vi sinh\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "MealController (5 APIs)",
+      "description": "Nhóm API thuộc MealController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 75] 75. Tạo bữa ăn độc lập (Bị vô hiệu hóa - DenyAll)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meal"
+              ]
+            },
+            "description": "**STT 75** - Tạo bữa ăn độc lập (Bị khóa cứng, FE không dùng)\n- Phân quyền: **DenyAll**\n- Phương thức: **POST /api/meal**"
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 76] 76. Lấy danh sách bữa ăn (Bị vô hiệu hóa - DenyAll)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meal",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meal"
+              ]
+            },
+            "description": "**STT 76** - Lấy danh sách bữa ăn độc lập\n- Phân quyền: **DenyAll**\n- Phương thức: **GET /api/meal**"
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 77] 77. Chi tiết bữa ăn theo ID (Bị vô hiệu hóa - DenyAll)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meal/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meal",
+                ":id"
+              ]
+            },
+            "description": "**STT 77** - Lấy chi tiết bữa ăn độc lập theo ID\n- Phân quyền: **DenyAll**\n- Phương thức: **GET /api/meal/1**"
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 78] 78. Cập nhật bữa ăn theo ID (Bị vô hiệu hóa - DenyAll)",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meal/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meal",
+                ":id"
+              ]
+            },
+            "description": "**STT 78** - Cập nhật bữa ăn độc lập theo ID\n- Phân quyền: **DenyAll**\n- Phương thức: **PUT /api/meal/1**"
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 79] 79. Xóa bữa ăn theo ID (Bị vô hiệu hóa - DenyAll)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/meal/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "meal",
+                ":id"
+              ]
+            },
+            "description": "**STT 79** - Xóa bữa ăn độc lập theo ID\n- Phân quyền: **DenyAll**\n- Phương thức: **DELETE /api/meal/1**"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "MenuController (7 APIs)",
+      "description": "Nhóm API thuộc MenuController (Gồm 7 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 80] 80. Tạo thực đơn đa cấp (Copy-on-Write)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu"
+              ]
+            },
+            "description": "**STT 80** - Tạo thực đơn đa cấp (ngày/tuần/tháng) áp dụng Copy-on-Write\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/menu**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_thuc_don\": \"Thực đơn mẫu 7 ngày cho đái tháo đường\",\n  \"loai_thuc_don\": \"TUAN\",\n  \"mo_ta\": \"Năng lượng 1600 kcal/ngày\",\n  \"days\": [\n    {\n      \"dayIndex\": 1,\n      \"meals\": [\n        {\n          \"mealCode\": \"SANG\",\n          \"dishes\": [\n            {\n              \"dishId\": 1,\n              \"weight\": 200\n            }\n          ]\n        }\n      ]\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 81] 81. Danh sách thực đơn cá nhân",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Tham số search"
+                }
+              ]
+            },
+            "description": "**STT 81** - Lấy danh sách thực đơn cá nhân kèm tìm kiếm từ khóa\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/menu**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 82] 82. Chi tiết thực đơn (lọc theo tuần và ngày)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/1?week=1&day=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu",
+                ":id"
+              ],
+              "query": [
+                {
+                  "key": "week",
+                  "value": "1",
+                  "description": "Tham số week"
+                },
+                {
+                  "key": "day",
+                  "value": "1",
+                  "description": "Tham số day"
+                }
+              ]
+            },
+            "description": "**STT 82** - Lấy chi tiết thực đơn (lọc theo tuần week và ngày day)\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/menu/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 83] 83. Cây cấu trúc thực đơn đầy đủ (Full Tree)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/1/full",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu",
+                ":id",
+                "full"
+              ]
+            },
+            "description": "**STT 83** - Lấy toàn bộ cây cấu trúc thực đơn (đủ ngày, bữa và món)\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/menu/1/full**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 84] 84. Cập nhật thực đơn đa cấp",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu",
+                ":id"
+              ]
+            },
+            "description": "**STT 84** - Cập nhật thực đơn đa cấp theo ID (bảo vệ bữa ăn độc lập)\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/menu/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_thuc_don\": \"Thực đơn chuẩn hóa 7 ngày đái tháo đường type 2\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 85] 85. Xóa thực đơn theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu",
+                ":id"
+              ]
+            },
+            "description": "**STT 85** - Xóa thực đơn theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **DELETE /api/menu/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 86] 86. Xuất thực đơn kèm 86 vi chất ra Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu/1/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu",
+                ":id",
+                "export"
+              ]
+            },
+            "description": "**STT 86** - Xuất thực đơn kèm 86 vi chất phân tích ra file Excel (ExcelJS)\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/menu/1/export**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "MenuProposalController (9 APIs)",
+      "description": "Nhóm API thuộc MenuProposalController (Gồm 9 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 87] 87. Gửi đề xuất thực đơn mẫu (Snapshot JSONB)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                ":id"
+              ]
+            },
+            "description": "**STT 87** - Gửi đề xuất thực đơn (chụp Deep Frozen Snapshot JSONB)\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/menu-proposals/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ly_do_de_xuat\": \"Thực đơn đã kiểm nghiệm lâm sàng đạt hiệu quả kiểm soát HbA1c\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 88] 88. Danh sách đề xuất thực đơn của tôi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/my",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                "my"
+              ]
+            },
+            "description": "**STT 88** - Lấy danh sách đề xuất thực đơn do chính mình gửi\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/menu-proposals/my**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 89] 89. Quản trị viên lấy danh sách toàn bộ đề xuất thực đơn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals?status=PENDING&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "description": "Tham số status"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                }
+              ]
+            },
+            "description": "**STT 89** - Quản trị viên lấy danh sách toàn bộ đề xuất theo trạng thái\n- Phân quyền: **Admin**\n- Phương thức: **GET /api/menu-proposals**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 90] 90. Xem chi tiết snapshot đầy đủ đề xuất thực đơn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/1/full",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                ":id",
+                "full"
+              ]
+            },
+            "description": "**STT 90** - Xem chi tiết snapshot đầy đủ của đề xuất thực đơn mẫu\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/menu-proposals/1/full**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 91] 91. Xem chi tiết ngày/tuần của đề xuất thực đơn",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                ":id"
+              ]
+            },
+            "description": "**STT 91** - Xem chi tiết ngày/tuần của đề xuất thực đơn\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/menu-proposals/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 92] 92. Quản trị viên duyệt đề xuất thực đơn",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/1/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                ":id",
+                "approve"
+              ]
+            },
+            "description": "**STT 92** - Quản trị viên duyệt đề xuất thành thực đơn công khai\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/menu-proposals/1/approve**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 93] 93. Quản trị viên từ chối đề xuất thực đơn",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/1/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                ":id",
+                "reject"
+              ]
+            },
+            "description": "**STT 93** - Quản trị viên từ chối đề xuất thực đơn kèm lý do\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/menu-proposals/1/reject**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Cơ cấu năng lượng bữa tối vượt ngưỡng khuyến nghị\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 94] 94. Danh sách thực đơn mẫu công khai",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/public?page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                "public"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                }
+              ]
+            },
+            "description": "**STT 94** - Lấy danh sách thực đơn mẫu đã được phê duyệt công khai\n- Phân quyền: **Public**\n- Phương thức: **GET /api/menu-proposals/public**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 95] 95. Xuất nội dung đề xuất thực đơn mẫu ra Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/menu-proposals/1/export",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "menu-proposals",
+                ":id",
+                "export"
+              ]
+            },
+            "description": "**STT 95** - Xuất nội dung đề xuất thực đơn mẫu ra file Excel\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/menu-proposals/1/export**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "NutritionGuideController (5 APIs)",
+      "description": "Nhóm API thuộc NutritionGuideController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 96] 96. Danh sách hướng dẫn dinh dưỡng bệnh lý",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-guide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-guide"
+              ]
+            },
+            "description": "**STT 96** - Lấy danh sách các tài liệu hướng dẫn dinh dưỡng bệnh lý\n- Phân quyền: **Public**\n- Phương thức: **GET /api/nutrition-guide**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 97] 97. Chi tiết tài liệu hướng dẫn dinh dưỡng theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-guide/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-guide",
+                ":id"
+              ]
+            },
+            "description": "**STT 97** - Lấy chi tiết tài liệu hướng dẫn dinh dưỡng theo ID\n- Phân quyền: **Public**\n- Phương thức: **GET /api/nutrition-guide/1**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 98] 98. Tạo bài viết hướng dẫn dinh dưỡng mới",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-guide",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-guide"
+              ]
+            },
+            "description": "**STT 98** - Tạo bài viết hướng dẫn dinh dưỡng lâm sàng mới\n- Phân quyền: **Admin**\n- Phương thức: **POST /api/nutrition-guide**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"diseaseName\": \"Bệnh phổi tắc nghẽn mạn tính (COPD)\",\n  \"code\": \"HD-COPD-01\",\n  \"nutritionPrinciple\": \"Tăng cường chất béo tốt, giảm tỷ lệ carbohydrate nhằm giảm sinh CO2\",\n  \"dietaryRequirements\": {\n    \"fatPercent\": \"40-45%\",\n    \"carbPercent\": \"40-45%\",\n    \"proteinPerKg\": \"1.2 - 1.5g\"\n  },\n  \"note\": \"Chia nhỏ bữa ăn làm 5-6 bữa/ngày, tránh đầy bụng gây khó thở\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 99] 99. Cập nhật bài viết hướng dẫn dinh dưỡng",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-guide/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-guide",
+                ":id"
+              ]
+            },
+            "description": "**STT 99** - Cập nhật bài viết hướng dưỡng dinh dưỡng theo ID\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/nutrition-guide/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nutritionPrinciple\": \"Tăng cường chất béo omega-3 kháng viêm, giảm áp lực hô hấp\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 100] 100. Xóa bài viết hướng dẫn dinh dưỡng theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-guide/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-guide",
+                ":id"
+              ]
+            },
+            "description": "**STT 100** - Xóa bài viết hướng dẫn dinh dưỡng theo ID\n- Phân quyền: **Admin**\n- Phương thức: **DELETE /api/nutrition-guide/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "NutritionLimitSetController (4 APIs)",
+      "description": "Nhóm API thuộc NutritionLimitSetController (Gồm 4 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 101] 101. Tạo bộ ngưỡng an toàn vi chất lâm sàng",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-limit-sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-limit-sets"
+              ]
+            },
+            "description": "**STT 101** - Tạo bộ ngưỡng giới hạn vi chất tối thiểu/tối đa theo bệnh lý\n- Phân quyền: **Admin**\n- Phương thức: **POST /api/nutrition-limit-sets**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ngưỡng kiểm soát Natri & Kali cho bệnh nhân suy thận mạn\",\n  \"disease_group_id\": 1,\n  \"isTemplate\": true,\n  \"items\": [\n    {\n      \"nutrientCode\": \"NA\",\n      \"minValue\": 1000,\n      \"maxValue\": 2000,\n      \"unit\": \"mg\"\n    },\n    {\n      \"nutrientCode\": \"K\",\n      \"minValue\": 1500,\n      \"maxValue\": 2500,\n      \"unit\": \"mg\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 102] 102. Cập nhật bộ ngưỡng giới hạn vi chất",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-limit-sets/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-limit-sets",
+                ":id"
+              ]
+            },
+            "description": "**STT 102** - Cập nhật bộ ngưỡng giới hạn vi chất theo ID\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/nutrition-limit-sets/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ngưỡng Natri & Kali cập nhật 2026\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 103] 103. Chi tiết bộ ngưỡng giới hạn vi chất theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-limit-sets/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-limit-sets",
+                ":id"
+              ]
+            },
+            "description": "**STT 103** - Lấy chi tiết bộ ngưỡng giới hạn vi chất theo ID\n- Phân quyền: **Public**\n- Phương thức: **GET /api/nutrition-limit-sets/1**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 104] 104. Danh sách toàn bộ các bộ ngưỡng giới hạn vi chất",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/nutrition-limit-sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "nutrition-limit-sets"
+              ]
+            },
+            "description": "**STT 104** - Lấy danh sách toàn bộ các bộ ngưỡng giới hạn vi chất\n- Phân quyền: **Public**\n- Phương thức: **GET /api/nutrition-limit-sets**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PackageController (5 APIs)",
+      "description": "Nhóm API thuộc PackageController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 105] 105. Tạo gói cước dịch vụ PRO/VIP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/package",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "package"
+              ]
+            },
+            "description": "**STT 105** - Tạo gói cước dịch vụ mới (thời hạn ngày, giá tiền, mô tả)\n- Phân quyền: **Superadmin**\n- Phương thức: **POST /api/package**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ten_goi\": \"Gói Chuyên Gia 12 Tháng\",\n  \"ma_goi\": \"PRO-12M\",\n  \"thoi_han_ngay\": 365,\n  \"gia_tien\": 1200000,\n  \"mo_ta\": \"Đầy đủ tính năng phân tích 86 vi chất và xuất báo cáo lâm sàng\",\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 106] 106. Quản trị viên lấy danh sách toàn bộ gói cước",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/package",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "package"
+              ]
+            },
+            "description": "**STT 106** - Quản trị viên lấy danh sách toàn bộ các gói cước\n- Phân quyền: **Superadmin**\n- Phương thức: **GET /api/package**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 107] 107. Chi tiết gói cước dịch vụ theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/package/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "package",
+                ":id"
+              ]
+            },
+            "description": "**STT 107** - Lấy chi tiết một gói cước dịch vụ theo ID\n- Phân quyền: **User**\n- Phương thức: **GET /api/package/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 108] 108. Cập nhật thông tin gói cước dịch vụ",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/package/update-package",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "package",
+                "update-package"
+              ]
+            },
+            "description": "**STT 108** - Cập nhật thông tin gói cước dịch vụ\n- Phân quyền: **Superadmin**\n- Phương thức: **PUT /api/package/update-package**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"ten_goi\": \"Gói Chuyên Gia 12 Tháng Khuyến Mãi\",\n  \"gia_tien\": 990000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 109] 109. Danh sách gói cước đang mở bán (Active)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/package/active",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "package",
+                "active"
+              ]
+            },
+            "description": "**STT 109** - Lấy danh sách các gói cước đang mở bán để người dùng nâng cấp\n- Phân quyền: **Public**\n- Phương thức: **GET /api/package/active**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "PatientController (8 APIs)",
+      "description": "Nhóm API thuộc PatientController (Gồm 8 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 110] 110. Tạo hồ sơ bệnh nhân (Cấp mã tự động)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ]
+            },
+            "description": "**STT 110** - Tạo hồ sơ bệnh nhân mới (cấp mã tự động chống race condition)\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/patients**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ho_ten\": \"Nguyễn Văn An\",\n  \"so_dien_thoai\": \"0912345678\",\n  \"ngay_sinh\": \"1985-05-15\",\n  \"gioi_tinh\": \"NAM\",\n  \"can_nang\": 68.5,\n  \"chieu_cao\": 172,\n  \"he_so_hoat_dong\": 1.375,\n  \"nhom_benh_chinh_id\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 111] 111. Cập nhật hồ sơ bệnh nhân & Nhân trắc học",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                ":id"
+              ]
+            },
+            "description": "**STT 111** - Cập nhật thông tin bệnh nhân, nhân trắc học & TDEE\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/patients/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ho_ten\": \"Nguyễn Văn An (Tái khám)\",\n  \"can_nang\": 67\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 112] 112. Xóa hồ sơ bệnh nhân theo ID",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                ":id"
+              ]
+            },
+            "description": "**STT 112** - Xóa hồ sơ bệnh nhân theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **DELETE /api/patients/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 113] 113. Chi tiết hồ sơ bệnh nhân theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                ":id"
+              ]
+            },
+            "description": "**STT 113** - Lấy thông tin chi tiết hồ sơ bệnh nhân theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/patients/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 114] 114. Xem trước mã bệnh nhân sinh tự động",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/code-preview?phone=0912345678",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "code-preview"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "0912345678",
+                  "description": "Tham số phone"
+                }
+              ]
+            },
+            "description": "**STT 114** - Xem trước mã bệnh nhân sinh ra dựa trên số điện thoại\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/patients/code-preview**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 115] 115. Danh sách bệnh nhân thuộc quyền quản lý",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients?page=1&limit=20&search=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Tham số search"
+                }
+              ]
+            },
+            "description": "**STT 115** - Lấy danh sách bệnh nhân thuộc quyền quản lý của bác sĩ\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/patients**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 116] 116. Tải template Excel import hồ sơ bệnh nhân",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/import-template",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "import-template"
+              ]
+            },
+            "description": "**STT 116** - Tải template Excel import hồ sơ bệnh nhân\n- Phân quyền: **Doctor**\n- Phương thức: **GET /api/patients/import-template**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 117] 117. Import danh sách bệnh nhân từ Excel",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/patients/import",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "patients",
+                "import"
+              ]
+            },
+            "description": "**STT 117** - Import danh sách bệnh nhân từ file Excel kèm kiểm tra lỗi\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/patients/import**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ProfileController (1 APIs)",
+      "description": "Nhóm API thuộc ProfileController (Gồm 1 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 118] 118. Quản trị viên phân trang danh sách người dùng (getAll)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/getAll",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "getAll"
+              ]
+            },
+            "description": "**STT 118** - Quản trị viên phân trang và tìm kiếm danh sách người dùng\n- Phân quyền: **Admin**\n- Phương thức: **POST /api/profile/getAll**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"page\": 1,\n  \"limit\": 20,\n  \"search\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "ProposerController (4 APIs)",
+      "description": "Nhóm API thuộc ProposerController (Gồm 4 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 119] 119. Thêm mới chuyên gia đề xuất nguyên liệu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/proposer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "proposer"
+              ]
+            },
+            "description": "**STT 119** - Thêm mới người/chuyên gia đề xuất nguyên liệu thực phẩm\n- Phân quyền: **Doctor**\n- Phương thức: **POST /api/proposer**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ho_ten\": \"PGS. TS. Trần Dinh Dưỡng\",\n  \"chuyen_khoa\": \"Dinh dưỡng lâm sàng tiết chế\",\n  \"email\": \"expert.tran@viennhidong.vn\",\n  \"so_dien_thoai\": \"0901234567\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 120] 120. Cập nhật thông tin chuyên gia đề xuất",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/proposer/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "proposer",
+                ":id"
+              ]
+            },
+            "description": "**STT 120** - Cập nhật thông tin chuyên gia đề xuất theo ID\n- Phân quyền: **Doctor**\n- Phương thức: **PUT /api/proposer/1**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{doctorToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"chuyen_khoa\": \"Chủ tịch Hội Dinh dưỡng Lâm sàng\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 121] 121. Danh sách tất cả chuyên gia đề xuất",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/proposer",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "proposer"
+              ]
+            },
+            "description": "**STT 121** - Lấy danh sách tất cả chuyên gia đề xuất nguyên liệu\n- Phân quyền: **Public**\n- Phương thức: **GET /api/proposer**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 122] 122. Chi tiết thông tin chuyên gia đề xuất theo ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/proposer/1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "proposer",
+                ":id"
+              ]
+            },
+            "description": "**STT 122** - Lấy chi tiết thông tin chuyên gia đề xuất theo ID\n- Phân quyền: **Public**\n- Phương thức: **GET /api/proposer/1**",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SubscriptionController (5 APIs)",
+      "description": "Nhóm API thuộc SubscriptionController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 123] 123. Gửi yêu cầu nâng cấp gói PRO (Payment Request)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/payment-request",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subscription",
+                "payment-request"
+              ]
+            },
+            "description": "**STT 123** - Người dùng gửi yêu cầu nạp tiền / nâng cấp tài khoản PRO\n- Phân quyền: **User**\n- Phương thức: **POST /api/subscription/payment-request**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": 1,\n  \"paymentMethod\": \"BANK_TRANSFER\",\n  \"evidenceId\": 1,\n  \"note\": \"Đã chuyển khoản thành công từ Techcombank\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 124] 124. Xem lịch sử yêu cầu nâng cấp của tôi",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/my-requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subscription",
+                "my-requests"
+              ]
+            },
+            "description": "**STT 124** - Người dùng xem lịch sử yêu cầu nâng cấp của chính mình\n- Phân quyền: **User**\n- Phương thức: **GET /api/subscription/my-requests**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 125] 125. Quản trị viên xem danh sách yêu cầu nâng cấp cần duyệt",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/list?status=PENDING&page=1&limit=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subscription",
+                "list"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "PENDING",
+                  "description": "Tham số status"
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Tham số page"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Tham số limit"
+                }
+              ]
+            },
+            "description": "**STT 125** - Quản trị viên xem danh sách tất cả yêu cầu thanh toán cần duyệt\n- Phân quyền: **Superadmin**\n- Phương thức: **GET /api/subscription/list**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 126] 126. Quản trị viên duyệt yêu cầu nạp tiền (Cộng ngày PRO)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/1/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subscription",
+                ":id",
+                "approve"
+              ]
+            },
+            "description": "**STT 126** - Duyệt yêu cầu nạp tiền (khóa bi quan, cộng dồn ngày PRO)\n- Phân quyền: **Superadmin**\n- Phương thức: **POST /api/subscription/1/approve**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Đã nhận đủ tiền từ sao kê ngân hàng\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 127] 127. Quản trị viên từ chối yêu cầu nạp tiền",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscription/1/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "subscription",
+                ":id",
+                "reject"
+              ]
+            },
+            "description": "**STT 127** - Từ chối yêu cầu nạp tiền kèm lý do giải trình\n- Phân quyền: **Superadmin**\n- Phương thức: **POST /api/subscription/1/reject**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Biên lai chuyển khoản không hợp lệ hoặc số tiền không khớp\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "UserController (5 APIs)",
+      "description": "Nhóm API thuộc UserController (Gồm 5 endpoints chuẩn hóa)",
+      "item": [
+        {
+          "name": "[STT 128] 128. Khóa hoặc mở khóa trạng thái tài khoản (Status)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/update-user-active-satus",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "update-user-active-satus"
+              ]
+            },
+            "description": "**STT 128** - Khóa hoặc mở khóa trạng thái tài khoản người dùng\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/users/update-user-active-satus**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-sample\",\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 129] 129. Cập nhật vai trò phân quyền người dùng (Role)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/update-role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "update-role"
+              ]
+            },
+            "description": "**STT 129** - Cập nhật vai trò phân quyền người dùng (RBAC)\n- Phân quyền: **Admin**\n- Phương thức: **PUT /api/users/update-role**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-uuid-sample\",\n  \"role\": \"BAC_SI\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 130] 130. Người dùng cập nhật thông tin cá nhân (Update Info)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/update-info",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "update-info"
+              ]
+            },
+            "description": "**STT 130** - Người dùng cập nhật thông tin cá nhân của chính mình\n- Phân quyền: **User**\n- Phương thức: **PUT /api/users/update-info**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ho_ten\": \"Bác Sĩ Dinh Dưỡng Lê Hoàng\",\n  \"so_dien_thoai\": \"0988776655\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 131] 131. Lấy thông tin tài khoản đăng nhập (getInfo - IDOR Protected)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/getInfo",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "getInfo"
+              ]
+            },
+            "description": "**STT 131** - Lấy thông tin tài khoản đăng nhập (vá lỗ hổng IDOR PII)\n- Phân quyền: **User**\n- Phương thức: **POST /api/users/getInfo**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "[STT 132] 132. Kiểm tra trạng thái hoàn thiện hồ sơ người dùng",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/check-profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "check-profile"
+              ]
+            },
+            "description": "**STT 132** - Kiểm tra trạng thái hoàn thiện hồ sơ người dùng\n- Phân quyền: **User**\n- Phương thức: **GET /api/users/check-profile**",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

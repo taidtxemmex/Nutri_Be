@@ -21,7 +21,9 @@
       "@common/*": ["src/common/*"],
       "@core/*": ["src/core/*"],
       "@config/*": ["src/config/*"],
-      "@modules/*": ["src/modules/*"]
+      "@modules/*": ["src/modules/*"],
+      "@security/*": ["src/security/*"]
     }
-  }
+  },
+  "exclude": ["node_modules", "dist"]
 }

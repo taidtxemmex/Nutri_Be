@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nutri-backend-prod
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - GLOBAL_PREFIX=api
+      - DATABASE_URL=${DATABASE_URL:-mysql://root:NutriPassword2026@127.0.0.1:3306/nutri_db?connection_limit=7&pool_timeout=10}
+      - JWT_SECRET=${JWT_SECRET:-truenutri_super_secret_jwt_key_2026_clinical_nutrition_protect_token}
+      - JWT_EXPIRES_IN=15m
+      - REFRESH_TOKEN_EXPIRES_IN=7d
+      - NODE_OPTIONS=--max-old-space-size=256 --enable-source-maps
+      - MAX_FILE_SIZE_MB=10
+    ports:
+      - "3000:3000"
+    volumes:
+      - /var/www/uploads:/app/uploads
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 350M
+        reservations:
+          memory: 200M
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

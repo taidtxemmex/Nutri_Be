@@ -1,0 +1,31 @@
+-- Rollback Migration 1: Restore native MySQL ENUM columns
+-- Warning: Rollback will fail if any column contains values outside the original ENUM sets.
+
+ALTER TABLE `benh_nhan` MODIFY COLUMN `gioi_tinh` ENUM('NAM','NU') NOT NULL;
+ALTER TABLE `bua_an` MODIFY COLUMN `trang_thai` ENUM('RIENG_TU','CHO_DUYET','DA_DUYET','TU_CHOI') DEFAULT 'RIENG_TU';
+ALTER TABLE `dang_ky` MODIFY COLUMN `trang_thai` ENUM('ACTIVE','EXPIRED') NOT NULL;
+ALTER TABLE `dang_ky_cho_xac_thuc` MODIFY COLUMN `gioi_tinh` ENUM('NAM','NU') DEFAULT NULL;
+ALTER TABLE `de_xuat_nguyen_lieu` 
+  MODIFY COLUMN `loai_de_xuat` ENUM('ADD','UPDATE') NOT NULL,
+  MODIFY COLUMN `loai_protein` ENUM('THUC_VAT','DONG_VAT') DEFAULT NULL,
+  MODIFY COLUMN `trang_thai` ENUM('RIENG_TU','CHO_DUYET','DA_DUYET','TU_CHOI') NOT NULL;
+ALTER TABLE `de_xuat_thuc_don` 
+  MODIFY COLUMN `loai_doi_tuong` ENUM('BENH_NHAN','NHOM_BENH') NOT NULL,
+  MODIFY COLUMN `loai_thuc_don` ENUM('NGAY','TUAN','THANG') NOT NULL,
+  MODIFY COLUMN `trang_thai` ENUM('RIENG_TU','CHO_DUYET','DA_DUYET','TU_CHOI') NOT NULL;
+ALTER TABLE `gioi_han_dinh_duong` MODIFY COLUMN `canh_bao` ENUM('OFF','GTE_5','GTE_10') DEFAULT NULL;
+ALTER TABLE `goi` MODIFY COLUMN `trang_thai` ENUM('ACTIVE','INACTIVE') NOT NULL;
+ALTER TABLE `ho_so_ca_nhan` MODIFY COLUMN `gioi_tinh` ENUM('NAM','NU') DEFAULT NULL;
+ALTER TABLE `khau_phan_24h` MODIFY COLUMN `kieu_nhap` ENUM('INGREDIENT_ONLY','BY_MEAL') NOT NULL;
+ALTER TABLE `mon_an` MODIFY COLUMN `trang_thai` ENUM('RIENG_TU','CHO_DUYET','DA_DUYET','TU_CHOI','HE_THONG') DEFAULT 'RIENG_TU';
+ALTER TABLE `nguoi_dung` 
+  MODIFY COLUMN `vai_tro` ENUM('USER','USERPRO','SUPERADMIN','ADMIN') NOT NULL,
+  MODIFY COLUMN `kenh` ENUM('LOCAL','FACEBOOK','KEYCLOAK_GOOGLE') DEFAULT NULL;
+ALTER TABLE `nguyen_lieu` 
+  MODIFY COLUMN `loai_protein` ENUM('DONG_VAT','THUC_VAT') DEFAULT NULL,
+  MODIFY COLUMN `trang_thai` ENUM('CHO_DUYET','DA_DUYET','TU_CHOI') DEFAULT NULL;
+ALTER TABLE `thiet_bi_dang_nhap` MODIFY COLUMN `device_type` ENUM('WEB','ANDROID','IOS','DESKTOP','TABLET','POSTMAN','UNKNOWN') DEFAULT NULL;
+ALTER TABLE `thuc_don` 
+  MODIFY COLUMN `loai_doi_tuong` ENUM('BENH_NHAN','NHOM_BENH') NOT NULL,
+  MODIFY COLUMN `loai_thuc_don` ENUM('NGAY','TUAN','THANG') NOT NULL;
+ALTER TABLE `yeu_cau_thanh_toan` MODIFY COLUMN `trang_thai` ENUM('APPROVED','REJECTED','PENDING') NOT NULL;

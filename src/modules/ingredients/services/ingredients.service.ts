@@ -1,0 +1,975 @@
+import { Injectable, HttpException, HttpStatus, Logger, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../core/database/prisma.service';
+import { CacheService } from '../../../core/cache/cache.service';
+import { UserRole } from '../../../config/enums/role.enum';
+import { NutritionEngine, Decimal } from '../../../core/nutrition-engine/nutrition.engine';
+import { BASE_NUTRIENT_CODES } from '../../../core/nutrition-engine/nutrition.constants';
+import { NutritionCalculatorService } from '../../../core/nutrition-engine/nutrition-calculator.service';
+import {
+  CACHE_TAG_CATEGORIES,
+  CACHE_TAG_INGREDIENTS,
+  CACHE_TTL_PERPETUAL,
+  buildCategoryCacheTag,
+  buildCategoryDetailCacheKey,
+  buildIngredientCacheTag,
+  buildIngredientDetailCacheKey,
+} from '../../../config/constants/cache.constants';
+import {
+  IngredientSummaryDto,
+  IngredientListItemDto,
+  IngredientDetailDto,
+  CalculateSummaryResponseDto,
+  CalculateSummaryItemResultDto,
+  ExistsByMaterialParamsDto,
+  FindAllIngredientsParamsDto,
+  FindIngredientByIdParamsDto,
+  CreateIngredientParamsDto,
+  UpdateIngredientParamsDto,
+  DeleteIngredientParamsDto,
+  ApproveIngredientParamsDto,
+  RejectIngredientParamsDto,
+  CalculateSummaryParamsDto,
+} from '../dto';
+
+export function normalizeVietnameseNFC(str: string): string {
+  if (!str) return '';
+  return str.normalize('NFC').trim();
+}
+
+@Injectable()
+export class IngredientsService {
+  private readonly logger = new Logger(IngredientsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly nutritionCalculator: NutritionCalculatorService = new NutritionCalculatorService(),
+    @Optional() private readonly cacheService?: CacheService,
+  ) {}
+
+  /**
+   * Kiểm tra trùng tên nguyên liệu có tính đến Collation & Unicode Normalization NFC
+   * Bảo toàn phân biệt dấu tiếng Việt chính xác ("Dứa" vs "Dừa")
+   */
+  async existsByMaterial({
+    material,
+    excludeId,
+    onlyApproved = false,
+    creatorId,
+  }: ExistsByMaterialParamsDto & {
+    onlyApproved?: boolean;
+    creatorId?: string;
+  }): Promise<boolean> {
+    const normalizedName = normalizeVietnameseNFC(material);
+    if (!normalizedName) return false;
+
+    const where: any = {
+      ten_nguyen_lieu: { contains: normalizedName },
+      deleted_at: null,
+    };
+
+    if (onlyApproved) {
+      if (creatorId) {
+        where.OR = [{ trang_thai: 'DA_DUYET' }, { tao_boi_id: creatorId }];
+      } else {
+        where.trang_thai = 'DA_DUYET';
+      }
+    }
+
+    // Lấy các bản ghi tiềm năng có tên tương tự từ MySQL
+    const candidates =
+      (await this.prisma.nguyen_lieu.findMany({
+        where,
+        select: { id: true, ten_nguyen_lieu: true },
+      })) || [];
+
+    const targetLower = normalizedName.toLowerCase();
+    const excludeBigInt = excludeId !== undefined && excludeId !== null ? BigInt(excludeId) : null;
+
+    return candidates.some((c) => {
+      if (excludeBigInt !== null && c.id === excludeBigInt) {
+        return false;
+      }
+      return normalizeVietnameseNFC(c.ten_nguyen_lieu).toLowerCase() === targetLower;
+    });
+  }
+
+  /**
+   * Bounded Paginated Query với Lean Query Projection (Rule 11)
+   * TUYỆT ĐỐI KHÔNG nạp 77 cột vi chất trong list queries để chống tràn RAM (Anti-OOM)
+   */
+  async findAll({ query = {} }: FindAllIngredientsParamsDto = {}) {
+    const page = query.page && query.page > 0 ? query.page : 1;
+    const limit = query.limit && query.limit > 0 ? Math.min(100, query.limit) : 20;
+    const skip = (page - 1) * limit;
+
+    const cacheKey = this.cacheService?.generateKey({
+      prefix: 'ingredients:list',
+      params: {
+        page,
+        limit,
+        keyword: query.keyword || query.search,
+        categoryId: query.categoryId,
+        category: query.category,
+        loaiProtein: query.loaiProtein,
+        trangThai: query.trangThai,
+        sortBy: query.sortBy,
+        sortOrder: query.sortOrder,
+      },
+    });
+
+    if (this.cacheService && cacheKey) {
+      const cached = await this.cacheService.get<any>(cacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    const where: any = { deleted_at: null };
+
+    const keyword = query.keyword || query.search;
+    if (keyword && keyword.trim()) {
+      where.ten_nguyen_lieu = { contains: keyword.trim() };
+    }
+
+    if (query.categoryId) {
+      where.danh_muc = query.categoryId;
+    } else if (query.category && query.category.trim()) {
+      const catTrimmed = query.category.trim();
+      const catNum = Number(catTrimmed);
+      if (!isNaN(catNum) && catNum > 0) {
+        where.danh_muc = catNum;
+      } else {
+        where.danh_muc_nguyen_lieu_danh_mucTodanh_muc = {
+          ten_danh_muc: { contains: catTrimmed },
+        };
+      }
+    }
+
+    if (query.loaiProtein) {
+      where.loai_protein = query.loaiProtein;
+    }
+
+    if (query.trangThai) {
+      where.trang_thai = query.trangThai;
+    }
+
+    const sortField = query.sortBy || 'id';
+    const sortOrder = (query.sortOrder || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc';
+
+    // Lean Query Projection: Chỉ select các trường hiển thị cơ bản
+    const [items, total] = await Promise.all([
+      this.prisma.nguyen_lieu.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { [sortField]: sortOrder },
+        select: {
+          id: true,
+          ten_nguyen_lieu: true,
+          danh_muc: true,
+          loai_protein: true,
+          trang_thai: true,
+          edible: true,
+          danh_muc_nguyen_lieu_danh_mucTodanh_muc: {
+            select: { id: true, ten_danh_muc: true },
+          },
+        },
+      }),
+      this.prisma.nguyen_lieu.count({ where }),
+    ]);
+
+    const mappedItems: IngredientListItemDto[] = items.map(
+      (i) =>
+        ({
+          id: Number(i.id),
+          ten_nguyen_lieu: i.ten_nguyen_lieu,
+          material: i.ten_nguyen_lieu,
+          name: i.ten_nguyen_lieu,
+          danh_muc: i.danh_muc,
+          categoryId: i.danh_muc,
+          categoryName: i.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc || null,
+          category: i.danh_muc_nguyen_lieu_danh_mucTodanh_muc
+            ? {
+                id: i.danh_muc_nguyen_lieu_danh_mucTodanh_muc.id,
+                categoryName: i.danh_muc_nguyen_lieu_danh_mucTodanh_muc.ten_danh_muc,
+              }
+            : null,
+          loai_protein: i.loai_protein,
+          loaiProtein: i.loai_protein,
+          trang_thai: i.trang_thai,
+          trangThai: i.trang_thai,
+          edible: i.edible,
+        }) as unknown as IngredientListItemDto,
+    );
+
+    const result = {
+      items: mappedItems,
+      total,
+      page,
+      limit,
+    };
+
+    if (this.cacheService && cacheKey) {
+      await this.cacheService.set(cacheKey, result, CACHE_TTL_PERPETUAL, CACHE_TAG_INGREDIENTS);
+    }
+
+    return result;
+  }
+
+  /**
+   * Tối ưu siêu tốc SELECT id, ten_nguyen_lieu (0 ms) cho dropdown / combobox
+   */
+  async findSummary(): Promise<IngredientSummaryDto[]> {
+    const rows = await this.prisma.nguyen_lieu.findMany({
+      where: { deleted_at: null, trang_thai: 'DA_DUYET' },
+      select: { id: true, ten_nguyen_lieu: true },
+      orderBy: { ten_nguyen_lieu: 'asc' },
+    });
+
+    return rows.map(
+      (r) =>
+        ({
+          id: Number(r.id),
+          ten_nguyen_lieu: r.ten_nguyen_lieu,
+          material: r.ten_nguyen_lieu,
+        }) as unknown as IngredientSummaryDto,
+    );
+  }
+
+  /**
+   * Lấy toàn bộ nguyên liệu đã duyệt (Phục vụ NutriFE FoodTable in-memory cache)
+   */
+  async findAllUnpaginated(): Promise<IngredientDetailDto[]> {
+    const items = await this.prisma.nguyen_lieu.findMany({
+      where: { deleted_at: null, trang_thai: 'DA_DUYET' },
+      orderBy: { ten_nguyen_lieu: 'asc' },
+      include: {
+        danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+      },
+    });
+
+    return items.map((item) => this.mapToDetailDto(item));
+  }
+
+  /**
+   * Tính toán dinh dưỡng động danh sách các thành phần nguyên liệu
+   * Nạp toàn bộ nguyên liệu qua 1 query duy nhất findMany({ where: { id: { in: ids } } })
+   * Tích lũy 86 vi chất chính xác tuyệt đối qua Decimal.js
+   * Tính tổng khối lượng sống (Gross), khối lượng ăn được (Edible/Net) và khối lượng chín (Cooked)
+   */
+  async calculateSummary({ dto }: CalculateSummaryParamsDto): Promise<CalculateSummaryResponseDto> {
+    if (!dto || !dto.items || !Array.isArray(dto.items) || dto.items.length === 0) {
+      throw new HttpException(
+        {
+          code: 'VALIDATION_FAILED',
+          message: 'Danh sách nguyên liệu (items) không được để trống',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // 1. Trích xuất và validate sơ bộ danh sách IDs & weights
+    const rawIds: bigint[] = [];
+    for (let idx = 0; idx < dto.items.length; idx++) {
+      const item = dto.items[idx];
+      const rawId = item.ingredientId ?? item.id;
+      if (rawId === undefined || rawId === null) {
+        throw new HttpException(
+          {
+            code: 'VALIDATION_FAILED',
+            message: `Nguyên liệu tại vị trí ${idx + 1} thiếu ingredientId hoặc id`,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const weightVal = item.weight ?? item.weightGrams;
+      if (weightVal === undefined || weightVal === null || Number(weightVal) <= 0) {
+        throw new HttpException(
+          {
+            code: 'VALIDATION_FAILED',
+            message: `Khối lượng của nguyên liệu ID ${rawId} phải lớn hơn 0`,
+          },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      rawIds.push(BigInt(rawId));
+    }
+
+    const uniqueIds = Array.from(new Set(rawIds));
+
+    // 2. Query duy nhất nạp toàn bộ nguyên liệu từ DB
+    const ingredients = await this.prisma.nguyen_lieu.findMany({
+      where: {
+        id: { in: uniqueIds },
+        deleted_at: null,
+      },
+    });
+
+    const ingredientMap = new Map<string, any>();
+    for (const ing of ingredients) {
+      ingredientMap.set(ing.id.toString(), ing);
+    }
+
+    // Kiểm tra xem có ID nào không tìm thấy trong DB không
+    for (const rawId of rawIds) {
+      if (!ingredientMap.has(rawId.toString())) {
+        throw new HttpException(
+          {
+            code: 'PROP_006',
+            message: `Không tìm thấy nguyên liệu có ID ${rawId.toString()}`,
+          },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+    }
+
+    // 3. Tích lũy dinh dưỡng và khối lượng bằng Decimal.js
+    const accumulatedNutrients = NutritionEngine.createEmptyDecimalMap();
+    let totalGrossWeight = NutritionEngine.ZERO;
+    let totalEdibleWeight = NutritionEngine.ZERO;
+    let totalCookedWeight = NutritionEngine.ZERO;
+
+    const itemResults: CalculateSummaryItemResultDto[] = [];
+
+    for (const item of dto.items) {
+      const id = (item.ingredientId ?? item.id)!.toString();
+      const ingredient = ingredientMap.get(id)!;
+      const inputWeight = Number(item.weight ?? item.weightGrams);
+      const isNetWeight = item.isNetWeight !== undefined ? Boolean(item.isNetWeight) : true;
+      const coefficient =
+        item.coefficient !== undefined && item.coefficient !== null ? Number(item.coefficient) : 1;
+
+      const edibleRateVal =
+        ingredient.edible !== undefined && ingredient.edible !== null
+          ? NutritionEngine.toDecimal({ val: ingredient.edible, fallback: 100 })
+          : NutritionEngine.ONE_HUNDRED;
+
+      const clampedEdibleRate = Decimal.max(
+        NutritionEngine.ZERO,
+        Decimal.min(NutritionEngine.ONE_HUNDRED, edibleRateVal),
+      );
+      const edibleRatio = clampedEdibleRate.dividedBy(NutritionEngine.ONE_HUNDRED);
+
+      let grossWeightDec: Decimal;
+      let edibleWeightDec: Decimal;
+
+      if (isNetWeight) {
+        // Khối lượng nhập là phần ăn được
+        edibleWeightDec = NutritionEngine.toDecimal({ val: inputWeight, fallback: 0 });
+        grossWeightDec = edibleRatio.isPositive()
+          ? edibleWeightDec.dividedBy(edibleRatio)
+          : edibleWeightDec;
+      } else {
+        // Khối lượng nhập là cả vỏ/xương thô
+        grossWeightDec = NutritionEngine.toDecimal({ val: inputWeight, fallback: 0 });
+        edibleWeightDec = grossWeightDec.times(edibleRatio);
+      }
+
+      const coeffDec = NutritionEngine.toDecimal({ val: coefficient, fallback: 1 });
+      const cookedWeightDec = edibleWeightDec.times(coeffDec);
+
+      // Tính toán vi chất dinh dưỡng của từng thành phần
+      const detailed = NutritionEngine.calculateIngredientNutrients({
+        ingredient,
+        weightGrams: inputWeight,
+        options: {
+          isNetWeight,
+          preserveDecimals: true,
+        },
+      });
+
+      // Tích lũy vào tổng chung
+      totalGrossWeight = totalGrossWeight.plus(grossWeightDec);
+      totalEdibleWeight = totalEdibleWeight.plus(edibleWeightDec);
+      totalCookedWeight = totalCookedWeight.plus(cookedWeightDec);
+      NutritionEngine.accumulateNutrients({
+        target: accumulatedNutrients,
+        source: detailed.nutrients,
+      });
+
+      itemResults.push({
+        ingredientId: Number(ingredient.id),
+        name: ingredient.ten_nguyen_lieu,
+        ten_nguyen_lieu: ingredient.ten_nguyen_lieu,
+        grossWeight: grossWeightDec.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+        edibleWeight: edibleWeightDec.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+        cookedWeight: cookedWeightDec.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+        coefficient: coeffDec.toNumber(),
+        isNetWeight,
+        nutrients: NutritionEngine.roundDecimalMap({ map: detailed.nutrients, decimalPlaces: 2 }),
+      });
+    }
+
+    return {
+      totalGrossWeight: totalGrossWeight.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      totalEdibleWeight: totalEdibleWeight.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      totalCookedWeight: totalCookedWeight.toDecimalPlaces(2, Decimal.ROUND_HALF_UP).toNumber(),
+      nutrients: NutritionEngine.roundDecimalMap({ map: accumulatedNutrients, decimalPlaces: 2 }),
+      items: itemResults,
+    };
+  }
+
+  /**
+   * Chi tiết nguyên liệu: Nạp đầy đủ 86 chỉ tiêu dinh dưỡng (Tái sử dụng Identity Map vĩnh viễn)
+   */
+  async findById({ id }: FindIngredientByIdParamsDto): Promise<IngredientDetailDto> {
+    const ingredientId = BigInt(id);
+    const fetchIngredient = async () => {
+      const item = await this.prisma.nguyen_lieu.findFirst({
+        where: {
+          id: ingredientId,
+          deleted_at: null,
+        },
+        include: {
+          danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+        },
+      });
+
+      if (!item) {
+        throw new HttpException(
+          { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+
+      return this.mapToDetailDto(item);
+    };
+
+    if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+      return this.cacheService.getOrSet(
+        buildIngredientDetailCacheKey(id),
+        CACHE_TTL_PERPETUAL,
+        fetchIngredient,
+        [CACHE_TAG_INGREDIENTS, buildIngredientCacheTag(id)],
+      );
+    }
+
+    return fetchIngredient();
+  }
+
+  /**
+   * Tạo nguyên liệu mới
+   * Phân nhánh Role: USER/USERPRO -> CHO_DUYET; ADMIN/SUPERADMIN -> DA_DUYET
+   */
+  async create({ dto, currentUser }: CreateIngredientParamsDto): Promise<IngredientDetailDto> {
+    const material = normalizeVietnameseNFC(dto.material || dto.name || '');
+    if (!material) {
+      throw new HttpException(
+        { code: 'BAD_REQUEST', message: 'Tên nguyên liệu không được để trống' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Kiểm tra danh mục nếu có - Tái sử dụng Cache Danh mục 0ms
+    if (dto.categoryId) {
+      let category: any;
+      if (this.cacheService && typeof this.cacheService.getOrSet === 'function') {
+        category = await this.cacheService.getOrSet(
+          buildCategoryDetailCacheKey(dto.categoryId),
+          CACHE_TTL_PERPETUAL,
+          async () => this.prisma.danh_muc.findUnique({ where: { id: dto.categoryId } }),
+          [CACHE_TAG_CATEGORIES, buildCategoryCacheTag(dto.categoryId)],
+        );
+      } else {
+        category = await this.prisma.danh_muc.findUnique({
+          where: { id: dto.categoryId },
+        });
+      }
+      if (!category) {
+        throw new HttpException(
+          { code: 'PROP_007', message: 'Không tìm thấy danh mục' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+    }
+
+    // Phân quyền trạng thái
+    const role = currentUser?.role;
+    const isAdmin = role === UserRole.ADMIN || role === UserRole.SUPERADMIN;
+    const trangThai = isAdmin ? 'DA_DUYET' : 'CHO_DUYET';
+
+    // Bắt trùng tên trên các nguyên liệu đã duyệt (và của chính user nếu là user thường)
+    const isDuplicate = await this.existsByMaterial({
+      material,
+      onlyApproved: true,
+      creatorId: !isAdmin ? currentUser?.id : undefined,
+    });
+    if (isDuplicate) {
+      throw new HttpException(
+        { code: 'PROP_014', message: 'Tên nguyên liệu đã tồn tại trong hệ thống' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const nutrientData = this.extractNutrientFields(dto);
+
+    // Kiểm tra xem có bản ghi đã bị xóa mềm trước đó không để hồi sinh thay vì ném lỗi trùng lặp CSDL
+    const softDeleted = await this.prisma.nguyen_lieu.findFirst({
+      where: {
+        ten_nguyen_lieu: material,
+        deleted_at: { not: null },
+      },
+    });
+
+    let created: any;
+    if (softDeleted) {
+      created = await this.prisma.nguyen_lieu.update({
+        where: { id: softDeleted.id },
+        data: {
+          danh_muc: dto.categoryId || null,
+          loai_protein: dto.loaiProtein || null,
+          trang_thai: trangThai,
+          tao_boi_id: currentUser?.id || null,
+          edible: dto.edible !== undefined && dto.edible !== null ? Number(dto.edible) : null,
+          deleted_at: null,
+          ...nutrientData,
+        },
+        include: {
+          danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+        },
+      });
+    } else {
+      created = await this.prisma.nguyen_lieu.create({
+        data: {
+          ten_nguyen_lieu: material,
+          danh_muc: dto.categoryId || null,
+          loai_protein: dto.loaiProtein || null,
+          trang_thai: trangThai,
+          tao_boi_id: currentUser?.id || null,
+          edible: dto.edible !== undefined && dto.edible !== null ? Number(dto.edible) : null,
+          ...nutrientData,
+        },
+        include: {
+          danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+        },
+      });
+    }
+
+    await this.invalidateIngredientCache(created.id);
+
+    return this.mapToDetailDto(created);
+  }
+
+  /**
+   * Cập nhật nguyên liệu
+   * Chỉ cho phép sửa khi trang_thai == DA_DUYET (nếu không ném ING_001 - 400)
+   * Nếu là USER -> tạo bản ghi mới chờ duyệt; nếu là ADMIN -> cập nhật trực tiếp
+   */
+  async update({ id, dto, currentUser }: UpdateIngredientParamsDto): Promise<IngredientDetailDto> {
+    const existing = await this.prisma.nguyen_lieu.findFirst({
+      where: {
+        id: BigInt(id),
+        deleted_at: null,
+      },
+    });
+
+    if (!existing) {
+      throw new HttpException(
+        { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // Chỉ cho phép sửa khi trang_thai == DA_DUYET
+    if (existing.trang_thai !== 'DA_DUYET') {
+      throw new HttpException(
+        {
+          code: 'ING_001',
+          message: 'Chỉ có thể cập nhật nguyên liệu đã được duyệt',
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Kiểm tra danh mục nếu có
+    if (dto.categoryId) {
+      const category = await this.prisma.danh_muc.findUnique({
+        where: { id: dto.categoryId },
+      });
+      if (!category) {
+        throw new HttpException(
+          { code: 'PROP_007', message: 'Không tìm thấy danh mục' },
+          HttpStatus.NOT_FOUND,
+        );
+      }
+    }
+
+    const role = currentUser?.role;
+    const isUser =
+      role === UserRole.USER || role === UserRole.USERPRO || role === UserRole.BENH_NHAN || !role;
+
+    const nutrientData = this.extractNutrientFields(dto, true);
+    const newMaterial =
+      dto.material || dto.name ? normalizeVietnameseNFC(dto.material || dto.name || '') : null;
+
+    // 1. Phân nhánh USER: Tạo bản ghi chờ duyệt hoặc cập nhật trực tiếp nếu giữ nguyên tên (tránh P2002 uk_ingredient_name)
+    if (isUser) {
+      return this.updateAsUser({ id, existing, dto, currentUser, newMaterial });
+    }
+
+    // 2. Phân nhánh ADMIN / SUPERADMIN: Cập nhật trực tiếp
+    if (
+      newMaterial &&
+      newMaterial.toLowerCase() !== normalizeVietnameseNFC(existing.ten_nguyen_lieu).toLowerCase()
+    ) {
+      const isDuplicate = await this.existsByMaterial({
+        material: newMaterial,
+        excludeId: existing.id,
+        onlyApproved: false,
+      });
+      if (isDuplicate) {
+        throw new HttpException(
+          { code: 'PROP_014', message: 'Tên nguyên liệu đã tồn tại trong hệ thống' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
+    const updateData: any = {
+      ...nutrientData,
+      trang_thai: 'DA_DUYET',
+    };
+
+    if (newMaterial) updateData.ten_nguyen_lieu = newMaterial;
+    if (dto.categoryId !== undefined && dto.categoryId !== null) {
+      updateData.danh_muc = dto.categoryId;
+    }
+    if (
+      dto.loaiProtein !== undefined &&
+      dto.loaiProtein !== null &&
+      String(dto.loaiProtein).trim() !== ''
+    ) {
+      updateData.loai_protein = dto.loaiProtein;
+    }
+    if (dto.edible !== undefined && dto.edible !== null) {
+      updateData.edible = Number(dto.edible);
+    }
+
+    const updated = await this.prisma.nguyen_lieu.update({
+      where: { id: BigInt(id) },
+      data: updateData,
+      include: {
+        danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+      },
+    });
+
+    await this.invalidateIngredientCache(id);
+
+    return this.mapToDetailDto(updated);
+  }
+
+  private async updateAsUser({
+    id,
+    existing,
+    dto,
+    currentUser,
+    newMaterial,
+  }: {
+    id: bigint | number | string;
+    existing: any;
+    dto: any;
+    currentUser?: any;
+    newMaterial: string | null;
+  }): Promise<IngredientDetailDto> {
+    const pendingData: Record<string, number | null> = {};
+    for (const field of BASE_NUTRIENT_CODES) {
+      const val = dto[field];
+      pendingData[field] =
+        val !== undefined && val !== null && val !== '' ? Number(val) : (existing[field] ?? null);
+    }
+
+    const targetMaterial = newMaterial || existing.ten_nguyen_lieu;
+    const isSameMaterial =
+      normalizeVietnameseNFC(targetMaterial).toLowerCase() ===
+      normalizeVietnameseNFC(existing.ten_nguyen_lieu).toLowerCase();
+
+    const basePayload = {
+      ten_nguyen_lieu: targetMaterial,
+      danh_muc:
+        dto.categoryId !== undefined && dto.categoryId !== null
+          ? dto.categoryId
+          : existing.danh_muc,
+      loai_protein:
+        dto.loaiProtein !== undefined &&
+        dto.loaiProtein !== null &&
+        String(dto.loaiProtein).trim() !== ''
+          ? dto.loaiProtein
+          : existing.loai_protein,
+      trang_thai: 'CHO_DUYET',
+      tao_boi_id: currentUser?.id || existing.tao_boi_id || null,
+      edible:
+        dto.edible !== undefined && dto.edible !== null ? Number(dto.edible) : existing.edible,
+      ...pendingData,
+    };
+
+    let savedRecord: any;
+
+    if (isSameMaterial) {
+      savedRecord = await this.prisma.nguyen_lieu.update({
+        where: { id: BigInt(id) },
+        data: basePayload,
+        include: {
+          danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+        },
+      });
+    } else {
+      const isDuplicate = await this.existsByMaterial({
+        material: targetMaterial,
+        excludeId: existing.id,
+        onlyApproved: false,
+      });
+      if (isDuplicate) {
+        throw new HttpException(
+          { code: 'PROP_014', message: 'Tên nguyên liệu đã tồn tại trong hệ thống' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+
+      try {
+        savedRecord = await this.prisma.nguyen_lieu.create({
+          data: basePayload,
+          include: {
+            danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+          },
+        });
+      } catch (err: any) {
+        if (err?.code === 'P2002') {
+          savedRecord = await this.prisma.nguyen_lieu.update({
+            where: { id: BigInt(id) },
+            data: basePayload,
+            include: {
+              danh_muc_nguyen_lieu_danh_mucTodanh_muc: true,
+            },
+          });
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    await this.invalidateIngredientCache(savedRecord.id);
+
+    return this.mapToDetailDto(savedRecord);
+  }
+
+  private async invalidateIngredientCache(id: bigint | number | string): Promise<void> {
+    if (!this.cacheService) return;
+    if (typeof this.cacheService.debouncedInvalidateTags === 'function') {
+      await this.cacheService.debouncedInvalidateTags([
+        CACHE_TAG_INGREDIENTS,
+        buildIngredientCacheTag(id),
+      ]);
+    } else {
+      await this.cacheService.invalidateTag(CACHE_TAG_INGREDIENTS);
+    }
+  }
+
+  /**
+   * Proactive Delete Guard:
+   * Kiểm tra _count trên chi_tiet_mon_an (món ăn chưa xóa mon_an.deleted_at: null),
+   * khau_phan_24h_nguyen_lieu, he_so_song_chin. Nếu > 0 ném ING_002 (409)
+   * Hỗ trợ soft-delete (deleted_at)
+   */
+  async delete({ id }: DeleteIngredientParamsDto): Promise<{ message: string }> {
+    const existing = await this.prisma.nguyen_lieu.findFirst({
+      where: {
+        id: BigInt(id),
+        deleted_at: null,
+      },
+    });
+
+    if (!existing) {
+      throw new HttpException(
+        { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    // 1. Kiểm tra trong chi tiết món ăn (của món ăn chưa bị xóa)
+    const dishUsageCount = await this.prisma.chi_tiet_mon_an.count({
+      where: {
+        nguyen_lieu_id: BigInt(id),
+        mon_an: {
+          deleted_at: null,
+        },
+      },
+    });
+
+    // 2. Kiểm tra trong khẩu phần 24h
+    const intakeUsageCount = await this.prisma.khau_phan_24h_nguyen_lieu.count({
+      where: {
+        nguyen_lieu_id: BigInt(id),
+      },
+    });
+
+    // 3. Kiểm tra trong hệ số sống chín
+    const coeffUsageCount = await this.prisma.he_so_song_chin.count({
+      where: {
+        nguyen_lieu_id: BigInt(id),
+      },
+    });
+
+    if (dishUsageCount > 0 || intakeUsageCount > 0 || coeffUsageCount > 0) {
+      throw new HttpException(
+        {
+          code: 'ING_002',
+          message:
+            'Không thể xóa nguyên liệu này vì đã được sử dụng trong món ăn, khẩu phần 24h hoặc hệ số sống chín',
+        },
+        HttpStatus.CONFLICT,
+      );
+    }
+
+    // Thực hiện Soft-Delete an toàn
+    await this.prisma.nguyen_lieu.update({
+      where: { id: BigInt(id) },
+      data: { deleted_at: new Date() },
+    });
+
+    await this.invalidateIngredientCache(id);
+
+    return { message: `Đã xóa nguyên liệu thành công (ID: ${id})` };
+  }
+
+  async remove(params: DeleteIngredientParamsDto): Promise<{ message: string }> {
+    return this.delete(params);
+  }
+
+  /**
+   * Phê duyệt nguyên liệu đề xuất (Admin)
+   */
+  async approve({ pendingId }: ApproveIngredientParamsDto): Promise<IngredientDetailDto> {
+    const pending = await this.prisma.nguyen_lieu.findFirst({
+      where: { id: BigInt(pendingId), deleted_at: null },
+    });
+
+    if (!pending) {
+      throw new HttpException(
+        { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const approved = await this.prisma.nguyen_lieu.update({
+      where: { id: BigInt(pendingId) },
+      data: { trang_thai: 'DA_DUYET' },
+      include: { danh_muc_nguyen_lieu_danh_mucTodanh_muc: true },
+    });
+
+    await this.invalidateIngredientCache(pendingId);
+
+    return this.mapToDetailDto(approved);
+  }
+
+  async approvePending({ pendingId }: ApproveIngredientParamsDto): Promise<IngredientDetailDto> {
+    return this.approve({ pendingId });
+  }
+
+  /**
+   * Từ chối nguyên liệu đề xuất (Admin)
+   */
+  async rejectPending({
+    pendingId,
+    reason: _reason,
+  }: RejectIngredientParamsDto): Promise<IngredientDetailDto> {
+    const pending = await this.prisma.nguyen_lieu.findFirst({
+      where: { id: BigInt(pendingId), deleted_at: null },
+    });
+
+    if (!pending) {
+      throw new HttpException(
+        { code: 'PROP_006', message: 'Không tìm thấy nguyên liệu' },
+        HttpStatus.NOT_FOUND,
+      );
+    }
+
+    const rejected = await this.prisma.nguyen_lieu.update({
+      where: { id: BigInt(pendingId) },
+      data: { trang_thai: 'TU_CHOI' },
+      include: { danh_muc_nguyen_lieu_danh_mucTodanh_muc: true },
+    });
+
+    await this.invalidateIngredientCache(pendingId);
+
+    return this.mapToDetailDto(rejected);
+  }
+
+  async reject({ pendingId, reason }: RejectIngredientParamsDto): Promise<IngredientDetailDto> {
+    return this.rejectPending({ pendingId, reason });
+  }
+
+  /**
+   * Trích xuất các trường vi chất từ DTO để đưa vào Prisma data
+   * Khi ignoreNull = true (dùng trong update), giữ nguyên giá trị cũ trong DB nếu trường là null hoặc undefined
+   */
+  private extractNutrientFields(dto: any, ignoreNull = false): Record<string, number | null> {
+    const nutrientData: Record<string, number | null> = {};
+    for (const field of BASE_NUTRIENT_CODES) {
+      const val = dto[field];
+      if (val !== undefined) {
+        if (val !== null && val !== '') {
+          nutrientData[field] = Number(val);
+        } else if (!ignoreNull) {
+          nutrientData[field] = null;
+        }
+      }
+    }
+    return nutrientData;
+  }
+
+  /**
+   * Chuyển đổi Entity sang Detail DTO đầy đủ 86 chỉ tiêu (Bao gồm các chỉ số tự tính toán bằng NutritionEngine)
+   */
+  private mapToDetailDto(item: any): IngredientDetailDto {
+    const carbDecimal = NutritionEngine.calculateCarbohydrate(
+      item.water,
+      item.protein,
+      item.fat,
+      item.ash,
+      item.fiber,
+    );
+    const energyDecimal = NutritionEngine.calculateEnergy(item.protein, item.fat, carbDecimal);
+    const vitARaeDecimal = NutritionEngine.calculateVitaminARae(
+      item.retinol,
+      item.betaCarotene,
+      item.alphaCarotene,
+      item.betaCryptoxanthin,
+    );
+    const vitARaeVal = Number(vitARaeDecimal.toFixed(2));
+
+    const dto: IngredientDetailDto = {
+      id: Number(item.id),
+      ten_nguyen_lieu: item.ten_nguyen_lieu,
+      material: item.ten_nguyen_lieu,
+      name: item.ten_nguyen_lieu,
+      danh_muc: item.danh_muc,
+      categoryId: item.danh_muc,
+      categoryName: item.danh_muc_nguyen_lieu_danh_mucTodanh_muc?.ten_danh_muc || null,
+      category: item.danh_muc_nguyen_lieu_danh_mucTodanh_muc
+        ? {
+            id: item.danh_muc_nguyen_lieu_danh_mucTodanh_muc.id,
+            categoryName: item.danh_muc_nguyen_lieu_danh_mucTodanh_muc.ten_danh_muc,
+          }
+        : null,
+      loai_protein: item.loai_protein,
+      loaiProtein: item.loai_protein,
+      trang_thai: item.trang_thai,
+      trangThai: item.trang_thai,
+      edible: item.edible,
+
+      // Calculated values
+      carbohydrate: Number(carbDecimal.toFixed(2)),
+      energy: Number(energyDecimal.toFixed(2)),
+      vitaminARae: vitARaeVal,
+      VitaminARae: vitARaeVal,
+    } as unknown as IngredientDetailDto;
+
+    // Gán 77 chỉ tiêu cơ sở
+    for (const field of BASE_NUTRIENT_CODES) {
+      (dto as any)[field] =
+        item[field] !== undefined && item[field] !== null ? Number(item[field]) : null;
+    }
+
+    return dto;
+  }
+}
