@@ -71,6 +71,43 @@ export class AuthService {
   }
 
   /**
+   * Xác thực tài khoản trực tiếp với Keycloak OpenID Connect Token endpoint
+   * Đảm bảo khi người dùng quên/đổi mật khẩu trên Keycloak, NestJS vẫn đăng nhập thành công và tự động đồng bộ hash
+   */
+  private async verifyWithKeycloak(username: string, password: string): Promise<boolean> {
+    const serverUrl = process.env.KC_SERVER_URL || 'https://ilove.truenutri.vn/auth';
+    const realm = process.env.KC_REALM || 'nutrition-realm';
+    const clientId = process.env.KC_CLIENT_ID || 'nutrition-service';
+    const clientSecret = process.env.KEYCLOAK_CLIENT_SECRET;
+
+    if (!serverUrl || !realm || !clientId || !clientSecret) {
+      return false;
+    }
+
+    try {
+      const tokenUrl = `${serverUrl.replace(/\/+$/, '')}/realms/${realm}/protocol/openid-connect/token`;
+      const body = new URLSearchParams({
+        grant_type: 'password',
+        client_id: clientId,
+        client_secret: clientSecret,
+        username,
+        password,
+      });
+
+      const res = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: body.toString(),
+      });
+
+      return res.ok;
+    } catch (err: any) {
+      this.logger.warn(`Keycloak fallback authentication failed for ${username}: ${err?.message}`);
+      return false;
+    }
+  }
+
+  /**
    * Đăng ký tài khoản mới:
    * Kiểm tra trùng lặp username, email
    * Băm mật khẩu bcrypt (10 salt rounds)
@@ -340,7 +377,7 @@ export class AuthService {
       });
     }
 
-    if (!user || !user.mat_khau) {
+    if (!user) {
       throw new UnauthorizedException({
         code: AUTH_ERROR_UNAUTHORIZED,
         message: 'Tên đăng nhập hoặc mật khẩu không chính xác.',
@@ -350,43 +387,54 @@ export class AuthService {
     let isMatch = false;
     let shouldRehash = false;
 
-    try {
-      if (user.mat_khau.startsWith('$2a$') || user.mat_khau.startsWith('$2b$')) {
-        isMatch = await bcrypt.compare(dto.password, user.mat_khau);
-      } else if (user.mat_khau.startsWith('pbkdf2-sha512$')) {
-        const [_algo, iterationsStr, saltB64, expectedHashB64] = user.mat_khau.split('$');
-        if (iterationsStr && saltB64 && expectedHashB64) {
-          const iterations = parseInt(iterationsStr, 10);
-          if (!isNaN(iterations) && iterations > 0) {
-            const actualHash = crypto.pbkdf2Sync(
-              dto.password,
-              Buffer.from(saltB64, 'base64'),
-              iterations,
-              64,
-              'sha512',
-            );
-            const actualHashB64 = actualHash.toString('base64');
-            const actualHashBuf = Buffer.from(actualHashB64);
-            const expectedHashBuf = Buffer.from(expectedHashB64);
+    if (user.mat_khau) {
+      try {
+        if (user.mat_khau.startsWith('$2a$') || user.mat_khau.startsWith('$2b$')) {
+          isMatch = await bcrypt.compare(dto.password, user.mat_khau);
+        } else if (user.mat_khau.startsWith('pbkdf2-sha512$')) {
+          const [_algo, iterationsStr, saltB64, expectedHashB64] = user.mat_khau.split('$');
+          if (iterationsStr && saltB64 && expectedHashB64) {
+            const iterations = parseInt(iterationsStr, 10);
+            if (!isNaN(iterations) && iterations > 0) {
+              const actualHash = crypto.pbkdf2Sync(
+                dto.password,
+                Buffer.from(saltB64, 'base64'),
+                iterations,
+                64,
+                'sha512',
+              );
+              const actualHashB64 = actualHash.toString('base64');
+              const actualHashBuf = Buffer.from(actualHashB64);
+              const expectedHashBuf = Buffer.from(expectedHashB64);
 
-            if (
-              actualHashBuf.length === expectedHashBuf.length &&
-              crypto.timingSafeEqual(actualHashBuf, expectedHashBuf)
-            ) {
-              isMatch = true;
-              shouldRehash = true;
+              if (
+                actualHashBuf.length === expectedHashBuf.length &&
+                crypto.timingSafeEqual(actualHashBuf, expectedHashBuf)
+              ) {
+                isMatch = true;
+                shouldRehash = true;
+              }
             }
           }
+        } else {
+          // Fallback kiểm tra bcrypt cho các định dạng khác
+          isMatch = await bcrypt.compare(dto.password, user.mat_khau);
         }
-      } else {
-        // Fallback kiểm tra bcrypt cho các định dạng khác
-        isMatch = await bcrypt.compare(dto.password, user.mat_khau);
+      } catch (verifyErr: any) {
+        this.logger.warn(
+          `Lỗi khi kiểm tra mật khẩu cho tài khoản ${user.ten_dang_nhap}: ${verifyErr?.message}`,
+        );
+        isMatch = false;
       }
-    } catch (verifyErr: any) {
-      this.logger.warn(
-        `Lỗi khi kiểm tra mật khẩu cho tài khoản ${user.ten_dang_nhap}: ${verifyErr?.message}`,
-      );
-      isMatch = false;
+    }
+
+    // Fallback: Nếu hash cục bộ không khớp hoặc chưa có (ví dụ đổi mật khẩu trên Keycloak), xác thực trực tiếp với Keycloak SSO
+    if (!isMatch && user.keycloak_user_id) {
+      const isKeycloakValid = await this.verifyWithKeycloak(trimmedUsername, dto.password);
+      if (isKeycloakValid) {
+        isMatch = true;
+        shouldRehash = true;
+      }
     }
 
     if (!isMatch) {

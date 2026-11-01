@@ -9,6 +9,7 @@ const logger = new Logger('CORS_Security');
 const DEFAULT_PRODUCTION_ORIGINS = [
   'https://nutri.vn',
   'https://ilove.truenutri.vn',
+  'https://truenutri.pages.dev',
   'http://165.245.185.11',
   'http://165.245.185.11:80',
   'http://165.245.185.11:3000',
@@ -37,21 +38,24 @@ const DEVELOPMENT_ORIGINS = [
 export function createCorsOptions(): CorsOptions {
   const isProduction = process.env.NODE_ENV === 'production';
 
-  // Thu thập cấu hình domain từ biến môi trường
-  const envOrigins = (process.env.CORS_ORIGINS || '')
+  // Gom FRONTEND_URL làm biến trung tâm cho CORS (hỗ trợ nhiều domain phân tách bằng dấu phẩy)
+  const rawOrigins = [process.env.FRONTEND_URL, process.env.CORS_ORIGINS]
+    .filter(Boolean)
+    .join(',');
+
+  const envOrigins = rawOrigins
     .split(',')
-    .map((o) => o.trim())
+    .map((o) => o.trim().replace(/\/+$/, ''))
     .filter((o) => o.length > 0);
 
   // Tạo tập hợp whitelist không trùng lặp
-  const allowedOriginsSet = new Set<string>([...DEFAULT_PRODUCTION_ORIGINS, ...envOrigins]);
-
-  if (process.env.FRONTEND_URL?.trim()) {
-    allowedOriginsSet.add(process.env.FRONTEND_URL.trim());
-  }
+  const allowedOriginsSet = new Set<string>(
+    DEFAULT_PRODUCTION_ORIGINS.map((o) => o.replace(/\/+$/, '')),
+  );
+  envOrigins.forEach((o) => allowedOriginsSet.add(o));
 
   if (!isProduction) {
-    DEVELOPMENT_ORIGINS.forEach((o) => allowedOriginsSet.add(o));
+    DEVELOPMENT_ORIGINS.forEach((o) => allowedOriginsSet.add(o.replace(/\/+$/, '')));
   }
 
   const allowedOrigins = Array.from(allowedOriginsSet);

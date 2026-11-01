@@ -66,7 +66,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     }
     // 2. Prisma ORM errors
     else if (exception instanceof Prisma.PrismaClientKnownRequestError) {
-      switch (exception.code) {
+      const prismaError = exception as Prisma.PrismaClientKnownRequestError;
+      switch (prismaError.code) {
         case 'P2002':
           status = HttpStatus.CONFLICT;
           errorCode = 'DATA_CONFLICT';

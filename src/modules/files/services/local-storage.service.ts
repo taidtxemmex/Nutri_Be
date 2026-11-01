@@ -148,13 +148,19 @@ export class LocalStorageService {
     const objectKey = typeof param === 'string' ? param : param.objectKey;
     this.assertSafePath(objectKey);
 
-    const fullPath = path.resolve(this.baseDir, objectKey);
+    let fullPath = path.resolve(this.baseDir, objectKey);
 
     if (!fs.existsSync(fullPath)) {
-      throw new NotFoundException({
-        code: 'FILE_NOT_FOUND',
-        message: `Không tìm thấy tập tin yêu cầu: ${objectKey}`,
-      });
+      // Tìm kiếm fallback trực tiếp trong thư mục gốc baseDir (tương thích các file di chuyển từ MinIO)
+      const directInBase = path.resolve(this.baseDir, path.basename(objectKey));
+      if (fs.existsSync(directInBase)) {
+        fullPath = directInBase;
+      } else {
+        throw new NotFoundException({
+          code: 'FILE_NOT_FOUND',
+          message: `Không tìm thấy tập tin yêu cầu: ${objectKey}`,
+        });
+      }
     }
 
     const stat = fs.statSync(fullPath);
@@ -195,13 +201,19 @@ export class LocalStorageService {
   public createReadStream(param: string | CreateReadStreamParamsDto): fs.ReadStream {
     const objectKey = typeof param === 'string' ? param : param.objectKey;
     this.assertSafePath(objectKey);
-    const fullPath = path.resolve(this.baseDir, objectKey);
+    let fullPath = path.resolve(this.baseDir, objectKey);
 
     if (!fs.existsSync(fullPath)) {
-      throw new NotFoundException({
-        code: 'FILE_NOT_FOUND',
-        message: `Không tìm thấy tập tin yêu cầu: ${objectKey}`,
-      });
+      // Tìm kiếm fallback trực tiếp trong thư mục gốc baseDir (tương thích các file di chuyển từ MinIO)
+      const directInBase = path.resolve(this.baseDir, path.basename(objectKey));
+      if (fs.existsSync(directInBase)) {
+        fullPath = directInBase;
+      } else {
+        throw new NotFoundException({
+          code: 'FILE_NOT_FOUND',
+          message: `Không tìm thấy tập tin yêu cầu: ${objectKey}`,
+        });
+      }
     }
 
     return fs.createReadStream(fullPath);

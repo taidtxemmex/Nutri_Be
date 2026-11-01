@@ -69,10 +69,11 @@ export class EmailTemplateService {
   private readonly defaultFrontendUrl: string;
 
   constructor(private readonly configService?: ConfigService) {
-    this.defaultFrontendUrl =
+    const rawUrl =
       this.configService?.get<string>('FRONTEND_URL') ||
       this.configService?.get<string>('app.frontend-url') ||
       'http://localhost:5173';
+    this.defaultFrontendUrl = rawUrl.split(',')[0].trim().replace(/\/+$/, '');
   }
 
   /**

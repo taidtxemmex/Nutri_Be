@@ -115,10 +115,11 @@ export class EmbeddedQueueWorkerService implements OnModuleInit, OnModuleDestroy
             let body = payload.body;
 
             if (!html && this.emailTemplateService) {
-              const frontendUrl =
+              const rawFrontendUrl =
                 this.configService?.get<string>('FRONTEND_URL') ||
                 this.configService?.get<string>('app.frontend-url') ||
                 'http://localhost:5173';
+              const frontendUrl = rawFrontendUrl.split(',')[0].trim().replace(/\/+$/, '');
 
               if (payload.type === 'VERIFY_EMAIL') {
                 const verifyLink =

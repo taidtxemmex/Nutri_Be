@@ -5,6 +5,9 @@
   "author": "TrueNutri Team",
   "private": true,
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "build": "nest build",
     "postbuild": "node -e \"const fs=require('fs'); if(!fs.existsSync('dist/main.js')) fs.writeFileSync('dist/main.js', 'require(\\\"./src/main.js\\\");\\\\n');\"",
