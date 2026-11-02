@@ -5,7 +5,7 @@ import { Type } from 'class-transformer';
 export class DailyIntakeQueryDto {
   @ApiPropertyOptional({ description: 'ID bệnh nhân lọc' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.daily_intakes.patient_id_string' })
   @MaxLength(50, { message: 'validation.daily_intakes.patient_id_max' })
   patientId?: string;
 
@@ -27,14 +27,14 @@ export class DailyIntakeQueryDto {
   @ApiPropertyOptional({ description: 'Trang hiện tại (1-based)', default: 1 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'validation.daily_intakes.page_int' })
   @Min(1, { message: 'validation.daily_intakes.page_min' })
   page?: number = 1;
 
   @ApiPropertyOptional({ description: 'Số lượng mục trên trang', default: 10 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'validation.daily_intakes.limit_int' })
   @Min(1, { message: 'validation.daily_intakes.limit_min' })
   @Max(100, { message: 'validation.daily_intakes.limit_max' })
   limit?: number = 10;

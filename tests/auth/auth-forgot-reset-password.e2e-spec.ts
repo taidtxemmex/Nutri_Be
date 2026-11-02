@@ -24,6 +24,7 @@ describe('Adversarial Test Suite - Forgot & Reset Password Flow (3-Layer Asserti
   let httpServer: any;
 
   beforeAll(async () => {
+    process.env.QUEUE_WORKER_AUTO_START = 'false';
     helper = new TestAppHelper();
     await helper.init();
     prisma = helper.getPrisma();
@@ -306,11 +307,50 @@ describe('Adversarial Test Suite - Forgot & Reset Password Flow (3-Layer Asserti
       expect(res4.body.error.message).toContain('quá nhiều yêu cầu');
 
       // LAYER 3: Direct DB assertion - The blocked 4th request must NOT insert another job
-      const emailJobs = await prisma.systemJob.findMany({
+      const emailJobsBefore = await prisma.systemJob.findMany({
         where: { queueName: 'email' },
       });
-      // Exactly 3 jobs created, 4th request was dropped before business logic / DB access
-      expect(emailJobs.length).toBe(3);
+      expect(emailJobsBefore.length).toBe(3);
+
+      // Calls 5..100: Flood remaining 96 requests from same IP - all must be immediately blocked with 429
+      const burstLatencies: number[] = [];
+      for (let i = 5; i <= 100; i++) {
+        const start = performance.now();
+        const res = await request(httpServer)
+          .post('/api/v1/auth/forgot-password')
+          .set('X-Forwarded-For', fixedBotIp)
+          .send({ email: email4 });
+        const lat = performance.now() - start;
+        burstLatencies.push(lat);
+        expect(res.status).toBe(429);
+        expect(res.body.error.code).toBe('TOO_MANY_REQUESTS');
+      }
+
+      // LAYER 3: Direct DB assertion - The blocked 97 requests must NOT insert any additional jobs
+      const emailJobsAfter = await prisma.systemJob.findMany({
+        where: { queueName: 'email' },
+      });
+      // Exactly 3 jobs created, 97 requests were dropped before business logic / DB access
+      expect(emailJobsAfter.length).toBe(3);
+
+      // Calculate latency metrics for blocked requests
+      const sorted = [...burstLatencies].sort((a, b) => a - b);
+      const p50 = sorted[Math.floor(sorted.length * 0.5)];
+      const p90 = sorted[Math.floor(sorted.length * 0.9)];
+      const p95 = sorted[Math.floor(sorted.length * 0.95)];
+      const p99 = sorted[Math.floor(sorted.length * 0.99)];
+      const avg = sorted.reduce((sum, v) => sum + v, 0) / sorted.length;
+
+      // eslint-disable-next-line no-console
+      console.log(`\n=== [STUPID BOT] 100-REQ BURST METRICS ===`);
+      // eslint-disable-next-line no-console
+      console.log(
+        `Total Requests: 100 | Allowed (200 OK): 3 | Blocked (429): 97 | Drop Rate: 97.0%`,
+      );
+      // eslint-disable-next-line no-console
+      console.log(
+        `Blocked Requests Latency - Min: ${sorted[0].toFixed(2)}ms | Avg: ${avg.toFixed(2)}ms | p50: ${p50.toFixed(2)}ms | p90: ${p90.toFixed(2)}ms | p95: ${p95.toFixed(2)}ms | p99: ${p99.toFixed(2)}ms | Max: ${sorted[sorted.length - 1].toFixed(2)}ms`,
+      );
     });
 
     it('L1 + L2 + L3: Anti-Spam 60s Cooldown for SAME account must reject 2nd request within 60s with 429 RATE_LIMIT_EXCEEDED', async () => {

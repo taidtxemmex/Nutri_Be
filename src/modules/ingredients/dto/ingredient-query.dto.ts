@@ -18,8 +18,8 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
     return isNaN(num) ? undefined : num;
   })
   @IsOptional()
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'validation.ingredients.category_id_int' })
+  @Min(1, { message: 'validation.ingredients.category_id_min' })
   categoryId?: number;
 
   @ApiPropertyOptional({ description: 'Lọc theo tên hoặc ID nhóm nguyên liệu' })
@@ -27,8 +27,8 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
     value === '' || value === null || value === undefined ? undefined : String(value).trim(),
   )
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
+  @IsString({ message: 'validation.ingredients.category_string' })
+  @MaxLength(255, { message: 'validation.ingredients.category_max' })
   category?: string;
 
   @ApiPropertyOptional({
@@ -43,9 +43,9 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
     return raw;
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  @IsIn(['THUC_VAT', 'DONG_VAT'])
+  @IsString({ message: 'validation.ingredients.protein_type_string' })
+  @MaxLength(50, { message: 'validation.ingredients.protein_type_max' })
+  @IsIn(['THUC_VAT', 'DONG_VAT'], { message: 'validation.ingredients.protein_type_enum' })
   loaiProtein?: string;
 
   @ApiPropertyOptional({
@@ -58,8 +58,8 @@ export class IngredientQueryDto extends BasePaginationQueryDto {
     return raw;
   })
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  @IsIn(['DA_DUYET', 'CHO_DUYET', 'TU_CHOI'])
+  @IsString({ message: 'validation.ingredients.status_string' })
+  @MaxLength(50, { message: 'validation.ingredients.status_max' })
+  @IsIn(['DA_DUYET', 'CHO_DUYET', 'TU_CHOI'], { message: 'validation.ingredients.status_enum' })
   trangThai?: string;
 }

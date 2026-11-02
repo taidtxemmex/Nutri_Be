@@ -118,12 +118,12 @@ export class SubscriptionsService {
 
     const code = dto.getPackageCode();
     if (!code) {
-      throw new BadRequestException('Mã gói cước không được để trống');
+      throw new BadRequestException('error.subscriptions.package_code_required');
     }
 
     const name = dto.getPackageName();
     if (!name) {
-      throw new BadRequestException('Tên gói cước không được để trống');
+      throw new BadRequestException('error.subscriptions.package_name_required');
     }
 
     // 1. Kiểm tra tính duy nhất của mã gói (chỉ xét các gói chưa bị xóa mềm)
@@ -136,7 +136,7 @@ export class SubscriptionsService {
     });
 
     if (existing) {
-      throw new ConflictException(`Mã gói cước "${code}" đã tồn tại trên hệ thống`);
+      throw new ConflictException('error.subscriptions.package_code_exists');
     }
 
     // 2. Ghi bản ghi vào CSDL
@@ -239,7 +239,7 @@ export class SubscriptionsService {
     });
 
     if (!plan) {
-      throw new NotFoundException(`Gói cước có ID "${rawId}" không tồn tại`);
+      throw new NotFoundException('error.subscriptions.package_not_found');
     }
 
     return PlanResponseDto.fromEntity(plan);
@@ -278,7 +278,7 @@ export class SubscriptionsService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Gói cước có ID "${id}" không tồn tại`);
+      throw new NotFoundException('error.subscriptions.package_not_found');
     }
 
     const updateData: any = {
@@ -347,7 +347,7 @@ export class SubscriptionsService {
     });
 
     if (!existing) {
-      throw new NotFoundException(`Gói cước có ID "${id}" không tồn tại`);
+      throw new NotFoundException('error.subscriptions.package_not_found');
     }
 
     await this.prisma.goi.update({
@@ -395,7 +395,7 @@ export class SubscriptionsService {
     }
     const packageCode = dto.getPackageCode();
     if (!packageCode) {
-      throw new BadRequestException('Mã gói cước không được để trống');
+      throw new BadRequestException('error.subscriptions.package_code_required');
     }
 
     // 1. Kiểm tra gói cước tồn tại và đang mở bán
@@ -415,11 +415,11 @@ export class SubscriptionsService {
     });
 
     if (!packageEntity) {
-      throw new NotFoundException(`Gói cước "${packageCode}" không tồn tại`);
+      throw new NotFoundException('error.subscriptions.package_not_found');
     }
 
     if (packageEntity.trang_thai !== 'ACTIVE') {
-      throw new BadRequestException(`Gói cước "${packageCode}" hiện không khả dụng để đăng ký`);
+      throw new BadRequestException('error.subscriptions.package_not_available');
     }
 
     // 2. Xác thực người dùng
@@ -433,7 +433,7 @@ export class SubscriptionsService {
     });
 
     if (!user) {
-      throw new NotFoundException('Tài khoản người dùng không tồn tại');
+      throw new NotFoundException('error.subscriptions.user_not_found');
     }
 
     // 3. Sinh mã giao dịch chuẩn duy nhất có retry chống đụng độ
@@ -468,14 +468,12 @@ export class SubscriptionsService {
         for (const doc of dto.documents) {
           // A3: Validate externalLink scheme (phòng thủ XSS / javascript: schemes)
           if (doc.externalLink && !/^https?:\/\//i.test(doc.externalLink)) {
-            throw new BadRequestException(
-              'Đường dẫn minh chứng bên ngoài phải bắt đầu bằng http:// hoặc https://',
-            );
+            throw new BadRequestException('error.subscriptions.proof_url_invalid');
           }
 
           // A3: Validate objectKey (chống path traversal và null byte)
           if (doc.objectKey && (doc.objectKey.includes('..') || doc.objectKey.includes('\0'))) {
-            throw new BadRequestException('Đường dẫn tệp tin objectKey không hợp lệ');
+            throw new BadRequestException('error.subscriptions.object_key_invalid');
           }
 
           await tx.minh_chung.create({
@@ -628,14 +626,12 @@ export class SubscriptionsService {
       }
 
       if (!request) {
-        throw new NotFoundException(`Yêu cầu thanh toán ID "${requestId}" không tồn tại`);
+        throw new NotFoundException('error.subscriptions.payment_request_not_found');
       }
 
       const currentStatus = (request.trang_thai || '').toUpperCase();
       if (currentStatus !== 'PENDING' && currentStatus !== 'CHO_DUYET') {
-        throw new BadRequestException(
-          `Yêu cầu thanh toán đang ở trạng thái "${request.trang_thai}", không thể phê duyệt`,
-        );
+        throw new BadRequestException('error.subscriptions.payment_invalid_status');
       }
 
       // 2. Khóa bi quan hàng User để chống race condition cập nhật đồng thời
@@ -666,7 +662,7 @@ export class SubscriptionsService {
       }
 
       if (!user) {
-        throw new NotFoundException('Người dùng liên kết với giao dịch không tồn tại');
+        throw new NotFoundException('error.subscriptions.user_not_found');
       }
 
       // 3. Tính toán thời hạn gia hạn cộng dồn (Cumulative Extension)
@@ -836,14 +832,12 @@ export class SubscriptionsService {
       });
 
       if (!request) {
-        throw new NotFoundException(`Yêu cầu thanh toán ID "${requestId}" không tồn tại`);
+        throw new NotFoundException('error.subscriptions.payment_request_not_found');
       }
 
       const currentStatus = (request.trang_thai || '').toUpperCase();
       if (currentStatus !== 'PENDING' && currentStatus !== 'CHO_DUYET') {
-        throw new BadRequestException(
-          `Yêu cầu thanh toán đang ở trạng thái "${request.trang_thai}", không thể từ chối`,
-        );
+        throw new BadRequestException('error.subscriptions.payment_invalid_status');
       }
 
       // A2: Cập nhật có điều kiện nguyên tử trạng thái = REJECTED (Chống race condition với approve)
@@ -862,7 +856,7 @@ export class SubscriptionsService {
         });
 
         if (updateResult.count === 0) {
-          throw new ConflictException('Yêu cầu thanh toán đã được xử lý bởi quản trị viên khác.');
+          throw new ConflictException('error.subscriptions.payment_already_processed');
         }
       }
 

@@ -45,7 +45,7 @@ export async function streamPrismaInBatches<T extends { id: unknown }>(
   const modelDelegate = prisma ? prisma[options.model] : null;
 
   if (!modelDelegate || typeof modelDelegate.findMany !== 'function') {
-    throw new Error(`Prisma model '${String(options.model)}' không tồn tại hoặc không hợp lệ`);
+    throw new Error(`Prisma model '${String(options.model)}' does not exist or is invalid`);
   }
 
   while (true) {

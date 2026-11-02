@@ -34,16 +34,19 @@ export class CustomValidationPipe extends ValidationPipe {
             /^[a-z0-9_-]+(\.[a-z0-9_-]+)+$/i.test(rawMessage) &&
             Boolean(this.i18nService && this.i18nService.hasKey(rawMessage));
 
-          const message =
-            this.i18nService && this.i18nService.hasKey(rawMessage)
-              ? this.i18nService.translate(rawMessage)
-              : rawMessage;
+          let message = rawMessage;
+          let finalKey: string | undefined = undefined;
+
+          if (isNamespaceKey && this.i18nService) {
+            message = this.i18nService.translate(rawMessage);
+            finalKey = rawMessage;
+          }
 
           result.push({
             field: fieldPath,
             code: code.toUpperCase(),
             message,
-            ...(isNamespaceKey ? { key: rawMessage } : {}),
+            ...(finalKey ? { key: finalKey } : {}),
           });
         }
       }

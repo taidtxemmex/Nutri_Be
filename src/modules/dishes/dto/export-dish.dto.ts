@@ -9,7 +9,7 @@ export class ExportDishDto {
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'Danh sách các cột dinh dưỡng cần xuất ra Excel' })
-  @IsArray()
+  @IsArray({ message: 'validation.dishes.columns_array' })
   @ArrayMaxSize(100, { message: 'validation.dishes.export_columns_max' })
   @IsString({ each: true, message: 'validation.dishes.column_string' })
   @MaxLength(100, { each: true, message: 'validation.dishes.column_max' })

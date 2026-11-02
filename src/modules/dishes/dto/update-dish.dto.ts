@@ -43,12 +43,12 @@ export class UpdateDishDto {
 
   @ApiPropertyOptional({ description: 'Trạng thái món ăn' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.dishes.status_string' })
   status?: string;
 
   @ApiPropertyOptional({ description: 'Món ăn công khai hay riêng tư' })
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.dishes.is_public_boolean' })
   isPublic?: boolean;
 
   @ApiPropertyOptional({ description: 'Hệ số sống chín' })
@@ -56,7 +56,7 @@ export class UpdateDishDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsNumber()
+  @IsNumber({}, { message: 'validation.dishes.coefficient_number' })
   coefficient?: number;
 
   @ApiPropertyOptional({

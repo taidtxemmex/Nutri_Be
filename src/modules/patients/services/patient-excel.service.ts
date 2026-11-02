@@ -135,7 +135,7 @@ export class PatientExcelService {
     }
 
     if (!fileBuffer || fileBuffer.length === 0) {
-      throw new BadRequestException('File không có dữ liệu để import');
+      throw new BadRequestException('error.patients.excel_no_data');
     }
 
     // 1. Chuẩn bị allocator mã bệnh nhân từ DB (Pre-fetch in-memory O(1))
@@ -156,7 +156,7 @@ export class PatientExcelService {
     try {
       reader = ExcelStreamReader.createReader(fileBuffer);
     } catch {
-      throw new BadRequestException('File không đúng định dạng Excel (.xlsx)');
+      throw new BadRequestException('error.files.invalid_excel_format');
     }
 
     let targetWorksheetFound = false;
@@ -219,7 +219,7 @@ export class PatientExcelService {
 
           dataRowCount++;
           if (dataRowCount > 1000) {
-            throw new BadRequestException('Chỉ cho phép import tối đa 1000 bệnh nhân / file');
+            throw new BadRequestException('error.patients.excel_max_1000');
           }
 
           collectedRows.push({
@@ -239,7 +239,7 @@ export class PatientExcelService {
       }
     } catch (err: any) {
       if (err instanceof BadRequestException) throw err;
-      throw new BadRequestException('File không đúng định dạng Excel (.xlsx)');
+      throw new BadRequestException('error.files.invalid_excel_format');
     }
 
     // Thu thập trước toàn bộ các mã bệnh nhân nhập tay (manualCode) trên tất cả các dòng vào usedCodes
@@ -368,11 +368,11 @@ export class PatientExcelService {
     }
 
     if (!targetWorksheetFound) {
-      throw new BadRequestException('Template không đúng. Vui lòng dùng file mẫu tải từ hệ thống');
+      throw new BadRequestException('error.patients.excel_invalid_template');
     }
 
     if (dataRowCount === 0) {
-      throw new BadRequestException('File không có dữ liệu để import');
+      throw new BadRequestException('error.patients.excel_no_data');
     }
 
     // NẾU CÓ LỖI: TRẢ VỀ FILE KẾT QUẢ TÔ ĐỎ (ROLLBACK TOÀN BỘ)

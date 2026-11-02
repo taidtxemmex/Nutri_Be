@@ -138,7 +138,7 @@ export class UsersController {
   ) {
     const targetUserId = paramId || dto.userId || dto.keycloakUserId;
     if (!targetUserId) {
-      throw new BadRequestException('Vui lòng cung cấp ID người dùng cần phân quyền.');
+      throw new BadRequestException('error.users.user_id_required_role');
     }
     return this.usersService.updateRole({ targetUserId, newRole: dto.newRole, currentUser });
   }
@@ -175,11 +175,11 @@ export class UsersController {
   ) {
     const targetUserId = paramId || dto.userId || dto.keycloakUserId;
     if (!targetUserId) {
-      throw new BadRequestException('Vui lòng cung cấp ID người dùng cần cập nhật trạng thái.');
+      throw new BadRequestException('error.users.user_id_required_status');
     }
     const isActive = dto.isActive !== undefined ? dto.isActive : dto.active;
     if (typeof isActive !== 'boolean') {
-      throw new BadRequestException('Vui lòng cung cấp giá trị boolean cho isActive/active.');
+      throw new BadRequestException('error.users.active_boolean_required');
     }
     return this.usersService.updateStatus({ targetUserId, isActive, currentUser });
   }

@@ -74,7 +74,7 @@ export class NutritionGuidesService {
     });
 
     if (existing) {
-      throw new ConflictException('Mã ký hiệu hướng dẫn đã tồn tại');
+      throw new ConflictException('error.nutrition_guides.code_exists');
     }
 
     const created = await this.prisma.huong_dan_dinh_duong.create({
@@ -115,7 +115,7 @@ export class NutritionGuidesService {
         where: { ma_ky_hieu: code },
       });
       if (codeCheck) {
-        throw new ConflictException('Mã ký hiệu hướng dẫn đã tồn tại');
+        throw new ConflictException('error.nutrition_guides.code_exists');
       }
     }
 

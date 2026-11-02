@@ -17,7 +17,7 @@ export class ExportProposalExcelDto {
     description: 'Chế độ xuất Excel: FULL | NET | NET_NUTRITION | RAW | COOKED',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.menu_proposals.export_type_string' })
   exportType?: string;
 
   @ApiPropertyOptional({
@@ -74,8 +74,8 @@ export class MenuProposalQueryDto {
   @ApiPropertyOptional({ description: 'Trang hiện tại (1-based)', default: 1 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'validation.menu_proposals.page_int' })
+  @Min(1, { message: 'validation.menu_proposals.page_min' })
   page?: number = 1;
 
   @ApiPropertyOptional({ description: 'Số lượng mục mỗi trang' })
@@ -83,9 +83,9 @@ export class MenuProposalQueryDto {
   @Transform(({ value }) =>
     value === '' || value === null || value === undefined ? undefined : Number(value),
   )
-  @IsInt()
-  @Min(1)
-  @Max(5000)
+  @IsInt({ message: 'validation.menu_proposals.limit_int' })
+  @Min(1, { message: 'validation.menu_proposals.limit_min' })
+  @Max(5000, { message: 'validation.menu_proposals.limit_max' })
   limit?: number;
 }
 

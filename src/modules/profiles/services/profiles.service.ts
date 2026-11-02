@@ -116,9 +116,7 @@ export class ProfilesService {
     });
 
     if (!user || user.deleted_at) {
-      throw new NotFoundException(
-        'Hồ sơ người dùng không tồn tại hoặc tài khoản đã bị vô hiệu hóa.',
-      );
+      throw new NotFoundException('error.profiles.user_not_found_or_disabled');
     }
 
     const dobStr = user.ho_so_ca_nhan?.ngay_sinh
@@ -165,9 +163,7 @@ export class ProfilesService {
       deleted_at: true,
     });
     if (!existingUser || existingUser.deleted_at) {
-      throw new NotFoundException(
-        'Không tìm thấy tài khoản người dùng hoặc tài khoản đã bị vô hiệu hóa.',
-      );
+      throw new NotFoundException('error.profiles.user_not_found_or_disabled');
     }
 
     const actualUserId = existingUser.id;

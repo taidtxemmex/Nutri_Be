@@ -349,7 +349,7 @@ export class UsersService {
       });
 
       if (!user) {
-        throw new NotFoundException('Không tìm thấy người dùng với ID này.');
+        throw new NotFoundException('error.users.user_not_found');
       }
 
       return user;
@@ -463,7 +463,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy thông tin người dùng.');
+      throw new NotFoundException('error.users.user_info_not_found');
     }
 
     const dobStr = user.ho_so_ca_nhan?.ngay_sinh
@@ -549,7 +549,7 @@ export class UsersService {
       },
     });
     if (!user) {
-      throw new NotFoundException('Người dùng không tồn tại.');
+      throw new NotFoundException('error.users.user_not_exists');
     }
 
     const actualUserId = user.id;
@@ -678,7 +678,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng cần phân quyền.');
+      throw new NotFoundException('error.users.user_to_assign_not_found');
     }
 
     if (user.vai_tro === UserRole.SUPERADMIN && newRole !== UserRole.SUPERADMIN) {
@@ -729,7 +729,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('Không tìm thấy người dùng cần cập nhật trạng thái.');
+      throw new NotFoundException('error.users.user_to_update_status_not_found');
     }
 
     const actualUserId = user.id;
@@ -801,7 +801,7 @@ export class UsersService {
     });
 
     if (!user || user.deleted_at) {
-      throw new NotFoundException('Không tìm thấy người dùng hoặc tài khoản đã bị vô hiệu hóa.');
+      throw new NotFoundException('error.users.user_disabled_or_not_found');
     }
 
     const hasRelationFields = 'ho_so_ca_nhan' in user || 'nguoi_de_xuat' in user;
@@ -847,7 +847,7 @@ export class UsersService {
     });
 
     if (!user || user.deleted_at) {
-      throw new NotFoundException('Không tìm thấy người dùng hoặc tài khoản đã bị xóa trước đó.');
+      throw new NotFoundException('error.users.user_deleted_or_not_found');
     }
 
     const actualUserId = user.id;
@@ -892,14 +892,12 @@ export class UsersService {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     if (!userIds || userIds.length === 0) {
-      throw new BadRequestException('Danh sách userIds không được để trống.');
+      throw new BadRequestException('error.users.user_ids_required');
     }
 
     // 1. Chặn người dùng tự xóa chính mình trong batch
     if (userIds.includes(currentUser.id)) {
-      throw new ForbiddenException(
-        'Bạn không thể tự xóa tài khoản của chính mình trong danh sách batch.',
-      );
+      throw new ForbiddenException('error.users.cannot_delete_self');
     }
 
     // 2. Chặn xóa tài khoản SUPERADMIN nếu người thực hiện không phải SUPERADMIN
@@ -972,11 +970,11 @@ export class UsersService {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     if (!userIds || userIds.length === 0) {
-      throw new BadRequestException('Danh sách userIds không được để trống.');
+      throw new BadRequestException('error.users.user_ids_required');
     }
 
     if (userIds.includes(currentUser.id) && !isActive) {
-      throw new ForbiddenException('Bạn không thể tự khóa tài khoản của chính mình.');
+      throw new ForbiddenException('error.users.cannot_lock_self');
     }
 
     const targetUsers = await this.prisma.nguoi_dung.findMany({
@@ -1039,7 +1037,7 @@ export class UsersService {
     this.idorDefenseService.assertAdmin(currentUser.role);
 
     if (!dtoList || dtoList.length === 0) {
-      throw new BadRequestException('Danh sách người dùng cần tạo không được để trống.');
+      throw new BadRequestException('error.users.create_list_required');
     }
 
     // 1. Kiểm tra trùng lặp username / email trong chính payload gửi lên
@@ -1047,10 +1045,10 @@ export class UsersService {
     const emails = dtoList.map((u) => u.email.toLowerCase());
 
     if (new Set(usernames).size !== usernames.length) {
-      throw new BadRequestException('Danh sách payload có chứa tên đăng nhập bị trùng lặp.');
+      throw new BadRequestException('error.users.duplicate_username_in_payload');
     }
     if (new Set(emails).size !== emails.length) {
-      throw new BadRequestException('Danh sách payload có chứa email bị trùng lặp.');
+      throw new BadRequestException('error.users.duplicate_email_in_payload');
     }
 
     // 2. Kiểm tra trùng lặp với CSDL bằng 1 single query (Chống N+1 Query - Rule 11)

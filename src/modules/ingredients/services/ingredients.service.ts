@@ -31,10 +31,8 @@ import {
   CalculateSummaryParamsDto,
 } from '../dto';
 
-export function normalizeVietnameseNFC(str: string): string {
-  if (!str) return '';
-  return str.normalize('NFC').trim();
-}
+import { normalizeVietnameseNFC } from '../../../common/utils/string.util';
+export { normalizeVietnameseNFC };
 
 @Injectable()
 export class IngredientsService {

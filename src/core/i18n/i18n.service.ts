@@ -105,17 +105,17 @@ export class I18nService {
 
   private resolveLegacyOrViKey(cleanKey: string): string | undefined {
     if (!cleanKey) return undefined;
-    if (LEGACY_KEY_ALIASES[cleanKey]) {
-      return LEGACY_KEY_ALIASES[cleanKey];
-    }
     const normalized = cleanKey.toLowerCase();
-    if (LEGACY_KEY_ALIASES[normalized]) {
-      return LEGACY_KEY_ALIASES[normalized];
-    }
     const stripped = normalized.replace(/[.!?:;]+$/, '').trim();
-    if (LEGACY_KEY_ALIASES[stripped]) {
-      return LEGACY_KEY_ALIASES[stripped];
+    const directAlias =
+      LEGACY_KEY_ALIASES[cleanKey] ||
+      LEGACY_KEY_ALIASES[normalized] ||
+      LEGACY_KEY_ALIASES[stripped];
+
+    if (directAlias) {
+      return LEGACY_KEY_ALIASES[directAlias] || directAlias;
     }
+
     return (
       this.viToKeyMap.get(cleanKey) ||
       this.viToKeyMap.get(normalized) ||

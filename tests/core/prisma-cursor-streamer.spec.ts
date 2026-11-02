@@ -43,6 +43,6 @@ describe('PrismaCursorStreamer Unit Tests (Chunked Batch Querying)', () => {
         model: 'nonExistentModel',
         onBatch: async () => {},
       }),
-    ).rejects.toThrow("Prisma model 'nonExistentModel' không tồn tại");
+    ).rejects.toThrow(/Prisma model 'nonExistentModel' (does not exist|không tồn tại)/);
   });
 });

@@ -463,5 +463,39 @@ describe('I18nService Multi-Language Tests (vi, en, zh)', () => {
         service.translate('validation.array_max_size', 'en', { field: 'Items', max: 50 }),
       ).toBe('Items must not exceed 50 elements');
     });
+
+    it('nên đảm bảo 100% tương thích ngược cho LEGACY_KEY_ALIASES và dịch đối xứng vi, en, zh', () => {
+      // 1. Kiểm tra các câu tiếng Việt legacy ánh xạ sang key chuẩn
+      expect(service.translate('Email không được vượt quá 255 ký tự', 'en')).toBe(
+        'Email cannot exceed 255 characters.',
+      );
+      expect(service.translate('Email không được vượt quá 255 ký tự', 'zh')).toBe(
+        '电子邮箱不能超过 255 个字符。',
+      );
+      expect(service.translate('Email không được vượt quá 255 ký tự', 'vi')).toBe(
+        'Email không được vượt quá 255 ký tự.',
+      );
+
+      // 2. Kiểm tra alias dạng dot-notation cũ
+      expect(service.translate('validation.auth.email_max_length', 'en')).toBe(
+        'Email cannot exceed 255 characters.',
+      );
+      expect(service.translate('validation.coefficients.value_number', 'en')).toBe(
+        'Coefficient must be a number.',
+      );
+      expect(service.translate('validation.coefficients.value_number', 'zh')).toBe(
+        '系数必须是数字。',
+      );
+
+      // 3. Kiểm tra các trường validation coefficients và auth
+      expect(service.translate('Hệ số phải là số', 'en')).toBe('Coefficient must be a number.');
+      expect(service.translate('Hệ số phải là số', 'zh')).toBe('系数必须是数字。');
+      expect(service.translate('Số điện thoại không đúng định dạng Việt Nam', 'en')).toBe(
+        'Phone number format is not a valid Vietnamese phone number.',
+      );
+      expect(service.translate('Số điện thoại không đúng định dạng Việt Nam', 'zh')).toBe(
+        '电话号码不是有效的越南电话号码格式。',
+      );
+    });
   });
 });

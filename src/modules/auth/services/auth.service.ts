@@ -135,7 +135,7 @@ export class AuthService {
       select: { id: true },
     });
     if (existingUser) {
-      throw new ConflictException('Tên đăng nhập đã tồn tại trong hệ thống.');
+      throw new ConflictException('error.auth.username_exists');
     }
 
     // 2. Kiểm tra email đã tồn tại trong hồ sơ chính thức chưa
@@ -144,7 +144,7 @@ export class AuthService {
       select: { id: true },
     });
     if (existingEmail) {
-      throw new ConflictException('Địa chỉ email đã được sử dụng bởi tài khoản khác.');
+      throw new ConflictException('error.auth.email_exists');
     }
 
     // 3. Dọn dẹp các bản ghi chờ xác thực đã hết hạn và bản ghi cũ có cùng email (khớp AuthServiceImpl.java:109-117)
@@ -166,7 +166,7 @@ export class AuthService {
       select: { id: true },
     });
     if (pendingUser) {
-      throw new ConflictException('Tên đăng nhập đang trong trạng thái chờ xác thực email.');
+      throw new ConflictException('error.auth.pending_verification');
     }
 
     // 4. Băm mật khẩu
@@ -236,7 +236,7 @@ export class AuthService {
         : (paramOrToken as string);
 
     if (!token || !token.trim()) {
-      throw new BadRequestException('Mã xác thực không hợp lệ.');
+      throw new BadRequestException('error.auth.verification_code_invalid');
     }
 
     const rawToken = token.trim();
@@ -261,12 +261,12 @@ export class AuthService {
     }
 
     if (!pending) {
-      throw new BadRequestException('Mã xác thực không tồn tại hoặc tài khoản đã được kích hoạt.');
+      throw new BadRequestException('error.auth.verification_code_not_found_or_active');
     }
 
     if (new Date(pending.expires_at).getTime() < Date.now()) {
       await this.prisma.dang_ky_cho_xac_thuc.delete({ where: { id: pending.id } });
-      throw new BadRequestException('Mã xác thực đã hết hạn. Vui lòng tiến hành đăng ký lại.');
+      throw new BadRequestException('error.auth.verification_code_expired_reregister');
     }
 
     const newUserId = crypto.randomUUID();
@@ -279,7 +279,7 @@ export class AuthService {
       if (existingUser) {
         throw new ConflictException({
           code: 'USER_ALREADY_EXISTS',
-          message: 'Tên đăng nhập đã tồn tại trong hệ thống.',
+          message: 'error.auth.username_exists',
         });
       }
 
@@ -845,9 +845,7 @@ export class AuthService {
     }
 
     if (!rawToken) {
-      throw new BadRequestException(
-        'Thiếu Google Token định danh (idToken, credential hoặc code).',
-      );
+      throw new BadRequestException('error.auth.google_missing_token');
     }
 
     let googleData: { sub: string; email: string; name?: string; picture?: string };
@@ -860,7 +858,7 @@ export class AuthService {
       if (!res.ok) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_UNAUTHORIZED,
-          message: 'Token Google không hợp lệ, không thể xác thực chữ ký số hoặc đã hết hạn.',
+          message: 'error.auth.google_invalid_token',
         });
       }
       const info = (await res.json()) as {
@@ -874,7 +872,7 @@ export class AuthService {
       if (!info.email || !info.sub) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_UNAUTHORIZED,
-          message: 'Token Google không chứa đầy đủ thông tin danh tính (sub, email).',
+          message: 'error.auth.google_missing_identity',
         });
       }
 
@@ -883,7 +881,7 @@ export class AuthService {
       if (expectedAudience && info.aud && info.aud !== expectedAudience) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_UNAUTHORIZED,
-          message: 'Token Google không thuộc về ứng dụng này (Client ID mismatch).',
+          message: 'error.auth.google_client_id_mismatch',
         });
       }
 
@@ -891,7 +889,7 @@ export class AuthService {
       if (info.email_verified === 'false' || info.email_verified === false) {
         throw new UnauthorizedException({
           code: AUTH_ERROR_UNAUTHORIZED,
-          message: 'Địa chỉ email Google chưa được xác thực.',
+          message: 'error.auth.google_email_unverified',
         });
       }
 
@@ -910,7 +908,7 @@ export class AuthService {
       this.logger.error(`Google OAuth2 authentication error: ${msg}`, stack);
       throw new UnauthorizedException({
         code: AUTH_ERROR_UNAUTHORIZED,
-        message: 'Không thể kết nối đến máy chủ Google để xác thực chữ ký token.',
+        message: 'error.auth.google_connection_failed',
       });
     }
 
@@ -1273,7 +1271,7 @@ export class AuthService {
         : (paramOrToken as string);
 
     if (!token || !token.trim()) {
-      throw new BadRequestException('Mã xác thực không hợp lệ.');
+      throw new BadRequestException('error.auth.verification_code_invalid');
     }
 
     const trimmedToken = token.trim();
@@ -1298,12 +1296,12 @@ export class AuthService {
     });
 
     if (!record) {
-      throw new BadRequestException('Mã xác thực không hợp lệ hoặc đã được sử dụng.');
+      throw new BadRequestException('error.auth.verification_code_used');
     }
 
     if (new Date(record.ngay_het_han).getTime() < Date.now()) {
       await this.prisma.ma_xac_thuc.delete({ where: { id: record.id } }).catch(() => {});
-      throw new BadRequestException('Mã xác thực đã hết hạn. Vui lòng yêu cầu cấp lại mã mới.');
+      throw new BadRequestException('error.auth.verification_code_expired_reissue');
     }
 
     const user = record.nguoi_dung;
@@ -1349,12 +1347,12 @@ export class AuthService {
     });
 
     if (!record) {
-      throw new BadRequestException('Mã xác thực không hợp lệ hoặc đã được sử dụng.');
+      throw new BadRequestException('error.auth.verification_code_used');
     }
 
     if (new Date(record.ngay_het_han).getTime() < Date.now()) {
       await this.prisma.ma_xac_thuc.delete({ where: { id: record.id } });
-      throw new BadRequestException('Mã xác thực đã hết hạn. Vui lòng yêu cầu cấp lại mã mới.');
+      throw new BadRequestException('error.auth.verification_code_expired_reissue');
     }
 
     const user = record.nguoi_dung;
@@ -1374,7 +1372,7 @@ export class AuthService {
     if (user?.mat_khau && (await bcrypt.compare(dto.newPassword, user.mat_khau))) {
       throw new BadRequestException({
         code: 'PASSWORD_CANNOT_BE_OLD',
-        message: 'Mật khẩu mới không được trùng với mật khẩu hiện tại.',
+        message: 'error.auth.password_cannot_be_old',
       });
     }
 

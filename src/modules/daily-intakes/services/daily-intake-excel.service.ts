@@ -37,6 +37,7 @@ import {
   ErrorRowItem,
   setExcelResponseHeaders,
 } from '../../../core/excel-engine';
+import { normalizeVietnameseKey } from '../../../common/utils/string.util';
 import { Writable } from 'stream';
 import {
   GenerateDailyIntakeTemplateParamDto,
@@ -2690,8 +2691,7 @@ export class DailyIntakeExcelService {
   }
 
   private normalizeVietnameseKey(str: string): string {
-    if (!str) return '';
-    return str.normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
+    return normalizeVietnameseKey(str);
   }
 
   private hasRowContent(row: ExcelJS.Row): boolean {

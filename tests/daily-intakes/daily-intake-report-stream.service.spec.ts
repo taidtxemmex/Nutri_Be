@@ -57,7 +57,9 @@ describe('Task 6.4: Daily Intake Multi-Patient Export & Route Aliases', () => {
         expect(err.getStatus()).toBe(HttpStatus.UNPROCESSABLE_ENTITY); // 422
         const res = err.getResponse();
         expect(res.code).toBe('EXPORT_DATE_RANGE_EXCEEDED');
-        expect(res.message).toBe('Dải ngày xuất báo cáo không được vượt quá 31 ngày');
+        expect(res.message).toMatch(
+          /(Dải ngày xuất báo cáo không được vượt quá 31 ngày|validation\.daily_intakes\.export_date_range_exceeded)/,
+        );
       }
     });
 

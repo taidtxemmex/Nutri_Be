@@ -74,8 +74,8 @@ export class BasePaginationQueryDto {
     const num = Number(value);
     return isNaN(num) || num <= 0 ? 1 : num;
   })
-  @IsInt()
-  @Min(1)
+  @IsInt({ message: 'validation.common.page_int' })
+  @Min(1, { message: 'validation.common.page_min_1' })
   page?: number = 1;
 
   @ApiPropertyOptional({
@@ -93,9 +93,9 @@ export class BasePaginationQueryDto {
     if (isNaN(num) || num < 1) return undefined;
     return Math.min(5000, num);
   })
-  @IsInt()
-  @Min(1)
-  @Max(5000)
+  @IsInt({ message: 'validation.common.limit_int' })
+  @Min(1, { message: 'validation.common.limit_min_1' })
+  @Max(5000, { message: 'validation.common.limit_max_5000' })
   limit?: number;
 
   // Property alias for backward compatibility with NutriFE / Spring Boot
@@ -106,18 +106,18 @@ export class BasePaginationQueryDto {
 
   @ApiPropertyOptional({ description: 'Search keyword' })
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
+  @IsString({ message: 'validation.common.search_string' })
+  @MaxLength(255, { message: 'validation.common.search_max_255' })
   search?: string;
 
   @ApiPropertyOptional({ default: 'id', description: 'Sort by field' })
   @IsOptional()
-  @IsString()
-  @MaxLength(50)
+  @IsString({ message: 'validation.common.sort_string' })
+  @MaxLength(50, { message: 'validation.common.sort_max_50' })
   sortBy?: string;
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc', description: 'Sort order' })
   @IsOptional()
-  @IsIn(['asc', 'desc', 'ASC', 'DESC'])
+  @IsIn(['asc', 'desc', 'ASC', 'DESC'], { message: 'validation.common.sort_order_enum' })
   sortOrder?: 'asc' | 'desc';
 }

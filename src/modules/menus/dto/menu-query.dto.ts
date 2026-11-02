@@ -16,27 +16,27 @@ export class MenuQueryDto {
   @ApiPropertyOptional({ description: 'Trang hiện tại (1-based)', default: 1 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'validation.menus.page_int' })
   @Min(1, { message: 'validation.menus.page_min' })
   page?: number = 1;
 
   @ApiPropertyOptional({ description: 'Số lượng mục trên mỗi trang (tối đa 100)', default: 10 })
   @IsOptional()
   @Type(() => Number)
-  @IsInt()
+  @IsInt({ message: 'validation.menus.limit_int' })
   @Min(1, { message: 'validation.menus.limit_min' })
   @Max(100, { message: 'validation.menus.limit_max' })
   limit?: number = 10;
 
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm theo tên thực đơn' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.menus.keyword_string' })
   @MaxLength(255, { message: 'validation.menus.keyword_max' })
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'Từ khóa tìm kiếm phụ (tương thích FE)' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.menus.search_string' })
   @MaxLength(255, { message: 'validation.menus.search_max' })
   search?: string;
 
@@ -58,7 +58,7 @@ export class MenuQueryDto {
 
   @ApiPropertyOptional({ description: 'Lọc theo ID bệnh nhân' })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.menus.patient_id_string' })
   @MaxLength(50, { message: 'validation.menus.patient_id_max' })
   patientId?: string;
 

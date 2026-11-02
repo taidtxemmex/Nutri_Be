@@ -19,7 +19,7 @@ export class ImportDailyIntakeQueryDto {
     description: 'ID bệnh nhân sở hữu khẩu phần 24h (tùy chọn khi dùng file mẫu đa bệnh nhân)',
   })
   @IsOptional()
-  @IsString()
+  @IsString({ message: 'validation.daily_intakes.patient_id_string' })
   @MaxLength(50, { message: 'validation.daily_intakes.patient_id_max' })
   patientId?: string;
 
@@ -35,6 +35,6 @@ export class ImportDailyIntakeQueryDto {
     default: false,
   })
   @IsOptional()
-  @IsBoolean()
+  @IsBoolean({ message: 'validation.daily_intakes.overwrite_boolean' })
   overwrite?: boolean = false;
 }

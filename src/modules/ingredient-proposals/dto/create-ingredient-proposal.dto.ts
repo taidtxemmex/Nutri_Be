@@ -74,7 +74,7 @@ export class CreateIngredientProposalDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsObject()
+  @IsObject({ message: 'validation.ingredient_proposals.nutrients_object' })
   nutrients?: Record<string, any>;
 
   @ApiPropertyOptional()

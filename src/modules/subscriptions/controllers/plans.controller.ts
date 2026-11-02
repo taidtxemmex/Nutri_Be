@@ -92,7 +92,7 @@ export class PlansController {
   ): Promise<PlanResponseDto> {
     const id = dto.id;
     if (!id) {
-      throw new BadRequestException('ID gói cước không được để trống khi gọi update-package');
+      throw new BadRequestException('validation.subscriptions.plan_id_required');
     }
     return this.subscriptionsService.updatePlan({ id, dto, adminUser: admin });
   }

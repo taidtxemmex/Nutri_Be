@@ -44,15 +44,11 @@ export interface DishImportResult {
 
 export type DishExportColumn = ExcelExportColumn;
 
-export function normalizeVietnameseNFC(str: string): string {
-  if (!str) return '';
-  return str.normalize('NFC').trim();
-}
-
-export function normalizeDishKey(str: string): string {
-  if (!str) return '';
-  return str.normalize('NFC').replace(/\s+/g, ' ').trim().toLowerCase();
-}
+import {
+  normalizeVietnameseNFC,
+  normalizeVietnameseKey as normalizeDishKey,
+} from '../../../common/utils/string.util';
+export { normalizeVietnameseNFC, normalizeDishKey };
 
 export const DEFAULT_DISH_EXPORT_KEYS: string[] = [
   'energy',
